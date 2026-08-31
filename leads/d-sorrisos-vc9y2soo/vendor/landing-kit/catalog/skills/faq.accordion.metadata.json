@@ -1,0 +1,16 @@
+{
+  "id": "faq.accordion",
+  "name": "FAQ accordion",
+  "description": "Perguntas respondíveis só com fatos do brief",
+  "good_for": [
+    "services",
+    "clinics"
+  ],
+  "avoid_for": [
+    "no_description"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "items": true
+  }
+}

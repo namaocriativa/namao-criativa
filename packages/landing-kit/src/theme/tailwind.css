@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@source "../**/*.{ts,tsx}";
+
+@theme {
+  --color-ink: var(--ink, #142033);
+  --color-paper: var(--paper, #eef2f4);
+  --color-accent: var(--accent, #1f6b5c);
+  --color-muted: var(--muted, #5b6b7c);
+  --color-surface: var(--surface, #ffffff);
+  --font-display: var(--font-display, Georgia, serif);
+  --font-body: var(--font-body, system-ui, sans-serif);
+  --radius-lk: var(--radius, 0.28rem);
+  --ease-cinematic: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-cinematic: 0.8s;
+}

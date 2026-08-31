@@ -1,0 +1,17 @@
+{
+  "id": "contact.form",
+  "name": "Contact form",
+  "description": "Contatos reais do brief (tel, WhatsApp, e-mail, mapa) — sem backend de form",
+  "good_for": [
+    "local_services"
+  ],
+  "avoid_for": [
+    "no_contacts"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "links": true,
+    "address": true,
+    "cta": true
+  }
+}

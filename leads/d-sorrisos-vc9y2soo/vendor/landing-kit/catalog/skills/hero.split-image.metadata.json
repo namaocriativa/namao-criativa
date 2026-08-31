@@ -1,0 +1,21 @@
+{
+  "id": "hero.split-image",
+  "name": "Hero split image",
+  "description": "Texto à esquerda e foto da empresa à direita",
+  "good_for": [
+    "companies",
+    "restaurants",
+    "real_estate",
+    "services"
+  ],
+  "avoid_for": [
+    "no_photos"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "image": true,
+    "headline": true,
+    "description": true,
+    "cta": true
+  }
+}

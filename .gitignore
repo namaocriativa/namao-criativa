@@ -1,0 +1,86 @@
+# dependencies and build
+node_modules
+dist
+build
+coverage
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+.nyc_output
+
+# IDEs and editors
+.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# Prisma Mongo client gerado no runtime
+services/runtime/src/generated
+
+# SQLite
+services/platform/prisma/dev.db
+services/platform/prisma/dev.db-journal
+services/platform/prisma/*.db
+services/platform/prisma/*.db-journal
+
+# Local lead images (keep folder structure)
+services/platform/storage/leads/**
+!services/platform/storage/leads/.gitkeep
+!services/platform/storage/.gitkeep
+
+# Landing projects — versionar fontes de exemplo; nunca deps/build
+leads/*/node_modules/
+leads/*/dist/
+leads/*/.landing-pipeline/
+leads/*/.vercel/
+leads/*/.scaffold-ok
+
+# Crawl4AI Python venv
+.venv
+services/platform/crawler/.venv
+
+# temp directory
+.temp
+.tmp
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Coolify IaC secrets + local state
+cloud/.env
+cloud/state.json
+cloud/config/stack.json

@@ -1,0 +1,22 @@
+{
+  "project_name": "namao",
+  "environment_name": "production",
+  "server_name": "localhost",
+  "runtime": {
+    "name": "namao-runtime",
+    "image_name": "ghcr.io/YOUR_ORG/namao-runtime",
+    "image_tag": "latest",
+    "ports_exposes": "3001",
+    "health_check_path": "/health",
+    "domain": ""
+  },
+  "mongodb": {
+    "name": "namao-mongodb",
+    "database": "namao"
+  },
+  "evolution": {
+    "name": "namao-evolution",
+    "instance": "namao",
+    "domain": ""
+  }
+}

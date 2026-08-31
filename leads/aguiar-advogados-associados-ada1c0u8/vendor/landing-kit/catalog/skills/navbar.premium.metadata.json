@@ -1,0 +1,19 @@
+{
+  "id": "navbar.premium",
+  "name": "Navbar premium",
+  "description": "Header alto com marca, links espaçados e CTA destacado",
+  "good_for": [
+    "luxury",
+    "real_estate",
+    "agencies"
+  ],
+  "avoid_for": [
+    "tiny_brands_without_logo"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "logo": true,
+    "nav": true,
+    "cta": true
+  }
+}

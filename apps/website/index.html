@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Namão Criativa</title>
+    <meta
+      name="description"
+      content="Namão Criativa — marketing, software, chatbots e inteligência artificial."
+    />
+    <link rel="icon" type="image/png" href="/logo-icon.png" />
+    <link rel="apple-touch-icon" href="/logo-icon.png" />
+    <meta name="theme-color" content="#050505" />
+    <meta property="og:title" content="Namão Criativa" />
+    <meta
+      property="og:description"
+      content="Namão Criativa — marketing, software, chatbots e inteligência artificial."
+    />
+    <meta property="og:image" content="/logo.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Figtree:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="site-nav">
+      <a class="nav-brand" href="/">
+        <img src="/logo-icon.png" alt="" width="40" height="40" decoding="async" />
+        <span>Namão</span>
+      </a>
+      <nav>
+        <a href="#oferta">Oferta</a>
+        <a href="#clientes">Clientes</a>
+        <a href="/login.html">Entrar</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="topo">
+        <video
+          class="hero-video"
+          src="/hero.mp4"
+          muted
+          autoplay
+          loop
+          playsinline
+          preload="metadata"
+        ></video>
+        <canvas id="hero-webgl" class="hero-webgl" aria-hidden="true"></canvas>
+        <div class="hero-veil" aria-hidden="true"></div>
+        <div class="hero-inner">
+          <p class="kicker">Agência digital</p>
+          <p class="brand-mark">Namão Criativa</p>
+          <h1>Presença digital com inteligência.</h1>
+          <p class="lede">
+            Marketing, software, chatbots e AI para negócios que querem
+            crescer com clareza.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="/register.html">Criar conta</a>
+            <a class="btn btn-ghost" href="/login.html">Já tenho acesso</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="oferta" class="offer">
+        <div class="offer-copy">
+          <p class="kicker">O que fazemos</p>
+          <h2>Quatro frentes, um time.</h2>
+          <p class="offer-lead">
+            Unimos comunicação, produto e automação para o seu negócio aparecer
+            melhor e atender melhor.
+          </p>
+          <ul class="offer-list">
+            <li>
+              <span class="offer-index">01</span>
+              <div>
+                <strong>Marketing</strong>
+                <span>Posicionamento, conteúdo e presença digital.</span>
+              </div>
+            </li>
+            <li>
+              <span class="offer-index">02</span>
+              <div>
+                <strong>Software</strong>
+                <span>Sites, sistemas e ferramentas sob medida.</span>
+              </div>
+            </li>
+            <li>
+              <span class="offer-index">03</span>
+              <div>
+                <strong>Chatbots</strong>
+                <span>Atendimento e captação no WhatsApp e na web.</span>
+              </div>
+            </li>
+            <li>
+              <span class="offer-index">04</span>
+              <div>
+                <strong>AI</strong>
+                <span>Automação e geração com dados reais do seu negócio.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="offer-stage" aria-hidden="true">
+          <canvas id="offer-webgl"></canvas>
+        </div>
+      </section>
+
+      <section id="clientes" class="clients">
+        <div class="clients-head">
+          <p class="kicker">Clientes</p>
+          <h2>Quem já constrói com a gente.</h2>
+        </div>
+        <ul class="clients-list">
+          <li>
+            <a class="clients-name" href="https://paulinhocabelos.vercel.app/" target="_blank" rel="noopener noreferrer">Paulinho Cabelos</a>
+            <span class="clients-meta">Beleza · Leme/SP</span>
+          </li>
+          <li>
+            <a class="clients-name" href="https://www.maluna.com.br/" target="_blank" rel="noopener noreferrer">Maluna</a>
+            <span class="clients-meta">Piscinas · Leme/SP</span>
+          </li>
+          <li class="is-next">
+            <span class="clients-name">O seu negócio</span>
+            <span class="clients-meta">Próximo</span>
+          </li>
+        </ul>
+        <div class="clients-marquee" aria-hidden="true">
+          <div class="clients-marquee-track">
+            <div class="clients-marquee-group">
+              <span>Paulinho Cabelos</span>
+              <span>Maluna</span>
+              <span>Paulinho Cabelos</span>
+              <span>Maluna</span>
+            </div>
+            <div class="clients-marquee-group">
+              <span>Paulinho Cabelos</span>
+              <span>Maluna</span>
+              <span>Paulinho Cabelos</span>
+              <span>Maluna</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="invite">
+        <p class="kicker">Como começa</p>
+        <h2>Pedir um convite.</h2>
+        <p>
+          Conte quem você é e o Instagram do negócio. Se o perfil fizer
+          sentido, enviamos o link para cadastro e autorização — só com a
+          sua permissão.
+        </p>
+        <button type="button" class="btn btn-primary" id="invite-open">
+          Pedir um Convite
+        </button>
+      </section>
+    </main>
+
+    <dialog class="invite-dialog" id="invite-dialog" aria-labelledby="invite-dialog-title">
+      <button type="button" class="text-btn invite-dialog-close" id="invite-close" aria-label="Fechar">
+        ×
+      </button>
+      <p class="kicker">Convite</p>
+      <h2 id="invite-dialog-title">Pedir um convite</h2>
+      <p class="lede">Nome, e-mail e o Instagram do negócio.</p>
+      <form id="invite-form">
+        <label>Nome da pessoa <input name="name" required autocomplete="name" maxlength="120" /></label>
+        <label>E-mail <input name="email" type="email" required autocomplete="email" maxlength="254" /></label>
+        <label>Instagram do negócio <input name="instagram" required autocomplete="username" placeholder="@seu.negocio" maxlength="80" /></label>
+        <button type="submit">Enviar pedido</button>
+      </form>
+      <p class="status" id="invite-status" role="status"></p>
+    </dialog>
+
+    <footer class="site-footer">
+      <p class="footer-mark">
+        <img
+          src="/logo-icon-with-effects.png"
+          alt=""
+          width="1536"
+          height="1024"
+          decoding="async"
+        />
+        <span>Namão Criativa</span>
+      </p>
+      <div class="footer-meta">
+        <p>Namão Criativa</p>
+        <p>Marketing · software · chatbots · AI</p>
+      </div>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

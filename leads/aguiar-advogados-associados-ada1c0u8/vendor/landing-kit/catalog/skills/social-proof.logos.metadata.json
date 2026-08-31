@@ -1,0 +1,16 @@
+{
+  "id": "social-proof.logos",
+  "name": "Social proof logos",
+  "description": "Faixa de logos (somente se existirem no brief)",
+  "good_for": [
+    "b2b",
+    "agencies"
+  ],
+  "avoid_for": [
+    "no_partner_logos"
+  ],
+  "visual_weight": "low",
+  "props": {
+    "logos": true
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "features.cards",
+  "name": "Features cards",
+  "description": "Grade de cards com os serviços exatamente como no brief",
+  "good_for": [
+    "services",
+    "clinics"
+  ],
+  "avoid_for": [
+    "single_service"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "items": true
+  }
+}

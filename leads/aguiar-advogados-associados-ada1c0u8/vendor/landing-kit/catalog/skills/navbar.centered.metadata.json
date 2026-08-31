@@ -1,0 +1,19 @@
+{
+  "id": "navbar.centered",
+  "name": "Navbar centered",
+  "description": "Marca centralizada, navegação simétrica",
+  "good_for": [
+    "restaurants",
+    "lifestyle",
+    "editorial"
+  ],
+  "avoid_for": [
+    "many_nav_links"
+  ],
+  "visual_weight": "low",
+  "props": {
+    "logo": true,
+    "nav": true,
+    "cta": true
+  }
+}

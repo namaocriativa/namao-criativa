@@ -1,0 +1,20 @@
+{
+  "id": "hero.centered",
+  "name": "Hero centered",
+  "description": "Hero centralizado com título dominante e foto opcional abaixo",
+  "good_for": [
+    "consulting",
+    "studios",
+    "minimal"
+  ],
+  "avoid_for": [
+    "product_catalog"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "image": true,
+    "headline": true,
+    "description": true,
+    "cta": true
+  }
+}

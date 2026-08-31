@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Painel — Namão Criativa</title>
+    <link rel="icon" type="image/png" href="/logo-icon.png" />
+    <link rel="apple-touch-icon" href="/logo-icon.png" />
+    <meta name="theme-color" content="#050505" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Figtree:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="auth-body">
+    <header class="site-nav">
+      <a class="nav-brand" href="/">
+        <img src="/logo-icon.png" alt="" width="40" height="40" decoding="async" />
+        <span>Namão</span>
+      </a>
+      <nav>
+        <a href="/conectar.html">Instagram</a>
+        <button type="button" class="text-btn" id="logout-btn">Sair</button>
+      </nav>
+    </header>
+    <main class="dash-main">
+      <p class="kicker">Área do cliente</p>
+      <h1 id="dash-title">Painel</h1>
+      <p class="lede" id="user-line">Carregando…</p>
+      <section class="dash-grid" id="dash-grid" hidden>
+        <article class="dash-card">
+          <p class="kicker">Negócio</p>
+          <h2 id="dash-business-name">—</h2>
+          <p id="dash-category" class="dash-meta"></p>
+          <p id="dash-description"></p>
+        </article>
+        <article class="dash-card">
+          <p class="kicker">Contato</p>
+          <dl id="dash-contact" class="dash-dl"></dl>
+        </article>
+        <article class="dash-card">
+          <p class="kicker">Presença</p>
+          <dl id="dash-presence" class="dash-dl"></dl>
+        </article>
+      </section>
+      <p class="status" id="dash-status"></p>
+    </main>
+    <script type="module" src="/src/dashboard.ts"></script>
+  </body>
+</html>

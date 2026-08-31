@@ -1,0 +1,18 @@
+{
+  "id": "content.block",
+  "name": "Content block",
+  "description": "Bloco fechado para seção custom (título, texto, lista, CTA)",
+  "good_for": [
+    "custom"
+  ],
+  "avoid_for": [
+    "free_html"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "title": true,
+    "body": true,
+    "items": true,
+    "cta": true
+  }
+}

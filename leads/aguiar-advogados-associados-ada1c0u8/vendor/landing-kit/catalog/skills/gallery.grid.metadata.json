@@ -1,0 +1,17 @@
+{
+  "id": "gallery.grid",
+  "name": "Gallery grid",
+  "description": "Grade uniforme de fotos reais",
+  "good_for": [
+    "restaurants",
+    "venues",
+    "retail"
+  ],
+  "avoid_for": [
+    "no_photos"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "images": true
+  }
+}

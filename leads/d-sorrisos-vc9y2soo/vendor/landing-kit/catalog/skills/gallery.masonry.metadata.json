@@ -1,0 +1,17 @@
+{
+  "id": "gallery.masonry",
+  "name": "Gallery masonry",
+  "description": "Galeria masonry com fotos reais",
+  "good_for": [
+    "creative",
+    "architecture",
+    "editorial"
+  ],
+  "avoid_for": [
+    "few_photos"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "images": true
+  }
+}

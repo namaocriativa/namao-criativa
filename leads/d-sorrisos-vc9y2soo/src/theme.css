@@ -1,0 +1,13 @@
+:root {
+  --ink: #0f1c2e;
+  --paper: #f2f5f8;
+  --accent: #c45c4a;
+  --muted: #5a6a7a;
+  --surface: #ffffff;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Source Sans 3", system-ui, sans-serif;
+  --container: 1080px;
+  --section-space: 3rem 0;
+  --radius: 0.85rem;
+  --density: medium;
+}

@@ -1,0 +1,16 @@
+{
+  "id": "footer.premium",
+  "name": "Footer premium",
+  "description": "Rodapé com marca, âncoras e links de contato reais",
+  "good_for": [
+    "premium",
+    "corporate"
+  ],
+  "avoid_for": [],
+  "visual_weight": "low",
+  "props": {
+    "brand": true,
+    "nav": true,
+    "links": true
+  }
+}

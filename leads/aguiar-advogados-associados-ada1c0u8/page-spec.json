@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "theme": {
+    "style": "premium",
+    "visualLanguage": "minimal editorial",
+    "colorStrategy": "neutro com acento quente",
+    "imageStrategy": "large-photography",
+    "density": "low",
+    "radius": "large",
+    "spacing": "generous",
+    "paletteId": "slate-teal",
+    "fontPairId": "fraunces-source",
+    "animation": "cinematic"
+  },
+  "sections": [
+    {
+      "id": "header",
+      "type": "header",
+      "component": "navbar.minimal",
+      "purpose": "Barra fixa com marca/logo, âncoras das demais seções e o CTA principal se houver contato.",
+      "props": {
+        "brand": "Aguiar Advogados Associados",
+        "logo": "/images/image-11-d414c39a.png",
+        "nav": [
+          {
+            "label": "Hero",
+            "href": "#hero"
+          },
+          {
+            "label": "Serviços",
+            "href": "#services"
+          },
+          {
+            "label": "Sobre",
+            "href": "#about"
+          },
+          {
+            "label": "Galeria",
+            "href": "#gallery"
+          },
+          {
+            "label": "Contato",
+            "href": "#contact"
+          }
+        ],
+        "cta": {
+          "label": "Contato",
+          "href": "https://wa.me/1935413505"
+        }
+      }
+    },
+    {
+      "id": "hero",
+      "type": "hero",
+      "component": "hero.immersive",
+      "purpose": "Abertura dominante com o nome do negócio, local/categoria, foto real e um CTA. Sem slogans inventados.",
+      "props": {
+        "eyebrow": "",
+        "headline": "Aguiar Advogados Associados - Araras, SP",
+        "description": "",
+        "image": "/images/image-01-01a39fe5.png",
+        "cta": {
+          "label": "Contato",
+          "href": "https://wa.me/1935413505"
+        },
+        "mode": "particles"
+      }
+    },
+    {
+      "id": "services",
+      "type": "services",
+      "component": "features.cards",
+      "purpose": "Grade com os serviços exatamente como estão no brief. Uma ideia por card.",
+      "props": {
+        "title": "Serviços",
+        "subtitle": "",
+        "items": []
+      }
+    },
+    {
+      "id": "about",
+      "type": "about",
+      "component": "about.split",
+      "purpose": "Texto institucional a partir da description/rating do brief. Sem números inventados.",
+      "props": {
+        "title": "Sobre",
+        "body": "Aguiar Advogados Associados é uma prestigiada empresa de advocacia localizada em Araras, SP. Fundada com o objetivo de fornecer serviços jurídicos excepcionais aos seus clientes, a Aguiar Advogados Associados se destaca pela sua equipe altamente qualificada e comprometida com a excelência no atendimento."
+      }
+    },
+    {
+      "id": "gallery",
+      "type": "gallery",
+      "component": "gallery.masonry",
+      "purpose": "Fotos reais do brief em grade. Sem stock e sem imagens fora do catálogo.",
+      "props": {
+        "title": "Galeria",
+        "images": [
+          "/images/image-01-01a39fe5.png",
+          "/images/image-02-a89ba2f9.jpg",
+          "/images/image-03-fe6589c9.jpg",
+          "/images/image-04-30fcf0ca.jpg",
+          "/images/image-05-80bfd752.png",
+          "/images/image-06-70125e15.png",
+          "/images/image-07-d3b22ece.png",
+          "/images/image-08-0b8615d4.jpg",
+          "/images/image-09-973e0111.png",
+          "/images/image-10-0dfea850.png",
+          "/images/image-12-c3a25342.jpg",
+          "/images/image-13-5bf7f04a.jpg",
+          "/images/image-14-ce8b2b19.jpg",
+          "/images/image-15-3c58f937.jpg"
+        ]
+      }
+    },
+    {
+      "id": "contact",
+      "type": "contact",
+      "component": "contact.form",
+      "purpose": "Telefone, WhatsApp, e-mail, endereço e mapa — somente o que existir no brief.",
+      "props": {
+        "title": "Contato",
+        "subtitle": "",
+        "links": [
+          {
+            "label": "(19) 3541-3505",
+            "href": "tel:(19)3541-3505"
+          },
+          {
+            "label": "WhatsApp",
+            "href": "https://wa.me/1935413505"
+          },
+          {
+            "label": "aguiar@aguiaradvogadosassociados.com.br",
+            "href": "mailto:aguiar@aguiaradvogadosassociados.com.br"
+          },
+          {
+            "label": "Ver no mapa",
+            "href": "https://www.google.com/maps/search/?api=1&query=-22.3381123,-47.3838497"
+          }
+        ],
+        "address": "Aguiar Advogados Associados, 1251, Avenida Maria Aparecida Muniz Michielin, Jardim Santa Rosa, Chácara Municipal, Jardim Alto das Araras, Araras, São Paulo, Região Sudeste, 13604-230, Brasil",
+        "cta": {
+          "label": "WhatsApp",
+          "href": "https://wa.me/1935413505"
+        }
+      }
+    },
+    {
+      "id": "footer",
+      "type": "footer",
+      "component": "footer.premium",
+      "purpose": "Rodapé mínimo com nome e cidade. Sem links inventados.",
+      "props": {
+        "brand": "Aguiar Advogados Associados",
+        "location": "Araras, SP",
+        "nav": [
+          {
+            "label": "Hero",
+            "href": "#hero"
+          },
+          {
+            "label": "Serviços",
+            "href": "#services"
+          },
+          {
+            "label": "Sobre",
+            "href": "#about"
+          },
+          {
+            "label": "Galeria",
+            "href": "#gallery"
+          },
+          {
+            "label": "Contato",
+            "href": "#contact"
+          }
+        ],
+        "links": [
+          {
+            "label": "(19) 3541-3505",
+            "href": "tel:(19)3541-3505"
+          },
+          {
+            "label": "WhatsApp",
+            "href": "https://wa.me/1935413505"
+          },
+          {
+            "label": "aguiar@aguiaradvogadosassociados.com.br",
+            "href": "mailto:aguiar@aguiaradvogadosassociados.com.br"
+          },
+          {
+            "label": "Ver no mapa",
+            "href": "https://www.google.com/maps/search/?api=1&query=-22.3381123,-47.3838497"
+          }
+        ]
+      }
+    }
+  ],
+  "overlays": [
+    {
+      "component": "scroll-progress",
+      "html": "<div data-ui-scroll-progress aria-hidden=\"true\" data-position=\"top\" data-smooth=\"true\" style=\"--ui-sp-height: 8px; --ui-sp-color: var(--bone, #c4b59a); --ui-sp-track: transparent; --ui-sp-z: 60\"><span></span></div>",
+      "css": "[data-ui-scroll-progress] {\n  position: fixed;\n  left: 0;\n  right: 0;\n  height: var(--ui-sp-height, 2px);\n  background: var(--ui-sp-track, transparent);\n  z-index: var(--ui-sp-z, 60);\n  pointer-events: none;\n}\n\n[data-ui-scroll-progress][data-position=\"top\"] {\n  top: 0;\n}\n\n[data-ui-scroll-progress][data-position=\"bottom\"] {\n  bottom: 0;\n}\n\n[data-ui-scroll-progress] > span {\n  display: block;\n  height: 100%;\n  width: 100%;\n  background: var(--ui-sp-color, #c4b59a);\n  transform: scaleX(0);\n  transform-origin: left center;\n  will-change: transform;\n}\n\n[data-ui-scroll-progress][data-smooth=\"true\"] > span {\n  transition: transform 0.12s linear;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  [data-ui-scroll-progress] > span {\n    transition: none;\n  }\n}",
+      "js": "(function () {\n  var root = document.querySelector('[data-ui-scroll-progress]');\n  if (!root) return;\n  var bar = root.firstElementChild;\n  if (!bar) return;\n\n  var frame = 0;\n  function paint() {\n    frame = 0;\n    var max = document.documentElement.scrollHeight - window.innerHeight;\n    var ratio = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;\n    bar.style.transform = 'scaleX(' + ratio + ')';\n  }\n  function schedule() {\n    if (!frame) frame = window.requestAnimationFrame(paint);\n  }\n\n  window.addEventListener('scroll', schedule, { passive: true });\n  window.addEventListener('resize', schedule);\n  paint();\n})();",
+      "props": {
+        "color": "#c4b59a",
+        "cssVariable": "--bone",
+        "trackColor": "transparent",
+        "height": 8,
+        "zIndex": 60,
+        "position": "top",
+        "smooth": true
+      }
+    }
+  ]
+}

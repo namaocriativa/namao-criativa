@@ -1,0 +1,17 @@
+{
+  "id": "testimonials.quotes",
+  "name": "Testimonials quotes",
+  "description": "Citação grande apenas se houver quote real no brief; senão só rating",
+  "good_for": [
+    "agencies"
+  ],
+  "avoid_for": [
+    "no_rating",
+    "invented_quotes"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "rating": true,
+    "quotes": true
+  }
+}

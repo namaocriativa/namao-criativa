@@ -1,0 +1,17 @@
+{
+  "id": "features.alternating",
+  "name": "Features alternating",
+  "description": "Lista alternada de serviços, um por linha",
+  "good_for": [
+    "professional",
+    "legal",
+    "consulting"
+  ],
+  "avoid_for": [
+    "many_short_items"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "items": true
+  }
+}

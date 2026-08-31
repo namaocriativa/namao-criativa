@@ -1,0 +1,19 @@
+{
+  "id": "navbar.minimal",
+  "name": "Navbar minimal",
+  "description": "Barra sticky com marca à esquerda e links + CTA à direita",
+  "good_for": [
+    "services",
+    "professional",
+    "b2b"
+  ],
+  "avoid_for": [
+    "very_long_nav"
+  ],
+  "visual_weight": "low",
+  "props": {
+    "logo": true,
+    "nav": true,
+    "cta": true
+  }
+}

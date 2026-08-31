@@ -1,0 +1,17 @@
+{
+  "id": "cta.split",
+  "name": "CTA split",
+  "description": "CTA em duas colunas com texto e ação",
+  "good_for": [
+    "premium",
+    "services"
+  ],
+  "avoid_for": [
+    "no_contacts"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "cta": true,
+    "image": true
+  }
+}

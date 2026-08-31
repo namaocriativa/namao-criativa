@@ -1,0 +1,20 @@
+{
+  "id": "hero.gradient",
+  "name": "Hero gradient",
+  "description": "Abertura tipográfica sobre degradê da marca, foto opcional",
+  "good_for": [
+    "b2b",
+    "no_photos",
+    "professional"
+  ],
+  "avoid_for": [
+    "photography_first"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "image": false,
+    "headline": true,
+    "description": true,
+    "cta": true
+  }
+}

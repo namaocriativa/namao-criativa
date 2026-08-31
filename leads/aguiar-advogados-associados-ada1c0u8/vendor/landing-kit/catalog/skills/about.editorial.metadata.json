@@ -1,0 +1,16 @@
+{
+  "id": "about.editorial",
+  "name": "About editorial",
+  "description": "Bloco editorial de texto com tipografia forte",
+  "good_for": [
+    "professional",
+    "luxury"
+  ],
+  "avoid_for": [
+    "very_long_content"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "body": true
+  }
+}

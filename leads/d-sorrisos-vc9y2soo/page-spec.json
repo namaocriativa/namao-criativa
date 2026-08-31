@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "theme": {
+    "style": "modern",
+    "visualLanguage": "profissional, mobile-first",
+    "colorStrategy": "catálogo fixo do design system",
+    "imageStrategy": "minimal",
+    "density": "medium",
+    "radius": "large",
+    "spacing": "compact",
+    "paletteId": "navy-coral",
+    "fontPairId": "fraunces-source",
+    "animation": "cinematic"
+  },
+  "sections": [
+    {
+      "id": "header",
+      "type": "header",
+      "component": "navbar.minimal",
+      "purpose": "Barra fixa com marca/logo, âncoras das demais seções e o CTA principal se houver contato.",
+      "props": {
+        "brand": "D+ Sorrisos",
+        "nav": [
+          {
+            "label": "Hero",
+            "href": "#hero"
+          },
+          {
+            "label": "Serviços",
+            "href": "#services"
+          },
+          {
+            "label": "Sobre",
+            "href": "#about"
+          },
+          {
+            "label": "Galeria",
+            "href": "#gallery"
+          },
+          {
+            "label": "Contato",
+            "href": "#contact"
+          }
+        ],
+        "cta": {
+          "label": "WhatsApp",
+          "href": "https://wa.me/551935547512"
+        }
+      }
+    },
+    {
+      "id": "hero",
+      "type": "hero",
+      "component": "hero.marketing",
+      "purpose": "Abertura dominante com o nome do negócio, local/categoria, foto real e um CTA. Sem slogans inventados.",
+      "props": {
+        "eyebrow": "",
+        "headline": "D+ Sorrisos",
+        "description": "",
+        "cta": {
+          "label": "WhatsApp",
+          "href": "https://wa.me/551935547512"
+        },
+        "footnote": "Atendimento em Leme."
+      }
+    },
+    {
+      "id": "services",
+      "type": "services",
+      "component": "features.cards",
+      "purpose": "Grade com os serviços exatamente como estão no brief. Uma ideia por card.",
+      "props": {
+        "title": "Serviços",
+        "subtitle": "",
+        "items": []
+      }
+    },
+    {
+      "id": "about",
+      "type": "about",
+      "component": "about.editorial",
+      "purpose": "Texto institucional a partir da description/rating do brief. Sem números inventados.",
+      "props": {
+        "title": "Sobre",
+        "body": "D+ Sorrisos é uma empresa profissional especializada em oferecer soluções de sorriso e bem-estar. Com uma abordagem moderna e focada no cliente, a nossa equipe trabalha para proporcionar serviços excepcionais que atendam às necessidades individuais de cada um de nossos clientes."
+      }
+    },
+    {
+      "id": "gallery",
+      "type": "gallery",
+      "component": "gallery.grid",
+      "purpose": "Fotos reais do brief em grade. Sem stock e sem imagens fora do catálogo.",
+      "props": {
+        "title": "Galeria",
+        "images": []
+      }
+    },
+    {
+      "id": "contact",
+      "type": "contact",
+      "component": "contact.form",
+      "purpose": "Telefone, WhatsApp, e-mail, endereço e mapa — somente o que existir no brief.",
+      "props": {
+        "title": "Contato",
+        "subtitle": "",
+        "links": [
+          {
+            "label": "+55 19 3554 7512",
+            "href": "tel:+551935547512"
+          },
+          {
+            "label": "WhatsApp",
+            "href": "https://wa.me/551935547512"
+          },
+          {
+            "label": "Ver no mapa",
+            "href": "https://www.google.com/maps/search/?api=1&query=-22.1846247,-47.3881926"
+          }
+        ],
+        "address": "D+ Sorrisos, 581, Rua Rafael de Barros, Centro, Leme, São Paulo, Região Sudeste, 13610-200, Brasil",
+        "cta": {
+          "label": "WhatsApp",
+          "href": "https://wa.me/551935547512"
+        }
+      }
+    },
+    {
+      "id": "footer",
+      "type": "footer",
+      "component": "footer.minimal",
+      "purpose": "Rodapé mínimo com nome e cidade. Sem links inventados.",
+      "props": {
+        "brand": "D+ Sorrisos",
+        "location": "Leme, SP",
+        "nav": [
+          {
+            "label": "Hero",
+            "href": "#hero"
+          },
+          {
+            "label": "Serviços",
+            "href": "#services"
+          },
+          {
+            "label": "Sobre",
+            "href": "#about"
+          },
+          {
+            "label": "Galeria",
+            "href": "#gallery"
+          },
+          {
+            "label": "Contato",
+            "href": "#contact"
+          }
+        ],
+        "links": [
+          {
+            "label": "+55 19 3554 7512",
+            "href": "tel:+551935547512"
+          },
+          {
+            "label": "WhatsApp",
+            "href": "https://wa.me/551935547512"
+          },
+          {
+            "label": "Ver no mapa",
+            "href": "https://www.google.com/maps/search/?api=1&query=-22.1846247,-47.3881926"
+          }
+        ]
+      }
+    }
+  ],
+  "overlays": [
+    {
+      "component": "scroll-progress",
+      "html": "<div data-ui-scroll-progress aria-hidden=\"true\" data-position=\"top\" data-smooth=\"true\" style=\"--ui-sp-height: 8px; --ui-sp-color: var(--bone, #c4b59a); --ui-sp-track: transparent; --ui-sp-z: 60\"><span></span></div>",
+      "css": "[data-ui-scroll-progress] {\n  position: fixed;\n  left: 0;\n  right: 0;\n  height: var(--ui-sp-height, 2px);\n  background: var(--ui-sp-track, transparent);\n  z-index: var(--ui-sp-z, 60);\n  pointer-events: none;\n}\n\n[data-ui-scroll-progress][data-position=\"top\"] {\n  top: 0;\n}\n\n[data-ui-scroll-progress][data-position=\"bottom\"] {\n  bottom: 0;\n}\n\n[data-ui-scroll-progress] > span {\n  display: block;\n  height: 100%;\n  width: 100%;\n  background: var(--ui-sp-color, #c4b59a);\n  transform: scaleX(0);\n  transform-origin: left center;\n  will-change: transform;\n}\n\n[data-ui-scroll-progress][data-smooth=\"true\"] > span {\n  transition: transform 0.12s linear;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  [data-ui-scroll-progress] > span {\n    transition: none;\n  }\n}",
+      "js": "(function () {\n  var root = document.querySelector('[data-ui-scroll-progress]');\n  if (!root) return;\n  var bar = root.firstElementChild;\n  if (!bar) return;\n\n  var frame = 0;\n  function paint() {\n    frame = 0;\n    var max = document.documentElement.scrollHeight - window.innerHeight;\n    var ratio = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;\n    bar.style.transform = 'scaleX(' + ratio + ')';\n  }\n  function schedule() {\n    if (!frame) frame = window.requestAnimationFrame(paint);\n  }\n\n  window.addEventListener('scroll', schedule, { passive: true });\n  window.addEventListener('resize', schedule);\n  paint();\n})();",
+      "props": {
+        "color": "#c4b59a",
+        "cssVariable": "--bone",
+        "trackColor": "transparent",
+        "height": 8,
+        "zIndex": 60,
+        "position": "top",
+        "smooth": true
+      }
+    }
+  ],
+  "features": [
+    {
+      "id": "features.ai-chat",
+      "props": {
+        "position": "bottom-right",
+        "suggestions": [
+          "Horários",
+          "Serviços",
+          "Como chegar"
+        ],
+        "cta": {
+          "whatsapp": "https://wa.me/551935547512"
+        }
+      }
+    }
+  ]
+}

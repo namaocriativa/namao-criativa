@@ -1,0 +1,15 @@
+{
+  "id": "cta.banner",
+  "name": "CTA banner",
+  "description": "Faixa de conversão com CTA do brief",
+  "good_for": [
+    "all"
+  ],
+  "avoid_for": [
+    "no_contacts"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "cta": true
+  }
+}

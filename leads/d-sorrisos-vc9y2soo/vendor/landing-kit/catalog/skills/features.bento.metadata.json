@@ -1,0 +1,17 @@
+{
+  "id": "features.bento",
+  "name": "Features bento",
+  "description": "Mosaico bento assimétrico para serviços",
+  "good_for": [
+    "agencies",
+    "premium",
+    "studios"
+  ],
+  "avoid_for": [
+    "very_long_service_names"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "items": true
+  }
+}

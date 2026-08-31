@@ -1,0 +1,17 @@
+{
+  "id": "about.split",
+  "name": "About split",
+  "description": "Texto institucional + foto ao lado",
+  "good_for": [
+    "companies",
+    "clinics"
+  ],
+  "avoid_for": [
+    "no_description"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "body": true,
+    "image": true
+  }
+}

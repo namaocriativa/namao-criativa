@@ -1,0 +1,17 @@
+{
+  "id": "social-proof.numbers",
+  "name": "Social proof numbers",
+  "description": "Nota e quantidade de avaliações reais, sem depoimentos",
+  "good_for": [
+    "local_services",
+    "restaurants"
+  ],
+  "avoid_for": [
+    "no_rating"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "rating": true,
+    "reviewCount": true
+  }
+}

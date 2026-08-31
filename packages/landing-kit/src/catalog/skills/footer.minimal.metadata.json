@@ -1,0 +1,13 @@
+{
+  "id": "footer.minimal",
+  "name": "Footer minimal",
+  "description": "Rodapé curto com nome e cidade",
+  "good_for": [
+    "all"
+  ],
+  "avoid_for": [],
+  "visual_weight": "low",
+  "props": {
+    "brand": true
+  }
+}

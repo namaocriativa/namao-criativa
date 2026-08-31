@@ -1,0 +1,13 @@
+{
+  "server_uuid": "",
+  "project_uuid": "",
+  "environment_uuid": "",
+  "environment_name": "production",
+  "mongodb_service_uuid": "",
+  "evolution_service_uuid": "",
+  "runtime_application_uuid": "",
+  "mongo_password": "",
+  "evolution_postgres_password": "",
+  "evolution_api_key": "",
+  "updated_at": ""
+}

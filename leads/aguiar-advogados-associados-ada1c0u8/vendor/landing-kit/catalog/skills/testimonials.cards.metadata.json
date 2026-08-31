@@ -1,0 +1,17 @@
+{
+  "id": "testimonials.cards",
+  "name": "Testimonials cards",
+  "description": "Prova social em cards — só nota/contagem reais, sem citações inventadas",
+  "good_for": [
+    "local_services"
+  ],
+  "avoid_for": [
+    "no_rating",
+    "fake_quotes"
+  ],
+  "visual_weight": "medium",
+  "props": {
+    "rating": true,
+    "reviewCount": true
+  }
+}

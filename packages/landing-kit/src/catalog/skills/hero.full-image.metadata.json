@@ -1,0 +1,21 @@
+{
+  "id": "hero.full-image",
+  "name": "Hero full image",
+  "description": "Foto full-bleed com título sobreposto",
+  "good_for": [
+    "restaurants",
+    "hotels",
+    "venues"
+  ],
+  "avoid_for": [
+    "no_photos",
+    "low_contrast_photos"
+  ],
+  "visual_weight": "high",
+  "props": {
+    "image": true,
+    "headline": true,
+    "description": true,
+    "cta": true
+  }
+}
