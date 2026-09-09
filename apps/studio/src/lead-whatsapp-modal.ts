@@ -45,14 +45,17 @@ function escapeHtml(value: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
+import { profileApi, type EntityKind } from "./profile-api";
+
 export function initLeadWhatsAppModal(
   host: HTMLElement,
   opts?: { onSent?: () => void },
 ): {
-  open: (leadId: string) => void;
+  open: (leadId: string, kind?: EntityKind) => void;
   close: () => void;
 } {
   let leadId: string | null = null;
+  let apiKind: EntityKind = "lead";
   let busy = false;
   let view: "list" | "preview" = "list";
   let items: WhatsAppListItem[] = [];
@@ -208,7 +211,7 @@ export function initLeadWhatsAppModal(
     setBusy(true);
     setStatus("Carregando mensagens…");
     try {
-      const res = await fetch(`/leads/${encodeURIComponent(leadId)}/whatsapp`);
+      const res = await fetch(profileApi(apiKind, leadId, "/whatsapp"));
       const data = (await res.json().catch(() => ({}))) as {
         items?: WhatsAppListItem[];
         message?: string | string[];
@@ -235,7 +238,7 @@ export function initLeadWhatsAppModal(
     setStatus("Carregando prévia…");
     try {
       const res = await fetch(
-        `/leads/${encodeURIComponent(leadId)}/whatsapp/${encodeURIComponent(kind)}/preview`,
+        profileApi(apiKind, leadId, `/whatsapp/${encodeURIComponent(kind)}/preview`),
       );
       const data = (await res.json().catch(() => ({}))) as WhatsAppPreview & {
         message?: string | string[];
@@ -257,7 +260,7 @@ export function initLeadWhatsAppModal(
     setStatus("Enviando…");
     try {
       const res = await fetch(
-        `/leads/${encodeURIComponent(leadId)}/whatsapp/${encodeURIComponent(preview.id)}`,
+        profileApi(apiKind, leadId, `/whatsapp/${encodeURIComponent(preview.id)}`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -304,8 +307,9 @@ export function initLeadWhatsAppModal(
     textEl.value = "";
   }
 
-  function open(nextId: string) {
+  function open(nextId: string, kind: EntityKind = "lead") {
     leadId = nextId;
+    apiKind = kind;
     items = [];
     preview = null;
     sent = false;

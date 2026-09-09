@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { LeadModule } from '../lead/lead.module';
 import { LlmModule } from '../llm/llm.module';
 import { StorageModule } from '../storage/storage.module';
 import { LandingController } from './landing.controller';
@@ -13,7 +12,7 @@ import { ScreenshotService } from './screenshot.service';
 import { VercelService } from './vercel.service';
 
 @Module({
-  imports: [LeadModule, LlmModule, StorageModule],
+  imports: [LlmModule, StorageModule],
   controllers: [LandingController],
   providers: [
     LandingService,

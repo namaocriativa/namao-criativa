@@ -18,7 +18,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     const url = this.config.get<string>('REDIS_URL')?.trim();
     if (!url) {
-      this.logger.warn('REDIS_URL not set; discovery cache disabled');
+      this.logger.warn('REDIS_URL not set; cache and rate limit use memory/disabled');
       return;
     }
 
@@ -26,6 +26,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       maxRetriesPerRequest: 1,
       enableReadyCheck: true,
       lazyConnect: true,
+      retryStrategy: () => null,
     });
 
     redis.on('error', (err) => {
@@ -97,6 +98,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Redis SET failed: ${message}`);
       this.available = false;
+    }
+  }
+
+  async setex(key: string, ttlSec: number, value: string): Promise<boolean> {
+    if (!this.isAvailable() || !this.client) return false;
+    try {
+      await this.client.setex(key, ttlSec, value);
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Redis SETEX failed: ${message}`);
+      this.available = false;
+      return false;
     }
   }
 

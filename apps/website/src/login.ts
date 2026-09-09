@@ -1,8 +1,21 @@
 import './chrome';
+import { clearChatSession } from './chat/api';
 import { api, setSession } from './session';
+import { SIGNUP_SUCCESS } from './signup';
 
 const form = document.getElementById('login-form') as HTMLFormElement;
 const statusEl = document.getElementById('login-status') as HTMLElement;
+const emailInput = form.querySelector<HTMLInputElement>('input[name="email"]');
+const params = new URLSearchParams(location.search);
+
+if (params.get('registered') === '1') {
+  statusEl.textContent = SIGNUP_SUCCESS;
+  statusEl.classList.remove('error');
+}
+const registeredEmail = params.get('email')?.trim();
+if (registeredEmail && emailInput && !emailInput.value) {
+  emailInput.value = registeredEmail;
+}
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -18,6 +31,7 @@ form.addEventListener('submit', async (event) => {
       }),
     });
     setSession(data.accessToken);
+    clearChatSession();
     location.href = '/dashboard.html';
   } catch (error) {
     statusEl.textContent =

@@ -14,7 +14,7 @@ import {
 } from "@namao/landing-kit";
 import { listComponents } from "../ui-lib";
 import { kitComponentLabel, onComponentRename } from "../ui-lib/component-names";
-import { getWizardLeadId } from "./mount-wizard";
+import { getWizardLeadId, wizardProfileApi } from "./mount-wizard";
 import { CopywriterStep } from "./CopywriterStep";
 import { ColorsStep } from "./ColorsStep";
 import { FeaturesStep } from "./FeaturesStep";
@@ -26,6 +26,8 @@ import {
 } from "./section-catalog";
 import {
   compactSectionMedia,
+  loadWizardDraft,
+  saveWizardDraft,
   toGeneratePayload,
   wizardStateFromConfig,
   type CopywriterPayload,
@@ -82,39 +84,52 @@ function StepCheck() {
   );
 }
 
+function clampStep(value: number): number {
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.min(Math.floor(value), STEPS.length - 1);
+}
+
 export function SiteGenerateWizard({
   onChange,
   onClose,
   onConfirm,
 }: SiteGenerateWizardProps) {
-  const [step, setStep] = useState(0);
-  const [sections, setSections] = useState<LandingSectionConfig[]>(() =>
-    defaultSectionConfigs(),
-  );
-  const [locks, setLocks] = useState<VariantLocks>({});
-  const [overlays, setOverlays] = useState<string[]>([]);
-  const [features, setFeatures] = useState<string[]>([]);
-  const [mapSectionId, setMapSectionId] = useState<string | null>(null);
-  const [copywriter, setCopywriter] = useState<CopywriterPayload>({});
-  const [theme, setTheme] = useState<ThemePayload>(() => defaultThemePayload());
-  const [stockVideoBySection, setStockVideoBySection] =
-    useState<StockVideoFlags>({});
   const leadId = getWizardLeadId();
-  const [hydrated, setHydrated] = useState(!leadId);
+  const [seed] = useState(() => loadWizardDraft(leadId));
+  const [step, setStep] = useState(() => clampStep(seed?.step ?? 0));
+  const [sections, setSections] = useState<LandingSectionConfig[]>(
+    () => seed?.sections ?? defaultSectionConfigs(),
+  );
+  const [locks, setLocks] = useState<VariantLocks>(() => seed?.locks ?? {});
+  const [overlays, setOverlays] = useState<string[]>(() => seed?.overlays ?? []);
+  const [features, setFeatures] = useState<string[]>(() => seed?.features ?? []);
+  const [mapSectionId, setMapSectionId] = useState<string | null>(
+    () => seed?.mapSectionId ?? null,
+  );
+  const [copywriter, setCopywriter] = useState<CopywriterPayload>(
+    () => seed?.copywriter ?? {},
+  );
+  const [theme, setTheme] = useState<ThemePayload>(
+    () => seed?.theme ?? defaultThemePayload(),
+  );
+  const [stockVideoBySection, setStockVideoBySection] = useState<StockVideoFlags>(
+    () => seed?.stockVideoBySection ?? {},
+  );
+  const [hydrated, setHydrated] = useState(() => Boolean(seed) || !leadId);
   const [focusId, setFocusId] = useState<string | null>(
-    () => defaultSectionConfigs()[0]?.id ?? null,
+    () => seed?.focusId ?? seed?.sections[0]?.id ?? defaultSectionConfigs()[0]?.id ?? null,
   );
   const [, setNameEpoch] = useState(0);
 
   useEffect(() => onComponentRename(() => setNameEpoch((value) => value + 1)), []);
 
   useEffect(() => {
-    if (!leadId) {
+    if (seed || !leadId) {
       setHydrated(true);
       return;
     }
     let cancelled = false;
-    void fetch(`/leads/${encodeURIComponent(leadId)}`)
+    void fetch(wizardProfileApi(leadId))
       .then((res) => (res.ok ? res.json() : null))
       .then((lead: { generateConfig?: unknown } | null) => {
         if (cancelled) return;
@@ -138,7 +153,7 @@ export function SiteGenerateWizard({
     return () => {
       cancelled = true;
     };
-  }, [leadId]);
+  }, [leadId, seed]);
 
   const overlayDefs = useMemo(() => listComponents(), []);
   const mapOn = features.includes(MAP_FEATURE_ID);
@@ -178,7 +193,33 @@ export function SiteGenerateWizard({
         mapSectionId,
       ),
     );
-  }, [hydrated, sections, locks, overlays, features, stockVideoBySection, copywriter, theme, mapSectionId, onChange]);
+    saveWizardDraft(leadId, {
+      step,
+      focusId,
+      sections,
+      locks,
+      overlays,
+      features,
+      mapSectionId,
+      copywriter,
+      stockVideoBySection,
+      theme,
+    });
+  }, [
+    hydrated,
+    leadId,
+    step,
+    focusId,
+    sections,
+    locks,
+    overlays,
+    features,
+    stockVideoBySection,
+    copywriter,
+    theme,
+    mapSectionId,
+    onChange,
+  ]);
 
   useEffect(() => {
     if (!mapOn) return;

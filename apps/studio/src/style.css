@@ -561,7 +561,7 @@ main {
 
 @media (min-width: 640px) {
   .leads-toolbar {
-    grid-template-columns: minmax(0, 1.4fr) minmax(140px, 0.8fr) auto;
+    grid-template-columns: minmax(0, 1.4fr) minmax(140px, 0.7fr) minmax(150px, 0.7fr) auto;
   }
 }
 
@@ -1207,6 +1207,11 @@ select {
 .landing-badge--failed {
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.origin-badge {
+  background: #ecfeff;
+  color: #0e7490;
 }
 
 .uilib-manifest {
@@ -3073,6 +3078,17 @@ select {
   }
 }
 
+.config-env-summary {
+  margin: 0 0 0.75rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.config-env-summary.error {
+  color: var(--danger);
+}
+
 .config-status-grid {
   display: grid;
   gap: 0.75rem;
@@ -3087,6 +3103,12 @@ select {
   }
 }
 
+@media (min-width: 1100px) {
+  .config-status-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 .config-status-card {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -3094,9 +3116,64 @@ select {
   background: #f8fafc;
 }
 
+.config-status-card--ok {
+  background: var(--success-soft);
+  border-color: #a7f3d0;
+}
+
+.config-status-card--missing {
+  background: var(--danger-soft);
+  border-color: #fecaca;
+}
+
+.config-status-card--optional {
+  background: #f8fafc;
+}
+
+.config-env-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .config-status-card h3 {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.config-env-key {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.config-env-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.config-env-badge--ok {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.config-env-badge--missing {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.config-env-badge--optional {
+  background: #e5e7eb;
+  color: #4b5563;
 }
 
 .config-status-card .status {

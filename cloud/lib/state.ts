@@ -7,12 +7,14 @@ export type CloudState = {
   project_uuid: string;
   environment_uuid: string;
   environment_name: string;
-  mongodb_service_uuid: string;
+  /** @deprecated MongoDB is Atlas — kept for old state.json cleanup */
+  mongodb_service_uuid?: string;
   evolution_service_uuid: string;
   runtime_application_uuid: string;
-  mongo_password: string;
   evolution_postgres_password: string;
   evolution_api_key: string;
+  cloudflare_pages_project?: string;
+  cloudflare_pages_subdomain?: string;
   updated_at: string;
 };
 
@@ -24,10 +26,8 @@ export function emptyState(): CloudState {
     project_uuid: '',
     environment_uuid: '',
     environment_name: 'production',
-    mongodb_service_uuid: '',
     evolution_service_uuid: '',
     runtime_application_uuid: '',
-    mongo_password: '',
     evolution_postgres_password: '',
     evolution_api_key: '',
     updated_at: '',
@@ -37,12 +37,17 @@ export function emptyState(): CloudState {
 export function loadState(): CloudState {
   if (!existsSync(STATE_PATH)) return emptyState();
   const raw = JSON.parse(readFileSync(STATE_PATH, 'utf8')) as Partial<CloudState>;
-  return { ...emptyState(), ...raw };
+  const merged = { ...emptyState(), ...raw };
+  // Drop legacy Coolify Mongo fields from in-memory state
+  delete merged.mongodb_service_uuid;
+  return merged;
 }
 
 export function saveState(state: CloudState): void {
-  state.updated_at = new Date().toISOString();
-  writeFileSync(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  const toSave = { ...state };
+  delete toSave.mongodb_service_uuid;
+  toSave.updated_at = new Date().toISOString();
+  writeFileSync(STATE_PATH, `${JSON.stringify(toSave, null, 2)}\n`, 'utf8');
 }
 
 export function statePath(): string {

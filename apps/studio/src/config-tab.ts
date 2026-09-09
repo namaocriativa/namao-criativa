@@ -1,9 +1,29 @@
-type LlmProvider = "ollama" | "gemini";
 type LlmRole = "plan" | "code" | "vision" | "chat";
 
 type RoleConfig = {
-  provider: LlmProvider;
   model: string;
+};
+
+type EnvStatusItem = {
+  key: string;
+  group: string;
+  label: string;
+  required: boolean;
+  present: boolean;
+  ok: boolean;
+  hint: string;
+  value?: string;
+  detail?: string;
+};
+
+type EnvStatusPayload = {
+  items: EnvStatusItem[];
+  counts: {
+    total: number;
+    ok: number;
+    missingRequired: number;
+    missingOptional: number;
+  };
 };
 
 type LlmConfigPayload = {
@@ -13,7 +33,6 @@ type LlmConfigPayload = {
   roles?: Record<LlmRole, RoleConfig & { ok?: boolean; error?: string }>;
   stages?: Array<{ id: string; label: string; role: LlmRole }>;
   defaults?: {
-    ollama: Record<LlmRole, string>;
     gemini: Record<LlmRole, string>;
   };
   gemini?: {
@@ -22,12 +41,7 @@ type LlmConfigPayload = {
     models?: string[];
     error?: string;
   };
-  ollama?: {
-    ok?: boolean;
-    url?: string;
-    models?: string[];
-    error?: string;
-  };
+  env?: EnvStatusPayload;
 };
 
 type ModelChoice = {
@@ -56,28 +70,6 @@ const GEMINI_CATALOG: ModelChoice[] = [
   { id: "gemini-1.5-pro" },
 ];
 
-const OLLAMA_CATALOG: ModelChoice[] = [
-  {
-    id: "llama3.1:8b",
-    tags: ["recomendado"],
-    roles: ["plan", "chat"],
-  },
-  {
-    id: "qwen2.5-coder:7b",
-    tags: ["recomendado", "código"],
-    roles: ["code"],
-  },
-  {
-    id: "llava:7b",
-    tags: ["recomendado", "visão"],
-    roles: ["vision"],
-  },
-  { id: "llama3.2:3b", tags: ["leve"] },
-  { id: "qwen2.5:14b", tags: ["qualidade"] },
-  { id: "mistral:7b" },
-  { id: "llava:13b", tags: ["visão"], roles: ["vision"] },
-];
-
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
   if (!node) throw new Error(`Elemento #${id} não encontrado`);
@@ -102,38 +94,20 @@ function tagsFor(choice: ModelChoice | undefined, role: LlmRole): string[] {
   return choice.tags;
 }
 
-function catalogFor(provider: LlmProvider): ModelChoice[] {
-  return provider === "gemini" ? GEMINI_CATALOG : OLLAMA_CATALOG;
-}
-
-function liveModels(payload: LlmConfigPayload | null, provider: LlmProvider): string[] {
-  return provider === "gemini"
-    ? payload?.gemini?.models || []
-    : payload?.ollama?.models || [];
-}
-
-function findChoice(
-  provider: LlmProvider,
-  model: string,
-): ModelChoice | undefined {
-  return catalogFor(provider).find((item) => item.id === model);
+function findChoice(model: string): ModelChoice | undefined {
+  return GEMINI_CATALOG.find((item) => item.id === model);
 }
 
 export function initConfigTab(options?: { onSaved?: () => void }) {
-  const geminiStatus = el<HTMLElement>("config-gemini-status");
-  const ollamaStatus = el<HTMLElement>("config-ollama-status");
-  const vercelStatus = el<HTMLElement>("config-vercel-status");
+  const envSummary = el<HTMLElement>("config-env-summary");
+  const envGrid = el<HTMLElement>("config-env-grid");
   const saveStatus = el<HTMLElement>("config-save-status");
   const saveBtn = el<HTMLButtonElement>("config-save-btn");
   const refreshBtn = el<HTMLButtonElement>("config-refresh-btn");
   const useGeminiBtn = el<HTMLButtonElement>("config-use-gemini-btn");
-  const useOllamaBtn = el<HTMLButtonElement>("config-use-ollama-btn");
 
   let payload: LlmConfigPayload | null = null;
 
-  function providerSelect(role: LlmRole) {
-    return el<HTMLSelectElement>(`config-role-${role}-provider`);
-  }
   function modelSelect(role: LlmRole) {
     return el<HTMLSelectElement>(`config-role-${role}-model`);
   }
@@ -144,10 +118,10 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
     return document.querySelector<HTMLElement>(`[data-tags-for="${role}"]`);
   }
 
-  function renderTags(role: LlmRole, provider: LlmProvider, model: string) {
+  function renderTags(role: LlmRole, model: string) {
     const node = tagsNode(role);
     if (!node) return;
-    const tags = tagsFor(findChoice(provider, model), role);
+    const tags = tagsFor(findChoice(model), role);
     if (!tags.length || modelSelect(role).value === CUSTOM_VALUE) {
       node.hidden = true;
       node.innerHTML = "";
@@ -168,15 +142,10 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
     if (custom && focus) customInput(role).focus();
   }
 
-  function fillModelSelect(
-    role: LlmRole,
-    provider: LlmProvider,
-    selectedModel: string,
-  ) {
-    const catalog = catalogFor(provider);
-    const live = liveModels(payload, provider);
+  function fillModelSelect(role: LlmRole, selectedModel: string) {
+    const live = payload?.gemini?.models || [];
     const byId = new Map<string, ModelChoice>();
-    for (const item of catalog) byId.set(item.id, item);
+    for (const item of GEMINI_CATALOG) byId.set(item.id, item);
     for (const id of live) {
       if (!byId.has(id)) byId.set(id, { id });
     }
@@ -203,7 +172,7 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
     }
     if (others.length) {
       groups.push(
-        `<optgroup label="${provider === "ollama" ? "Catálogo e instalados" : "Outros"}">${others.map(optionHtml).join("")}</optgroup>`,
+        `<optgroup label="Outros">${others.map(optionHtml).join("")}</optgroup>`,
       );
     }
     groups.push(`<option value="${CUSTOM_VALUE}">Personalizado…</option>`);
@@ -214,31 +183,26 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
     select.value = known ? current : CUSTOM_VALUE;
     customInput(role).value = known ? "" : current;
     syncCustomVisibility(role);
-    renderTags(role, provider, known ? current : "");
+    renderTags(role, known ? current : "");
   }
 
   function applyRoles(roles: Record<LlmRole, RoleConfig>) {
     for (const role of ROLES) {
       const cfg = roles[role];
       if (!cfg) continue;
-      providerSelect(role).value = cfg.provider;
-      fillModelSelect(role, cfg.provider, cfg.model);
+      fillModelSelect(role, cfg.model);
     }
   }
 
   function readRoles(): Record<LlmRole, RoleConfig> {
     const roles = {} as Record<LlmRole, RoleConfig>;
     for (const role of ROLES) {
-      const provider = providerSelect(role).value as LlmProvider;
       const selected = modelSelect(role).value;
       const model =
         selected === CUSTOM_VALUE
           ? customInput(role).value.trim()
           : selected.trim();
-      roles[role] = {
-        provider: provider === "gemini" ? "gemini" : "ollama",
-        model,
-      };
+      roles[role] = { model };
     }
     return roles;
   }
@@ -256,70 +220,35 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
     }
   }
 
-  function renderStatus(data: LlmConfigPayload) {
-    const gemini = data.gemini;
-    if (!gemini?.configured) {
-      setStatus(
-        geminiStatus,
-        "Chave ausente. Defina GEMINI_API_KEY no .env (aistudio.google.com/apikey).",
-        true,
-      );
-    } else if (gemini.ok) {
-      setStatus(
-        geminiStatus,
-        `OK — ${gemini.models?.length || 0} modelos listados`,
-      );
-    } else {
-      setStatus(
-        geminiStatus,
-        `Chave presente, API falhou: ${gemini.error || "indisponível"}`,
-        true,
-      );
+  function renderEnv(data: LlmConfigPayload) {
+    const env = data.env;
+    if (!env?.items?.length) {
+      setStatus(envSummary, "Nenhuma variável listada.", true);
+      envGrid.innerHTML = "";
+      return;
     }
 
-    const ollama = data.ollama;
-    if (ollama?.ok) {
-      setStatus(
-        ollamaStatus,
-        `OK (${ollama.url}) — ${ollama.models?.length || 0} modelos locais`,
-      );
-    } else {
-      setStatus(
-        ollamaStatus,
-        `Offline (${ollama?.url || "?"}): ${ollama?.error || "indisponível"}`,
-        true,
+    const parts = [`${env.counts.ok} OK`];
+    if (env.counts.missingRequired) {
+      parts.push(
+        `${env.counts.missingRequired} obrigatória${
+          env.counts.missingRequired === 1 ? "" : "s"
+        } ausente${env.counts.missingRequired === 1 ? "" : "s"}`,
       );
     }
+    if (env.counts.missingOptional) {
+      parts.push(`${env.counts.missingOptional} opcionais vazias`);
+    }
+    envSummary.textContent = `${parts.join(" · ")} · ${env.counts.total} no .env`;
+    envSummary.classList.toggle("error", env.counts.missingRequired > 0);
+
+    envGrid.innerHTML = env.items
+      .map((item) => envCardHtml(item, data.gemini))
+      .join("");
   }
 
-  async function loadVercel() {
-    try {
-      const res = await fetch("/landing/status");
-      const data = (await res.json()) as {
-        vercel?: { configured?: boolean; autoDeploy?: boolean; team?: boolean };
-      };
-      const vercel = data.vercel;
-      if (!vercel?.configured) {
-        setStatus(
-          vercelStatus,
-          "Token ausente. Defina VERCEL_TOKEN em services/platform/.env (vercel.com/account/tokens).",
-          true,
-        );
-        return;
-      }
-      setStatus(
-        vercelStatus,
-        `OK — deploy automático ${vercel.autoDeploy ? "ligado" : "desligado"}${
-          vercel.team ? " · team" : ""
-        }`,
-      );
-    } catch (error) {
-      setStatus(
-        vercelStatus,
-        error instanceof Error ? error.message : "Falha ao checar Vercel",
-        true,
-      );
-    }
+  function renderStatus(data: LlmConfigPayload) {
+    renderEnv(data);
   }
 
   async function load() {
@@ -335,40 +264,21 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
       if (data.settings?.roles) applyRoles(data.settings.roles);
       setStatus(saveStatus, data.ready ? "Pronto para gerar." : data.error || "");
       saveStatus.classList.toggle("error", !data.ready);
-      void loadVercel();
     } catch (error) {
-      setStatus(
-        geminiStatus,
-        error instanceof Error ? error.message : "Falha ao carregar config",
-        true,
-      );
-      setStatus(ollamaStatus, "", false);
-      setStatus(vercelStatus, "", false);
-      setStatus(
-        saveStatus,
-        error instanceof Error ? error.message : "Falha ao carregar config",
-        true,
-      );
+      const message =
+        error instanceof Error ? error.message : "Falha ao carregar config";
+      setStatus(envSummary, message, true);
+      envGrid.innerHTML = "";
+      setStatus(saveStatus, message, true);
     }
   }
 
   for (const role of ROLES) {
-    providerSelect(role).addEventListener("change", () => {
-      const provider = providerSelect(role).value as LlmProvider;
-      const fallback =
-        payload?.defaults?.[provider]?.[role] ||
-        (provider === "gemini" ? "gemini-2.5-flash" : "");
-      fillModelSelect(role, provider, fallback);
-    });
     modelSelect(role).addEventListener("change", () => {
-      const provider = providerSelect(role).value as LlmProvider;
       syncCustomVisibility(role, true);
       renderTags(
         role,
-        provider,
-        modelSelect(role).value === CUSTOM_VALUE
-          ? ""
-          : modelSelect(role).value,
+        modelSelect(role).value === CUSTOM_VALUE ? "" : modelSelect(role).value,
       );
     });
   }
@@ -377,19 +287,7 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
     const next = {} as Record<LlmRole, RoleConfig>;
     for (const role of ROLES) {
       next[role] = {
-        provider: "gemini",
         model: payload?.defaults?.gemini?.[role] || "gemini-2.5-flash",
-      };
-    }
-    applyRoles(next);
-  });
-
-  useOllamaBtn.addEventListener("click", () => {
-    const next = {} as Record<LlmRole, RoleConfig>;
-    for (const role of ROLES) {
-      next[role] = {
-        provider: "ollama",
-        model: payload?.defaults?.ollama?.[role] || "",
       };
     }
     applyRoles(next);
@@ -445,4 +343,53 @@ function escapeAttr(value: string): string {
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
     .replace(/</g, "&lt;");
+}
+
+function envCardHtml(
+  item: EnvStatusItem,
+  gemini?: LlmConfigPayload["gemini"],
+): string {
+  const geminiFailed =
+    item.key === "GEMINI_API_KEY" &&
+    Boolean(gemini?.configured) &&
+    gemini?.ok === false;
+  const tone = geminiFailed
+    ? "missing"
+    : item.present
+      ? "ok"
+      : item.required
+        ? "missing"
+        : "optional";
+  const badge = geminiFailed ? "Falha" : item.present ? "OK" : "Ausente";
+  const message = envMessage(item, gemini);
+  const isError = (item.required && !item.present) || geminiFailed;
+  return `<div class="config-status-card config-status-card--${tone}">
+      <div class="config-env-card-head">
+        <h3>${escapeAttr(item.label)} <span class="config-role-hint">${escapeAttr(item.group)}</span></h3>
+        <span class="config-env-badge config-env-badge--${tone}">${badge}</span>
+      </div>
+      <code class="config-env-key">${escapeAttr(item.key)}</code>
+      <div class="status${isError ? " error" : ""}">${escapeAttr(message)}</div>
+    </div>`;
+}
+
+function envMessage(
+  item: EnvStatusItem,
+  gemini?: LlmConfigPayload["gemini"],
+): string {
+  if (item.key === "GEMINI_API_KEY" && item.present) {
+    if (gemini?.ok) {
+      return `OK — ${gemini.models?.length || 0} modelos listados`;
+    }
+    if (gemini?.configured && gemini.ok === false) {
+      return `Chave presente, API falhou: ${gemini.error || "indisponível"}`;
+    }
+  }
+  if (item.present) {
+    if (item.detail && item.value) return `${item.detail} · ${item.value}`;
+    if (item.detail) return item.detail;
+    if (item.value) return item.value;
+    return "Definida no .env";
+  }
+  return item.hint;
 }

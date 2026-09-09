@@ -10,6 +10,7 @@ export type JwtUser = {
   name: string;
   role: string;
   leadId: string | null;
+  customerId: string | null;
 };
 
 type JwtPayload = {
@@ -40,6 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         name: true,
         role: true,
         leadId: true,
+        customerId: true,
       },
     });
     return user;

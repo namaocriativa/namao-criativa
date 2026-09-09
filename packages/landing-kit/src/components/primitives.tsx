@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Cta, NavItem } from '../spec/page-spec';
+import { isWhatsappHref, trackEvent } from '../lib/analytics';
 
 export function CtaButton({
   cta,
@@ -10,7 +11,14 @@ export function CtaButton({
 }) {
   if (!cta?.href || !cta.label) return null;
   return (
-    <a className={className} href={cta.href}>
+    <a
+      className={className}
+      href={cta.href}
+      onClick={() => {
+        const event = isWhatsappHref(cta.href) ? 'whatsapp_click' : 'cta_click';
+        trackEvent(event, { link_url: cta.href, link_text: cta.label });
+      }}
+    >
       {cta.label}
     </a>
   );

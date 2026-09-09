@@ -26,7 +26,8 @@ import { execFile } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { promisify } from 'util';
-import { LeadService } from '../lead/lead.service';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerCreateData } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { LandingJobRuntime, LandingJobsService } from './landing-jobs.service';
 import { applyCopywriterOverride, buildLeadBrief } from './lead-brief';
@@ -94,7 +95,7 @@ export class LandingPipelineService {
   private readonly logger = new Logger(LandingPipelineService.name);
 
   constructor(
-    private readonly leadService: LeadService,
+    private readonly owners: OwnerLookup,
     private readonly scaffoldService: ScaffoldService,
     private readonly llmService: LlmService,
     private readonly jobsService: LandingJobsService,
@@ -129,7 +130,7 @@ export class LandingPipelineService {
 
   private async execute(job: LandingJobRuntime) {
     const warnings: string[] = [];
-    const lead = await this.leadService.findById(job.leadId);
+    const lead = await this.owners.requireDetail(job.leadId);
     const publicSiteId = await this.scaffoldService.ensurePublicSiteId(lead.id);
     const apiBase = publicChatApiOrigin();
     const projectDir = await this.scaffoldService.assertScaffoldExists(job.slug);
@@ -587,11 +588,8 @@ export class LandingPipelineService {
     });
     await this.writeProject(projectDir, brief, spec, { publicSiteId, apiBase });
     await writeJson(path.join(artifactDir, 'page-spec.json'), spec);
-    await this.prisma.lead.update({
-      where: { id: lead.id },
-      data: {
-        chatEnabled: spec.features.some((item) => isChatRuntimeFeature(item.id)),
-      },
+    await this.owners.update(lead.id, {
+      chatEnabled: spec.features.some((item) => isChatRuntimeFeature(item.id)),
     });
 
     await emitProgress('copying_images', 'Copiando imagens do enrichment...');
@@ -747,7 +745,10 @@ export class LandingPipelineService {
       await this.prisma.landingGeneration.upsert({
         where: { jobId: job.id },
         create: {
-          leadId: job.leadId,
+          ...ownerCreateData(
+            await this.owners.requireKind(job.leadId),
+            job.leadId,
+          ),
           jobId: job.id,
           pageSpec: spec as object,
           componentIds: spec.sections.map((item) => item.component).join(','),
@@ -820,6 +821,8 @@ export class LandingPipelineService {
       spec,
       publicSiteId: boot.publicSiteId,
       apiBase: boot.apiBase,
+      leadId: brief.leadId,
+      landingSlug: brief.slug,
     });
     for (const file of files) {
       const target = path.join(projectDir, file.path);

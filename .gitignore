@@ -46,10 +46,7 @@ id_ed25519*
 .env.production.local
 .env.local
 
-# Prisma Mongo client gerado no runtime
-services/runtime/src/generated
-
-# SQLite
+# SQLite (legado local)
 services/platform/prisma/dev.db
 services/platform/prisma/dev.db-journal
 services/platform/prisma/*.db
@@ -88,3 +85,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 cloud/.env
 cloud/state.json
 cloud/config/stack.json
+
+# Cloudflare Pages — generated API proxy (see WEBSITE_API_ORIGIN)
+apps/website/public/_redirects
+.wrangler

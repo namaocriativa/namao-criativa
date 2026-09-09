@@ -1,6 +1,8 @@
 export type AppRoute =
   | { name: "leads" }
   | { name: "lead"; id: string }
+  | { name: "customers" }
+  | { name: "customer"; id: string }
   | { name: "discovery" }
   | { name: "enrichment" }
   | { name: "packages" }
@@ -21,6 +23,15 @@ export function parsePath(pathname: string): AppRoute {
   if (lead?.[1]) {
     try {
       return { name: "lead", id: decodeURIComponent(lead[1]) };
+    } catch {
+      return { name: "not-found" };
+    }
+  }
+  if (path === "/customers") return { name: "customers" };
+  const customer = path.match(/^\/customers\/([^/]+)$/);
+  if (customer?.[1]) {
+    try {
+      return { name: "customer", id: decodeURIComponent(customer[1]) };
     } catch {
       return { name: "not-found" };
     }
@@ -47,6 +58,10 @@ export function hrefFor(route: AppRoute): string {
       return "/leads";
     case "lead":
       return `/leads/${encodeURIComponent(route.id)}`;
+    case "customers":
+      return "/customers";
+    case "customer":
+      return `/customers/${encodeURIComponent(route.id)}`;
     case "discovery":
       return "/discovery";
     case "enrichment":
@@ -70,6 +85,10 @@ export function tabForRoute(route: AppRoute): string {
       return "leads";
     case "lead":
       return "detail";
+    case "customers":
+      return "customers";
+    case "customer":
+      return "detail";
     case "discovery":
       return "discovery";
     case "enrichment":
@@ -90,6 +109,7 @@ export function tabForRoute(route: AppRoute): string {
 export function navRouteFor(route: AppRoute): string | null {
   if (route.name === "not-found") return null;
   if (route.name === "lead") return "leads";
+  if (route.name === "customer") return "customers";
   if (route.name === "package") return "packages";
   return route.name;
 }
@@ -100,6 +120,10 @@ export function titleForRoute(route: AppRoute, leadName?: string): string {
       return `Leads · ${APP_TITLE}`;
     case "lead":
       return `${leadName || "Lead"} · ${APP_TITLE}`;
+    case "customers":
+      return `Customers · ${APP_TITLE}`;
+    case "customer":
+      return `${leadName || "Customer"} · ${APP_TITLE}`;
     case "discovery":
       return `Discovery · ${APP_TITLE}`;
     case "enrichment":
@@ -124,6 +148,7 @@ export function currentRoute(): AppRoute {
 function sameRoute(a: AppRoute, b: AppRoute): boolean {
   if (a.name !== b.name) return false;
   if (a.name === "lead" && b.name === "lead") return a.id === b.id;
+  if (a.name === "customer" && b.name === "customer") return a.id === b.id;
   if (a.name === "package" && b.name === "package") return a.id === b.id;
   return true;
 }

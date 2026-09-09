@@ -1,0 +1,322 @@
+.namao-chat {
+  position: fixed;
+  z-index: 90;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  font-family: var(--font-body, "Figtree", sans-serif);
+  color: #1c1c1c;
+}
+
+.namao-chat__launcher {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.namao-chat__teaser {
+  position: relative;
+  max-width: 230px;
+  background: #fff;
+  color: #2a2a2a;
+  border-radius: 18px;
+  padding: 12px 16px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.namao-chat__teaser::after {
+  content: "";
+  position: absolute;
+  right: -7px;
+  bottom: 16px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  transform: rotate(45deg);
+  box-shadow: 4px 4px 10px rgb(0 0 0 / 0.06);
+}
+
+.namao-chat__avatar {
+  position: relative;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+}
+
+.namao-chat--auth .namao-chat__avatar {
+  width: 62px;
+  height: 62px;
+}
+
+.namao-chat__photo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  display: block;
+  background: #050505;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 0.28);
+}
+
+.namao-chat--auth .namao-chat__photo {
+  border: 2px solid #f2f2f2;
+  border-radius: 18px;
+}
+
+.namao-chat__dot {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid #fff;
+}
+
+.namao-chat--auth .namao-chat__dot {
+  border-color: #050505;
+}
+
+.namao-chat__panel {
+  width: min(360px, calc(100vw - 32px));
+  height: min(520px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 22px 60px rgb(0 0 0 / 0.28);
+  overflow: hidden;
+}
+
+.namao-chat__panel[hidden],
+.namao-chat__launcher[hidden],
+.namao-chat__chips[hidden],
+.namao-chat__whatsapp[hidden],
+.namao-chat__error[hidden] {
+  display: none !important;
+}
+
+.namao-chat--auth .namao-chat__panel {
+  width: min(400px, calc(100vw - 32px));
+  height: min(580px, calc(100vh - 100px));
+  border-radius: 8px 8px 16px 16px;
+}
+
+.namao-chat__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #14b8a6;
+  color: #fff;
+}
+
+.namao-chat--auth .namao-chat__header {
+  background: #050505;
+  color: #f2f2f2;
+}
+
+.namao-chat__header-photo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: #050505;
+}
+
+.namao-chat--auth .namao-chat__header-photo {
+  border-radius: 10px;
+}
+
+.namao-chat__header-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.namao-chat__header-copy strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.namao-chat__header-copy span {
+  display: block;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.namao-chat__close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.namao-chat__messages {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+}
+
+.namao-chat--auth .namao-chat__messages {
+  background: #f6f6f4;
+}
+
+.namao-chat__bubble {
+  max-width: 88%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.namao-chat__bubble--assistant {
+  align-self: flex-start;
+  background: #ececec;
+  color: #1c1c1c;
+}
+
+.namao-chat--auth .namao-chat__bubble--assistant {
+  background: #ebeae6;
+  border-radius: 4px 14px 14px 14px;
+}
+
+.namao-chat__bubble--user {
+  align-self: flex-end;
+  background: #14b8a6;
+  color: #fff;
+}
+
+.namao-chat--auth .namao-chat__bubble--user {
+  background: #050505;
+  color: #f2f2f2;
+  border-radius: 14px 4px 14px 14px;
+}
+
+.namao-chat__typing {
+  letter-spacing: 0.2em;
+}
+
+.namao-chat__error {
+  font-size: 12px;
+  color: #b42318;
+  padding: 0 16px;
+}
+
+.namao-chat__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+
+.namao-chat__chip {
+  border: 1px solid #d4d4d4;
+  background: #fff;
+  color: #1c1c1c;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.namao-chat__footer {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+}
+
+.namao-chat__whatsapp {
+  font-size: 12px;
+  color: #0f766e;
+  text-align: center;
+  font-weight: 600;
+}
+
+.namao-chat--auth .namao-chat__whatsapp {
+  color: #444;
+}
+
+.namao-chat__form {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 2px solid #111;
+  border-radius: 999px;
+  padding: 4px 4px 4px 14px;
+  background: #fff;
+}
+
+.namao-chat--auth .namao-chat__form {
+  border-color: #050505;
+  border-radius: 10px;
+  background: #f6f6f4;
+}
+
+.namao-chat__form input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  min-width: 0;
+  outline: none;
+  color: #1c1c1c;
+}
+
+.namao-chat__send {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: #14b8a6;
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.namao-chat--auth .namao-chat__send {
+  background: #050505;
+  border-radius: 8px;
+}
+
+.namao-chat__send:disabled {
+  opacity: 0.5;
+}
+
+@media (max-width: 520px) {
+  .namao-chat {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .namao-chat__teaser {
+    max-width: 180px;
+    font-size: 13px;
+  }
+}

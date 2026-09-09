@@ -10,6 +10,8 @@ import { InvitesService } from '../invites/invites.service';
 import { LeadAccountService } from '../lead-account/lead-account.service';
 import { publicLoginUrl } from '../lead-account/lead-account.util';
 import { LeadActivityService } from '../lead-activity/lead-activity.service';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerWhere } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   PREVIEW_INVITE_TOKEN,
@@ -56,6 +58,7 @@ export class LeadWhatsAppService {
     private readonly invites: InvitesService,
     private readonly accounts: LeadAccountService,
     private readonly activity: LeadActivityService,
+    private readonly owners: OwnerLookup,
   ) {}
 
   async list(leadId: string) {
@@ -65,7 +68,7 @@ export class LeadWhatsAppService {
     const siteUrl = lead.publishedOrigin?.trim() || null;
     const evolutionReady = this.evolution.configured();
     const client = await this.prisma.user.findFirst({
-      where: { leadId: lead.id, role: 'CLIENT' },
+      where: { ...ownerWhere(lead.id), role: 'CLIENT' },
       select: { id: true },
     });
 
@@ -285,7 +288,7 @@ export class LeadWhatsAppService {
     }
 
     const client = await this.prisma.user.findFirst({
-      where: { leadId: lead.id, role: 'CLIENT' },
+      where: { ...ownerWhere(lead.id), role: 'CLIENT' },
       select: { id: true },
     });
     if (!client) {
@@ -378,25 +381,31 @@ export class LeadWhatsAppService {
   }
 
   private async requireLead(leadId: string) {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        whatsapp: true,
-        publishedOrigin: true,
-        users: {
-          where: { role: 'CLIENT' },
-          select: { email: true },
-          take: 1,
-        },
-        instagramConnections: {
-          select: { username: true },
-          take: 1,
-        },
+    const kind = await this.owners.kindOf(leadId);
+    if (!kind) throw new NotFoundException(`Lead ${leadId} not found`);
+    const select = {
+      id: true,
+      name: true,
+      phone: true,
+      whatsapp: true,
+      publishedOrigin: true,
+      users: {
+        where: { role: 'CLIENT' },
+        select: { email: true },
+        take: 1,
       },
-    });
+      instagramConnections: {
+        select: { username: true },
+        take: 1,
+      },
+    };
+    const lead =
+      kind === 'lead'
+        ? await this.prisma.lead.findUnique({ where: { id: leadId }, select })
+        : await this.prisma.customer.findUnique({
+            where: { id: leadId },
+            select,
+          });
     if (!lead) throw new NotFoundException(`Lead ${leadId} not found`);
     return lead;
   }

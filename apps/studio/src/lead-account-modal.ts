@@ -26,11 +26,14 @@ function apiMessage(data: AccountPayload, fallback: string): string {
   return fallback;
 }
 
+import { profileApi, type EntityKind } from "./profile-api";
+
 export function initLeadAccountModal(host: HTMLElement): {
-  open: (leadId: string) => void;
+  open: (leadId: string, kind?: EntityKind) => void;
   close: () => void;
 } {
   let leadId: string | null = null;
+  let apiKind: EntityKind = "lead";
   let busy = false;
 
   host.innerHTML = `
@@ -49,7 +52,7 @@ export function initLeadAccountModal(host: HTMLElement): {
       >
         <header class="site-wizard-modal__header">
           <div>
-            <p class="site-wizard-modal__kicker">Acesso do lead</p>
+            <p class="site-wizard-modal__kicker">Acesso</p>
             <h3 id="lead-account-title">Ver senha</h3>
           </div>
           <button type="button" class="outline" data-account-close>Fechar</button>
@@ -131,7 +134,7 @@ export function initLeadAccountModal(host: HTMLElement): {
     setBusy(true);
     setStatus("Carregando acesso…");
     try {
-      const res = await fetch(`/leads/${encodeURIComponent(leadId)}/account`);
+      const res = await fetch(profileApi(apiKind, leadId, "/account"));
       const data = (await res.json().catch(() => ({}))) as AccountPayload;
       if (!res.ok) {
         throw new Error(apiMessage(data, "Falha ao carregar acesso"));
@@ -163,7 +166,7 @@ export function initLeadAccountModal(host: HTMLElement): {
     setStatus("Processando…");
     try {
       const res = await fetch(
-        `/leads/${encodeURIComponent(leadId)}/account/${path}`,
+        profileApi(apiKind, leadId, `/account/${path}`),
         { method: "POST" },
       );
       const data = (await res.json().catch(() => ({}))) as AccountPayload;
@@ -204,8 +207,9 @@ export function initLeadAccountModal(host: HTMLElement): {
     }
   }
 
-  function open(nextId: string) {
+  function open(nextId: string, kind: EntityKind = "lead") {
     leadId = nextId;
+    apiKind = kind;
     email = "";
     password = "";
     renderCredentials();

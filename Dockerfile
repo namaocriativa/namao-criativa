@@ -8,9 +8,10 @@ RUN apt-get update -y \
 
 COPY package.json package-lock.json ./
 COPY services/platform/package.json ./services/platform/
-COPY services/runtime/package.json ./services/runtime/
 COPY packages/landing-kit/package.json ./packages/landing-kit/
 COPY apps/studio/package.json ./apps/studio/
+COPY apps/website/package.json ./apps/website/
+COPY cloud/package.json ./cloud/
 
 # postinstall (prisma generate) precisa do schema — gera depois do COPY
 RUN npm ci --ignore-scripts
@@ -30,11 +31,10 @@ CMD ["sh", "/app/services/platform/docker-entrypoint.dev.sh"]
 FROM base AS production
 RUN npm run build -w @namao/landing-kit \
   && npm run build -w @namao/platform \
-  && mkdir -p /data /app/services/platform/storage/leads
+  && mkdir -p /app/services/platform/storage/leads
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV DATABASE_URL=file:/data/dev.db
 
 EXPOSE 3000
 

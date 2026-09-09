@@ -19,6 +19,6 @@ describe('publicChatApiOrigin', () => {
   it('em dev aponta para o client-api local', () => {
     delete process.env.PUBLIC_CHAT_API_ORIGIN;
     process.env.NODE_ENV = 'development';
-    expect(publicChatApiOrigin()).toBe('http://localhost:3001');
+    expect(publicChatApiOrigin()).toBe('http://localhost:3000');
   });
 });

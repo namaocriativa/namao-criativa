@@ -22,7 +22,10 @@ export async function api(path: string, init: RequestInit = {}) {
   const res = await fetch(path, { ...init, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((data as { message?: string }).message || `Erro ${res.status}`);
+    const raw = (data as { message?: string | string[] }).message;
+    throw new Error(
+      Array.isArray(raw) ? raw[0] : raw || `Erro ${res.status}`,
+    );
   }
   return data;
 }

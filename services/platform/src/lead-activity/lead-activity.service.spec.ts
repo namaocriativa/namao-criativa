@@ -6,10 +6,15 @@ describe('LeadActivityService', () => {
     lead: { findUnique: jest.fn() },
     leadActivity: { create: jest.fn(), findMany: jest.fn() },
   };
-  const service = new LeadActivityService(prisma as never);
+  const owners = {
+    requireKind: jest.fn().mockResolvedValue('lead'),
+    findProfile: jest.fn(),
+  };
+  const service = new LeadActivityService(prisma as never, owners as never);
 
   beforeEach(() => {
     jest.resetAllMocks();
+    owners.requireKind.mockResolvedValue('lead');
   });
 
   it('grava uma atividade', async () => {
@@ -25,6 +30,7 @@ describe('LeadActivityService', () => {
     expect(prisma.leadActivity.create).toHaveBeenCalledWith({
       data: {
         leadId: 'lead-1',
+        customerId: null,
         channel: 'email',
         kind: 'site-introduction',
         title: 'E-mail enviado: Apresentação do site',
@@ -35,14 +41,14 @@ describe('LeadActivityService', () => {
   });
 
   it('404 se o lead não existe', async () => {
-    prisma.lead.findUnique.mockResolvedValue(null);
+    owners.findProfile.mockResolvedValue(null);
     await expect(service.listHistory('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });
 
   it('mistura atividades persistidas com eventos de sistema, do mais novo ao mais antigo', async () => {
-    prisma.lead.findUnique.mockResolvedValue({
+    owners.findProfile.mockResolvedValue({
       id: 'lead-1',
       createdAt: new Date('2026-01-01T10:00:00.000Z'),
       updatedAt: new Date('2026-01-03T10:00:00.000Z'),

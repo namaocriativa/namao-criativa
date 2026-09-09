@@ -1,23 +1,28 @@
 import { BadRequestException, Body, Controller, Get, Put } from '@nestjs/common';
 import { UpdateLlmSettingsDto } from './dto/update-llm-settings.dto';
+import { EnvStatusService } from './env-status.service';
 import { LlmService } from './llm.service';
-import { LLM_ROLES } from './llm.types';
 
 @Controller('config')
 export class LlmController {
-  constructor(private readonly llmService: LlmService) {}
+  constructor(
+    private readonly llmService: LlmService,
+    private readonly envStatus: EnvStatusService,
+  ) {}
 
   @Get('llm')
   getLlm() {
     return this.llmService.configPayload();
   }
 
+  @Get('env')
+  getEnv() {
+    return this.envStatus.list();
+  }
+
   @Put('llm')
   async putLlm(@Body() dto: UpdateLlmSettingsDto) {
-    const usesGemini = LLM_ROLES.some(
-      (role) => dto.roles[role].provider === 'gemini',
-    );
-    if (usesGemini && !this.llmService.geminiConfigured()) {
+    if (!this.llmService.geminiConfigured()) {
       throw new BadRequestException(
         'GEMINI_API_KEY não configurada no .env. Obtenha em https://aistudio.google.com/apikey',
       );

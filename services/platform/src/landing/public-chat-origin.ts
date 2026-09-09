@@ -4,5 +4,5 @@ export function publicChatApiOrigin(): string {
     '',
   );
   if (configured) return configured;
-  return process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
+  return process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000';
 }

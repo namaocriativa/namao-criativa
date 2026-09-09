@@ -8,8 +8,7 @@ import { execFile } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { promisify } from 'util';
-import { PrismaService } from '../prisma/prisma.service';
-import { LeadService } from '../lead/lead.service';
+import { OwnerLookup } from '../owner/owner-lookup.service';
 import { newPublicSiteId } from './public-site-id';
 import { stableLandingSlug } from './prompt.builder';
 
@@ -21,8 +20,7 @@ export class ScaffoldService {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly leadService: LeadService,
-    private readonly prisma: PrismaService,
+    private readonly owners: OwnerLookup,
   ) {}
 
   getLeadsDir(): string {
@@ -36,16 +34,13 @@ export class ScaffoldService {
   }
 
   async resolveSlug(leadId: string) {
-    const lead = await this.leadService.findById(leadId);
+    const lead = await this.owners.requireDetail(leadId);
     const slug = stableLandingSlug(lead);
     const patch: { landingSlug?: string; publicSiteId?: string } = {};
     if (!lead.landingSlug) patch.landingSlug = slug;
     if (!lead.publicSiteId) patch.publicSiteId = newPublicSiteId();
     if (Object.keys(patch).length) {
-      await this.prisma.lead.update({
-        where: { id: leadId },
-        data: patch,
-      });
+      await this.owners.update(leadId, patch);
     }
     return {
       lead: {
@@ -58,16 +53,10 @@ export class ScaffoldService {
   }
 
   async ensurePublicSiteId(leadId: string): Promise<string> {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-      select: { publicSiteId: true },
-    });
-    if (lead?.publicSiteId) return lead.publicSiteId;
+    const lead = await this.owners.requireProfile(leadId);
+    if (lead.publicSiteId) return lead.publicSiteId;
     const publicSiteId = newPublicSiteId();
-    await this.prisma.lead.update({
-      where: { id: leadId },
-      data: { publicSiteId },
-    });
+    await this.owners.update(leadId, { publicSiteId });
     return publicSiteId;
   }
 
@@ -92,9 +81,9 @@ export default defineConfig({
         );
       }
       if (lead.landingStatus === 'none') {
-        await this.prisma.lead.update({
-          where: { id: leadId },
-          data: { landingStatus: 'scaffolded', landingSlug: slug },
+        await this.owners.update(leadId, {
+          landingStatus: 'scaffolded',
+          landingSlug: slug,
         });
       }
       return {
@@ -187,13 +176,10 @@ export default defineConfig({
       'utf8',
     );
 
-    await this.prisma.lead.update({
-      where: { id: lead.id },
-      data: {
-        landingSlug: slug,
-        landingStatus: 'scaffolded',
-        publicSiteId: lead.publicSiteId || newPublicSiteId(),
-      },
+    await this.owners.update(lead.id, {
+      landingSlug: slug,
+      landingStatus: 'scaffolded',
+      publicSiteId: lead.publicSiteId || newPublicSiteId(),
     });
 
     return {

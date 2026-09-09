@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { LeadService } from '../lead/lead.service';
+import { OwnerLookup } from '../owner/owner-lookup.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateLandingDto } from './dto/generate-landing.dto';
 import { normalizeGenerateConfig } from './generate-config';
@@ -26,7 +26,7 @@ export class LandingService {
   private readonly logger = new Logger(LandingService.name);
 
   constructor(
-    private readonly leadService: LeadService,
+    private readonly owners: OwnerLookup,
     private readonly prisma: PrismaService,
     private readonly scaffoldService: ScaffoldService,
     private readonly llmService: LlmService,
@@ -56,7 +56,7 @@ export class LandingService {
   }
 
   async prompt(leadId: string) {
-    const lead = await this.leadService.findById(leadId);
+    const lead = await this.owners.requireDetail(leadId);
     const slug = stableLandingSlug(lead);
     const brief = buildLeadBrief(lead);
     const prompt = buildPipelineOverviewPrompt(brief);
@@ -123,7 +123,7 @@ export class LandingService {
   }
 
   async deleteSite(leadId: string) {
-    const lead = await this.leadService.findById(leadId);
+    const lead = await this.owners.requireDetail(leadId);
     const slug = (lead.landingSlug || stableLandingSlug(lead)).trim();
     if (!slug || slug.includes('..') || slug.includes('/') || slug.includes('\\')) {
       throw new BadRequestException('Slug de landing inválido');
@@ -162,14 +162,11 @@ export class LandingService {
       );
     }
 
-    const updated = await this.prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        landingStatus: 'none',
-        landingSlug: null,
-        landingBuiltAt: null,
-        activeLandingJobId: null,
-      },
+    const updated = await this.owners.update(leadId, {
+      landingStatus: 'none',
+      landingSlug: null,
+      landingBuiltAt: null,
+      activeLandingJobId: null,
     });
 
     return {
@@ -186,7 +183,7 @@ export class LandingService {
   }
 
   async getPreviewMeta(leadId: string) {
-    const lead = await this.leadService.findById(leadId);
+    const lead = await this.owners.requireDetail(leadId);
     const slug = stableLandingSlug(lead);
     const distDir = path.join(this.scaffoldService.projectPath(slug), 'dist');
     try {
@@ -200,7 +197,7 @@ export class LandingService {
   }
 
   async publish(leadId: string) {
-    const lead = await this.leadService.findById(leadId);
+    const lead = await this.owners.requireDetail(leadId);
     const slug = (lead.landingSlug || stableLandingSlug(lead)).trim();
     if (!slug) {
       throw new BadRequestException('Lead sem landing gerada');

@@ -1,4 +1,5 @@
 import type { Lead, LeadImage } from "./types";
+import { entityKindOf, profileApi } from "./profile-api";
 
 type GalleryHandlers = {
   onLeadUpdated: (lead: Lead) => void;
@@ -47,7 +48,7 @@ export function initLeadGallery(
         aria-labelledby="lead-gallery-title"
       >
         <header class="site-wizard-modal__header">
-          <h3 id="lead-gallery-title">Galeria do Lead</h3>
+          <h3 id="lead-gallery-title">Galeria</h3>
           <button type="button" class="outline" data-gallery-close>Fechar</button>
         </header>
         <p class="lead-gallery-meta" data-gallery-meta></p>
@@ -141,7 +142,7 @@ export function initLeadGallery(
       const body = new FormData();
       for (const file of list) body.append("files", file);
       const res = await fetch(
-        `/leads/${encodeURIComponent(lead.id)}/images`,
+        `${profileApi(entityKindOf(lead), lead.id, "/images")}`,
         { method: "POST", body },
       );
       const data = await res.json().catch(() => ({}));
@@ -171,7 +172,7 @@ export function initLeadGallery(
     setStatus("Excluindo…");
     try {
       const res = await fetch(
-        `/leads/${encodeURIComponent(lead.id)}/images/${encodeURIComponent(imageId)}`,
+        `${profileApi(entityKindOf(lead), lead.id, `/images/${encodeURIComponent(imageId)}`)}`,
         { method: "DELETE" },
       );
       const data = await res.json().catch(() => ({}));

@@ -170,7 +170,7 @@ export function defaultGeneratePayload(): GeneratePayload {
   return toGeneratePayload(defaultSectionConfigs(), {}, [], []);
 }
 
-type WizardHydrateState = {
+export type WizardHydrateState = {
   sections: LandingSectionConfig[];
   locks: VariantLocks;
   overlays: string[];
@@ -180,6 +180,110 @@ type WizardHydrateState = {
   stockVideoBySection: StockVideoFlags;
   theme: ThemePayload | null;
 };
+
+export type WizardDraft = WizardHydrateState & {
+  step: number;
+  focusId: string | null;
+};
+
+const WIZARD_DRAFT_PREFIX = "siteWizardDraft:";
+
+function wizardDraftKey(leadId: string): string {
+  return `${WIZARD_DRAFT_PREFIX}${leadId}`;
+}
+
+function asIdList(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const ids: string[] = [];
+  for (const item of raw) {
+    const id =
+      typeof item === "string"
+        ? item.trim()
+        : item && typeof item === "object"
+          ? String((item as { id?: unknown; component?: unknown }).id || "").trim() ||
+            String((item as { component?: unknown }).component || "").trim()
+          : "";
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+function asLockMap(raw: unknown): VariantLocks {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const next: VariantLocks = {};
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!id) continue;
+    next[id] = value == null || value === "" ? null : String(value);
+  }
+  return next;
+}
+
+function asStockFlags(raw: unknown): StockVideoFlags {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const next: StockVideoFlags = {};
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (value) next[id] = true;
+  }
+  return next;
+}
+
+export function parseWizardDraft(raw: unknown): WizardDraft | null {
+  const state = wizardStateFromConfig(raw);
+  if (!state) return null;
+  const record = raw as Record<string, unknown>;
+  const overlays = asIdList(record.overlays) ?? state.overlays;
+  const features = asIdList(record.features) ?? state.features;
+  const stepRaw = record.step;
+  const step =
+    typeof stepRaw === "number" && Number.isFinite(stepRaw)
+      ? Math.max(0, Math.floor(stepRaw))
+      : 0;
+  const focusRaw = record.focusId;
+  const focusId =
+    typeof focusRaw === "string" && focusRaw.trim()
+      ? focusRaw.trim()
+      : focusRaw === null
+        ? null
+        : (state.sections[0]?.id ?? null);
+  const mapRaw = record.mapSectionId;
+  const mapSectionId =
+    typeof mapRaw === "string" && mapRaw.trim()
+      ? mapRaw.trim()
+      : state.mapSectionId;
+  return {
+    ...state,
+    locks: { ...state.locks, ...asLockMap(record.locks) },
+    overlays,
+    features,
+    mapSectionId,
+    stockVideoBySection: {
+      ...state.stockVideoBySection,
+      ...asStockFlags(record.stockVideoBySection),
+    },
+    step,
+    focusId,
+  };
+}
+
+export function loadWizardDraft(leadId: string | null): WizardDraft | null {
+  if (!leadId) return null;
+  try {
+    const raw = localStorage.getItem(wizardDraftKey(leadId));
+    if (!raw) return null;
+    return parseWizardDraft(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+export function saveWizardDraft(leadId: string | null, draft: WizardDraft): void {
+  if (!leadId) return;
+  try {
+    localStorage.setItem(wizardDraftKey(leadId), JSON.stringify(draft));
+  } catch {
+    // Quota ou modo privado: o wizard segue só em memória nesta sessão.
+  }
+}
 
 function asSection(raw: unknown): LandingSectionConfig | null {
   if (!raw || typeof raw !== "object") return null;

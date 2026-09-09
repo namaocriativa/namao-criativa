@@ -1,11 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OllamaService } from '../landing/ollama.service';
 import {
   GEMINI_DEFAULTS,
   LLM_ROLES,
   LLM_SETTING_KEY,
-  type LlmProvider,
   type LlmRole,
   type LlmSettings,
   type RoleConfig,
@@ -16,10 +14,7 @@ export class LlmSettingsService implements OnModuleInit {
   private readonly logger = new Logger(LlmSettingsService.name);
   private cache: LlmSettings | null = null;
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly ollama: OllamaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
     this.cache = await this.load();
@@ -32,29 +27,16 @@ export class LlmSettingsService implements OnModuleInit {
   defaults(): LlmSettings {
     return {
       roles: {
-        plan: {
-          provider: 'ollama',
-          model: this.ollama.modelFor('plan'),
-        },
-        code: {
-          provider: 'ollama',
-          model: this.ollama.modelFor('code'),
-        },
-        vision: {
-          provider: 'ollama',
-          model: this.ollama.modelFor('vision'),
-        },
-        chat: {
-          provider: 'ollama',
-          model: this.ollama.modelFor('chat'),
-        },
+        plan: { model: GEMINI_DEFAULTS.plan },
+        code: { model: GEMINI_DEFAULTS.code },
+        vision: { model: GEMINI_DEFAULTS.vision },
+        chat: { model: GEMINI_DEFAULTS.chat },
       },
     };
   }
 
-  defaultModel(provider: LlmProvider, role: LlmRole): string {
-    if (provider === 'gemini') return GEMINI_DEFAULTS[role];
-    return this.ollama.modelFor(role);
+  defaultModel(role: LlmRole): string {
+    return GEMINI_DEFAULTS[role];
   }
 
   async save(input: LlmSettings): Promise<LlmSettings> {
@@ -88,11 +70,11 @@ export class LlmSettingsService implements OnModuleInit {
   normalize(input: Partial<LlmSettings> | null | undefined): LlmSettings {
     const roles = {} as Record<LlmRole, RoleConfig>;
     for (const role of LLM_ROLES) {
-      const raw = input?.roles?.[role];
-      const provider: LlmProvider =
-        raw?.provider === 'gemini' ? 'gemini' : 'ollama';
-      const model = (raw?.model || '').trim() || this.defaultModel(provider, role);
-      roles[role] = { provider, model };
+      const raw = input?.roles?.[role] as
+        | (RoleConfig & { provider?: string })
+        | undefined;
+      const model = (raw?.model || '').trim() || this.defaultModel(role);
+      roles[role] = { model };
     }
     return { roles };
   }

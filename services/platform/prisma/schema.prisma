@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -39,6 +39,7 @@ model Lead {
   publishedOrigin     String?
   vercelProjectId     String?
   vercelDeploymentId  String?
+  fromPublicSignup    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -52,26 +53,85 @@ model Lead {
   chatSessions ChatSession[]
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
+
+  @@index([fromPublicSignup])
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  category    String?
+  description String?
+  phone       String?
+  whatsapp    String?
+  email       String?
+  website     String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  latitude    Float?
+  longitude   Float?
+  instagram   String?
+  facebook    String?
+  linkedin    String?
+  services    Json?
+  rating      Float?
+  reviewCount Int?
+  metadata    Json?
+  generateConfig      Json?
+  landingSlug         String?   @unique
+  landingStatus       String    @default("none")
+  landingBuiltAt      DateTime?
+  activeLandingJobId  String?
+  publicSiteId        String?   @unique
+  chatEnabled         Boolean   @default(false)
+  publishedOrigin     String?
+  vercelProjectId     String?
+  vercelDeploymentId  String?
+  fromPublicSignup    Boolean  @default(false)
+  convertedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  images  LeadImage[]
+  sources LeadSource[]
+  users   User[]
+  invites Invite[]
+  instagramConnections InstagramConnection[]
+  landingJobs LandingJob[]
+  landingGenerations LandingGeneration[]
+  chatSessions ChatSession[]
+  chatEvents   ChatEvent[]
+  activities   LeadActivity[]
+
+  @@index([fromPublicSignup])
 }
 
 model LeadActivity {
-  id        String   @id @default(cuid())
-  leadId    String
-  channel   String
-  kind      String
-  title     String
-  summary   String
-  payload   Json?
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  leadId     String?
+  customerId String?
+  channel    String
+  kind       String
+  title      String
+  summary    String
+  payload    Json?
+  createdAt  DateTime @default(now())
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([leadId, createdAt])
+  @@index([customerId, createdAt])
 }
 
 model ChatSession {
   id           String   @id
-  leadId       String
+  leadId       String?
+  customerId   String?
+  userId       String?
+  channel      String   @default("landing")
   tokenHash    String   @unique
   expiresAt    DateTime
   ipHash       String
@@ -82,11 +142,16 @@ model ChatSession {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  lead     Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead     Lead?         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer?     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   messages ChatMessage[]
   events   ChatEvent[]
 
   @@index([leadId])
+  @@index([customerId])
+  @@index([userId, channel])
+  @@index([channel])
   @@index([expiresAt])
 }
 
@@ -103,23 +168,27 @@ model ChatMessage {
 }
 
 model ChatEvent {
-  id        String   @id @default(cuid())
-  leadId    String
-  sessionId String?
-  name      String
-  payload   Json?
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  leadId     String?
+  customerId String?
+  sessionId  String?
+  name       String
+  payload    Json?
+  createdAt  DateTime @default(now())
 
-  lead    Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  session ChatSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  lead     Lead?         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer?     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  session  ChatSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([leadId])
+  @@index([customerId])
   @@index([sessionId])
 }
 
 model LandingJob {
   id               String   @id @default(cuid())
-  leadId           String
+  leadId           String?
+  customerId       String?
   slug             String
   status           String   @default("queued")
   log              Json     @default("[]")
@@ -128,16 +197,19 @@ model LandingJob {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
   generations LandingGeneration[]
 
   @@index([leadId])
+  @@index([customerId])
   @@index([status])
 }
 
 model LandingGeneration {
   id             String   @id @default(cuid())
-  leadId         String
+  leadId         String?
+  customerId     String?
   jobId          String   @unique
   pageSpec       Json
   componentIds   String
@@ -150,10 +222,12 @@ model LandingGeneration {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  lead Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  job  LandingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  lead     Lead?      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  job      LandingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
+  @@index([customerId])
   @@index([themeStyle])
   @@index([category])
 }
@@ -165,34 +239,42 @@ model User {
   name         String
   role         String   @default("CLIENT")
   leadId       String?
+  customerId   String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  lead                 Lead?                  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   instagramConnections InstagramConnection[]
+  chatSessions ChatSession[]
 
   @@index([leadId])
+  @@index([customerId])
 }
 
 model Invite {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  leadId    String
-  phone     String?
-  status    String   @default("PENDING")
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  token      String   @unique
+  leadId     String?
+  customerId String?
+  phone      String?
+  status     String   @default("PENDING")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
+  @@index([customerId])
 }
 
 model InstagramConnection {
   id             String    @id @default(cuid())
   userId         String
-  leadId         String
+  leadId         String?
+  customerId     String?
   igUserId       String
   username       String?
   accessToken    String
@@ -201,43 +283,52 @@ model InstagramConnection {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([leadId])
+  @@unique([customerId])
   @@index([userId])
 }
 
 model LeadSource {
   id         String   @id @default(cuid())
-  leadId     String
+  leadId     String?
+  customerId String?
   provider   String
   url        String?
   externalId String?
   data       Json?
   createdAt  DateTime @default(now())
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
+  @@index([customerId])
 }
 
 model LeadImage {
-  id        String   @id @default(cuid())
-  leadId    String
-  source    String
-  sourceUrl String
-  localPath String
-  filename  String
-  mimeType  String?
-  width     Int?
-  height    Int?
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  leadId     String?
+  customerId String?
+  source     String
+  sourceUrl  String
+  localPath  String
+  filename   String
+  mimeType   String?
+  width      Int?
+  height     Int?
+  createdAt  DateTime @default(now())
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([leadId, sourceUrl])
+  @@unique([customerId, sourceUrl])
   @@index([leadId])
+  @@index([customerId])
 }
 
 model Package {
@@ -277,4 +368,16 @@ model PackageImage {
 model AppSetting {
   key   String @id
   value String
+}
+
+model InviteRequest {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  instagram String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
 }

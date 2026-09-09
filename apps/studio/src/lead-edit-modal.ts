@@ -1,4 +1,5 @@
 import type { Lead } from "./types";
+import { entityKindOf, profileApi } from "./profile-api";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -38,7 +39,7 @@ export function initLeadEditModal(
       >
         <header class="site-wizard-modal__header">
           <div>
-            <p class="site-wizard-modal__kicker">Resumo do lead</p>
+            <p class="site-wizard-modal__kicker">Resumo</p>
             <h3 id="lead-edit-title">Editar informações</h3>
           </div>
           <button type="button" class="outline" data-edit-close>Fechar</button>
@@ -122,7 +123,7 @@ export function initLeadEditModal(
     saveBtn.disabled = true;
     setStatus("Salvando…");
     try {
-      const res = await fetch(`/leads/${encodeURIComponent(lead.id)}`, {
+      const res = await fetch(profileApi(entityKindOf(lead), lead.id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

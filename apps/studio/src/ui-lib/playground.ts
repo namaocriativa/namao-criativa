@@ -22,7 +22,7 @@ type PlaygroundState = Record<string, ComponentState>;
 type CodeTab = "spec" | "html" | "css" | "js";
 
 const CODE_TABS: Array<{ id: CodeTab; label: string }> = [
-  { id: "spec", label: "Spec (Ollama)" },
+  { id: "spec", label: "Spec (Gemini)" },
   { id: "html", label: "HTML" },
   { id: "css", label: "CSS" },
   { id: "js", label: "JS" },
@@ -335,7 +335,7 @@ function buildManifestPanel(): HTMLElement {
   panel.className = "lead-data-fold uilib-manifest";
 
   const summary = document.createElement("summary");
-  summary.textContent = "Manifesto para o Ollama (JSON)";
+  summary.textContent = "Manifesto para o Gemini (JSON)";
   panel.appendChild(summary);
 
   const bodyEl = document.createElement("div");
@@ -344,7 +344,7 @@ function buildManifestPanel(): HTMLElement {
   const hint = document.createElement("p");
   hint.className = "prompt-hint";
   hint.textContent =
-    "Catálogo legível por máquina com todos os componentes e suas props customizáveis. É este JSON que se injeta no prompt para o Ollama escolher e configurar componentes da página.";
+    "Catálogo legível por máquina com todos os componentes e suas props customizáveis. É este JSON que se injeta no prompt para o Gemini escolher e configurar componentes da página.";
   bodyEl.appendChild(hint);
 
   const output = document.createElement("pre");

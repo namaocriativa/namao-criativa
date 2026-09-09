@@ -26,9 +26,69 @@
       </nav>
     </header>
     <main class="dash-main">
-      <p class="kicker">Área do cliente</p>
+      <p class="kicker" id="dash-kicker">Área do cliente</p>
       <h1 id="dash-title">Painel</h1>
       <p class="lede" id="user-line">Carregando…</p>
+      <section class="dash-banner" id="dash-trial" hidden>
+        <p class="kicker">Prévia da conta</p>
+        <h2>Você ainda não é cliente</h2>
+        <p id="dash-trial-copy">
+          Esta é uma prévia. Para ter o serviço completo — estatísticas, site
+          permanente e acompanhamento — é preciso concluir o pagamento.
+        </p>
+        <p id="dash-trial-deadline"></p>
+        <a
+          class="btn btn-primary"
+          id="dash-contact"
+          hidden
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Falar no WhatsApp</a
+        >
+      </section>
+      <section class="dash-stats" id="dash-stats" hidden>
+        <div class="dash-stats-head">
+          <div>
+            <p class="kicker">Estatísticas</p>
+            <p class="dash-stats-host" id="dash-stats-host"></p>
+          </div>
+          <div class="dash-range" id="dash-range" role="group" aria-label="Período">
+            <button type="button" data-range="7d" class="is-active">7 dias</button>
+            <button type="button" data-range="28d">28 dias</button>
+            <button type="button" data-range="90d">90 dias</button>
+          </div>
+        </div>
+        <p class="status" id="dash-stats-status">Carregando visitas…</p>
+        <div class="dash-kpis" id="dash-kpis" hidden>
+          <article class="dash-kpi">
+            <p class="kicker">Visitantes</p>
+            <p class="dash-kpi-value" id="kpi-users">—</p>
+          </article>
+          <article class="dash-kpi">
+            <p class="kicker">Sessões</p>
+            <p class="dash-kpi-value" id="kpi-sessions">—</p>
+          </article>
+          <article class="dash-kpi">
+            <p class="kicker">Páginas vistas</p>
+            <p class="dash-kpi-value" id="kpi-pageviews">—</p>
+          </article>
+          <article class="dash-kpi">
+            <p class="kicker">Engajamento</p>
+            <p class="dash-kpi-value" id="kpi-engagement">—</p>
+          </article>
+        </div>
+        <div class="dash-stats-split" id="dash-stats-split" hidden>
+          <article class="dash-card">
+            <p class="kicker">Páginas</p>
+            <ol class="dash-rank" id="dash-top-pages"></ol>
+          </article>
+          <article class="dash-card">
+            <p class="kicker">Canais</p>
+            <ol class="dash-rank" id="dash-channels"></ol>
+          </article>
+        </div>
+      </section>
       <section class="dash-grid" id="dash-grid" hidden>
         <article class="dash-card">
           <p class="kicker">Negócio</p>
@@ -38,11 +98,16 @@
         </article>
         <article class="dash-card">
           <p class="kicker">Contato</p>
-          <dl id="dash-contact" class="dash-dl"></dl>
+          <dl id="dash-contact-dl" class="dash-dl"></dl>
         </article>
         <article class="dash-card">
           <p class="kicker">Presença</p>
           <dl id="dash-presence" class="dash-dl"></dl>
+        </article>
+        <article class="dash-card" id="dash-ig-card" hidden>
+          <p class="kicker">Instagram</p>
+          <p id="dash-ig-status"></p>
+          <a class="btn btn-ghost" href="/conectar.html">Gerenciar permissão</a>
         </article>
       </section>
       <p class="status" id="dash-status"></p>

@@ -43,7 +43,7 @@ export function buildPipelineOverviewPrompt(brief: LeadBrief): string {
   return `# Pipeline de landing (Page Spec)
 
 O scaffold Vite+React já existe em \`${brief.outputDir}/\`.
-Ollama NÃO gera código. Gera JSON: direção criativa, arquitetura de componentes e copy.
+Gemini NÃO gera código. Gera JSON: direção criativa, arquitetura de componentes e copy.
 O sistema valida com Zod e renderiza componentes fechados.
 
 ## Brief factual

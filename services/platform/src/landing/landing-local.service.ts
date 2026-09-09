@@ -10,7 +10,7 @@ import { createServer } from 'net';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ScaffoldService } from './scaffold.service';
-import { LeadService } from '../lead/lead.service';
+import { OwnerLookup } from '../owner/owner-lookup.service';
 import { stableLandingSlug } from './prompt.builder';
 
 const BASE_PORT = 4173;
@@ -31,7 +31,7 @@ export class LandingLocalService implements OnModuleDestroy {
   private readonly sessions = new Map<string, LocalSession>();
 
   constructor(
-    private readonly leadService: LeadService,
+    private readonly owners: OwnerLookup,
     private readonly scaffoldService: ScaffoldService,
   ) {}
 
@@ -42,7 +42,7 @@ export class LandingLocalService implements OnModuleDestroy {
     }
     if (current) this.sessions.delete(leadId);
 
-    const lead = await this.leadService.findById(leadId);
+    const lead = await this.owners.requireDetail(leadId);
     const slug = (lead.landingSlug || stableLandingSlug(lead)).trim();
     if (!slug) {
       throw new NotFoundException('Lead sem landing gerada');

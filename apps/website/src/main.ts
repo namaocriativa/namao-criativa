@@ -1,5 +1,6 @@
 import './chrome';
 import './invite-request';
+import { mountWebsiteChat } from './chat/mount';
 
 async function bootScenes() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -24,3 +25,4 @@ async function bootScenes() {
 }
 
 void bootScenes();
+mountWebsiteChat();

@@ -13,6 +13,7 @@ export interface LeadSource {
 
 export interface Lead {
   id?: string;
+  _entityKind?: "lead" | "customer";
   name?: string;
   category?: string | null;
   description?: string | null;
@@ -55,6 +56,7 @@ export interface Lead {
   activeLandingJobId?: string | null;
   publishedOrigin?: string | null;
   vercelProjectId?: string | null;
+  fromPublicSignup?: boolean;
   source?: string;
   discoverySources?: string[];
   generateConfig?: {

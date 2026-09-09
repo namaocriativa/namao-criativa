@@ -57,7 +57,7 @@ async function resolveProject(
     log('bootstrap', `creating project "${projectName}"`);
     const created = await client.post<ProjectCreated>('/projects', {
       name: projectName,
-      description: 'Namão Criativa — runtime, MongoDB, Evolution',
+      description: 'Namão Criativa — API, MongoDB, Evolution',
     });
     if (!created?.uuid) {
       throw new Error('Coolify did not return project uuid');

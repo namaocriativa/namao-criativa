@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { Prisma } from '@prisma/client';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerCreateData, ownerIdOf } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 import type { LandingGenerateConfig } from './pipeline.types';
 
@@ -72,16 +74,20 @@ export class LandingJobsService {
   private readonly emitters = new Map<string, EventEmitter>();
   private readonly configs = new Map<string, LandingGenerateConfig>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly owners: OwnerLookup,
+  ) {}
 
   async create(
     leadId: string,
     slug: string,
     config?: LandingGenerateConfig,
   ): Promise<LandingJobRuntime> {
+    const kind = await this.owners.requireKind(leadId);
     const row = await this.prisma.landingJob.create({
       data: {
-        leadId,
+        ...ownerCreateData(kind, leadId),
         slug,
         status: 'queued',
         log: [] as Prisma.InputJsonValue,
@@ -89,16 +95,13 @@ export class LandingJobsService {
       },
     });
 
-    await this.prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        landingStatus: 'generating',
-        activeLandingJobId: row.id,
-        landingSlug: slug,
-        ...(config
-          ? { generateConfig: config as Prisma.InputJsonValue }
-          : {}),
-      },
+    await this.owners.update(leadId, {
+      landingStatus: 'generating',
+      activeLandingJobId: row.id,
+      landingSlug: slug,
+      ...(config
+        ? { generateConfig: config as Prisma.InputJsonValue }
+        : {}),
     });
 
     const event: LandingJobEvent = {
@@ -159,14 +162,11 @@ export class LandingJobsService {
               ? 'build_failed'
               : 'error';
 
-      await this.prisma.lead.update({
-        where: { id: job.leadId },
-        data: {
-          landingStatus,
-          activeLandingJobId: null,
-          landingBuiltAt:
-            landingStatus === 'built' ? new Date() : undefined,
-        },
+      await this.owners.update(job.leadId, {
+        landingStatus,
+        activeLandingJobId: null,
+        landingBuiltAt:
+          landingStatus === 'built' ? new Date() : undefined,
       });
     }
 
@@ -210,7 +210,8 @@ export class LandingJobsService {
 
   private toRuntime(row: {
     id: string;
-    leadId: string;
+    leadId: string | null;
+    customerId?: string | null;
     slug: string;
     status: string;
     log: Prisma.JsonValue;
@@ -228,7 +229,7 @@ export class LandingJobsService {
 
     return {
       id: row.id,
-      leadId: row.leadId,
+      leadId: ownerIdOf(row) || '',
       slug: row.slug,
       status: row.status as LandingJobStage,
       log: Array.isArray(row.log) ? (row.log as LandingJobEvent[]) : [],

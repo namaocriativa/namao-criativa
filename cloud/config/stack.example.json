@@ -3,20 +3,21 @@
   "environment_name": "production",
   "server_name": "localhost",
   "runtime": {
-    "name": "namao-runtime",
-    "image_name": "ghcr.io/YOUR_ORG/namao-runtime",
+    "name": "namao-api",
+    "image_name": "ghcr.io/namaocriativa/namao-api",
     "image_tag": "latest",
-    "ports_exposes": "3001",
+    "ports_exposes": "3000",
     "health_check_path": "/health",
     "domain": ""
-  },
-  "mongodb": {
-    "name": "namao-mongodb",
-    "database": "namao"
   },
   "evolution": {
     "name": "namao-evolution",
     "instance": "namao",
+    "domain": ""
+  },
+  "website": {
+    "pages_project": "namao-website",
+    "production_branch": "main",
     "domain": ""
   }
 }

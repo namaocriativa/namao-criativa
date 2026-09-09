@@ -1,7 +1,6 @@
 import { Type } from 'class-transformer';
 import {
   IsDefined,
-  IsIn,
   IsNotEmpty,
   IsString,
   MaxLength,
@@ -9,9 +8,6 @@ import {
 } from 'class-validator';
 
 export class LlmRoleConfigDto {
-  @IsIn(['ollama', 'gemini'])
-  provider!: 'ollama' | 'gemini';
-
   @IsString()
   @IsNotEmpty()
   @MaxLength(120)

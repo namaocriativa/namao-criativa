@@ -17,6 +17,7 @@ import { LeadActivityService } from '../lead-activity/lead-activity.service';
 import { LeadMailService } from '../lead-mail/lead-mail.service';
 import { SendLeadWhatsAppDto } from '../lead-whatsapp/dto/send-lead-whatsapp.dto';
 import { LeadWhatsAppService } from '../lead-whatsapp/lead-whatsapp.service';
+import { ConvertToCustomerService } from '../owner/convert-to-customer.service';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadService, type LeadUploadFile } from './lead.service';
 
@@ -28,6 +29,7 @@ export class LeadController {
     private readonly mail: LeadMailService,
     private readonly whatsapp: LeadWhatsAppService,
     private readonly activity: LeadActivityService,
+    private readonly convertToCustomer: ConvertToCustomerService,
   ) {}
 
   @Get()
@@ -87,6 +89,11 @@ export class LeadController {
   @Get(':id/history')
   listHistory(@Param('id') id: string) {
     return this.activity.listHistory(id);
+  }
+
+  @Post(':id/convert-to-customer')
+  convertToCustomerAction(@Param('id') id: string) {
+    return this.convertToCustomer.convert(id);
   }
 
   @Get(':id')

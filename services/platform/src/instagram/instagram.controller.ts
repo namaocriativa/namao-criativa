@@ -11,6 +11,7 @@ import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { JwtUser } from '../auth/jwt.strategy';
+import { jwtOwnerId } from '../owner/owner.util';
 import { InstagramService } from './instagram.service';
 
 @Controller()
@@ -43,10 +44,10 @@ export class InstagramController {
   @Post('auth/instagram/sync')
   @UseGuards(JwtAuthGuard)
   syncMine(@CurrentUser() user: JwtUser) {
-    if (!user.leadId) {
+    if (!jwtOwnerId(user)) {
       return { imported: 0, error: 'no_lead' };
     }
-    return this.instagram.syncLead(user.leadId, user);
+    return this.instagram.syncLead(jwtOwnerId(user)!, user);
   }
 
   @Post('leads/:id/instagram/sync')

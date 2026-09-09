@@ -194,6 +194,46 @@ describe('pipeline-assembler', () => {
     expect(html).toContain('https://api.example.com');
   });
 
+  it('injeta GTM e dataLayer quando há container id', () => {
+    const files = assembleLandingFiles({
+      brief: sampleBrief(),
+      spec: {
+        version: 1,
+        theme: {
+          style: 'premium',
+          visualLanguage: 'limpo',
+          colorStrategy: 'neutro',
+          imageStrategy: 'balanced',
+          density: 'medium',
+          radius: 'small',
+          spacing: 'generous',
+          paletteId: 'slate-teal',
+          fontPairId: 'fraunces-source',
+        },
+        sections: [
+          {
+            id: 'hero',
+            type: 'hero',
+            component: 'hero.split-image',
+            purpose: 'abertura',
+            props: { headline: 'Teste', nav: [], cta: null, brand: 'Teste' },
+          },
+        ],
+        overlays: [],
+        features: [],
+      },
+      publicSiteId: 'site_abc',
+      gtmContainerId: 'GTM-TEST99',
+      leadId: 'lead1',
+      landingSlug: 'escritorio-teste',
+    });
+    const html = files.find((file) => file.path === 'index.html')?.content || '';
+    expect(html).toContain('googletagmanager.com/gtm.js?id=');
+    expect(html).toContain('GTM-TEST99');
+    expect(html).toContain('"lead_id":"lead1"');
+    expect(html).toContain('ns.html?id=GTM-TEST99');
+  });
+
   it('serializa seção custom no page-spec com id estável', () => {
     const brief = sampleBrief();
     const files = assembleLandingFiles({

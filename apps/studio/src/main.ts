@@ -15,9 +15,11 @@ import {
   getGeneratePayload,
   mountSiteWizard,
   openSiteWizard,
+  setWizardApiKind,
   setWizardLeadId,
   setWizardOnConfirm,
 } from "./site-config";
+import { entityKindOf, profileApi, type EntityKind } from "./profile-api";
 import { initLeadGallery } from "./lead-gallery";
 import { initLeadAccountModal } from "./lead-account-modal";
 import { initLeadEditModal } from "./lead-edit-modal";
@@ -110,6 +112,14 @@ const savedLeadsStatus = el<HTMLElement>("saved-leads-status");
 const refreshLeadsBtn = el<HTMLButtonElement>("refresh-leads-btn");
 const leadsSearchInput = el<HTMLInputElement>("leads-search-input");
 const leadsCategoryFilter = el<HTMLSelectElement>("leads-category-filter");
+const leadsOriginFilter = el<HTMLSelectElement>("leads-origin-filter");
+const savedCustomers = el<HTMLElement>("saved-customers");
+const savedCustomersStatus = el<HTMLElement>("saved-customers-status");
+const refreshCustomersBtn = el<HTMLButtonElement>("refresh-customers-btn");
+const customersSearchInput = el<HTMLInputElement>("customers-search-input");
+const customersCategoryFilter = el<HTMLSelectElement>(
+  "customers-category-filter",
+);
 const navLinks = document.querySelectorAll<HTMLAnchorElement>(
   ".nav-tabs a[data-route], .side-nav a[data-route]",
 );
@@ -117,6 +127,8 @@ const navLinks = document.querySelectorAll<HTMLAnchorElement>(
 /** Cache da lista completa para filtrar no client. */
 let savedLeadsCache: Lead[] = [];
 let leadsSearchDebounce: ReturnType<typeof setTimeout> | null = null;
+let savedCustomersCache: Lead[] = [];
+let customersSearchDebounce: ReturnType<typeof setTimeout> | null = null;
 
 const detailHeading = el<HTMLElement>("detail-heading");
 const leadSitePanel = el<HTMLElement>("lead-site-panel");
@@ -139,6 +151,7 @@ const siteProgressToggle = el<HTMLButtonElement>("site-progress-toggle");
 const siteDownloadLogBtn = el<HTMLButtonElement>("site-download-log-btn");
 
 let currentLeadId: string | null = null;
+let currentEntityKind: EntityKind = "lead";
 let currentLead: Lead | null = null;
 let historyLoadSeq = 0;
 let activeJobId: string | null = null;
@@ -176,23 +189,34 @@ function syncNav(route: AppRoute) {
 
 const packagesTab = initPackagesTab();
 
+function currentProfileApi(suffix = "", id = currentLeadId) {
+  if (!id) return "";
+  return profileApi(currentEntityKind, id, suffix);
+}
+
 function applyRoute(route: AppRoute) {
   showTab(tabForRoute(route));
   syncNav(route);
-  if (route.name !== "lead") setLeadView(false);
+  if (route.name !== "lead" && route.name !== "customer") setLeadView(false);
   const titleHint =
-    route.name === "lead"
+    route.name === "lead" || route.name === "customer"
       ? detailHeading.textContent || undefined
       : undefined;
   document.title = titleForRoute(route, titleHint);
-  if (route.name === "lead" && currentLeadId !== route.id) {
-    void openSavedLead(route.id);
+  if (route.name === "lead") {
+    if (currentLeadId !== route.id || currentEntityKind !== "lead") {
+      void openSavedLead(route.id, "lead");
+    }
+  } else if (route.name === "customer") {
+    if (currentLeadId !== route.id || currentEntityKind !== "customer") {
+      void openSavedLead(route.id, "customer");
+    }
   }
   packagesTab.onRoute(route);
 }
 
 initUiLib(el<HTMLElement>("ui-lib-root"));
-initConfigTab({ onSaved: () => void refreshOllamaStatus() });
+initConfigTab({ onSaved: () => void refreshLlmStatus() });
 mountSiteWizard(el<HTMLElement>("site-wizard-root"));
 const leadGallery = initLeadGallery(el<HTMLElement>("lead-gallery-root"), {
   onLeadUpdated: (lead) => {
@@ -545,12 +569,31 @@ function contextValue(value: unknown, empty = "—") {
 }
 
 function renderLeadContext(lead: Lead) {
+  const kind = entityKindOf(lead);
+  const isCustomer = kind === "customer";
   const imageList = lead.images || [];
   const sources = (lead.sources || []).map((s) => s.provider).filter(Boolean);
   const place =
     lead.city && lead.state
       ? `${lead.city}/${lead.state}`
       : lead.city || lead.state || "";
+  const foldSummary = document.querySelector("#lead-context-fold > summary");
+  if (foldSummary) {
+    foldSummary.textContent = isCustomer
+      ? "Contexto do customer"
+      : "Contexto do lead";
+  }
+  const summaryTitle = leadContextSummary.closest(".app-card")?.querySelector("h3");
+  if (summaryTitle) {
+    summaryTitle.textContent = isCustomer ? "Resumo do customer" : "Resumo do lead";
+  }
+  const backBtn = document.getElementById("detail-back-btn");
+  if (backBtn instanceof HTMLAnchorElement) {
+    backBtn.href = isCustomer ? "/customers" : "/leads";
+    backBtn.textContent = isCustomer
+      ? "← Voltar aos customers"
+      : "← Voltar aos leads";
+  }
   leadContextEditBtn.hidden = !lead.id;
   leadContextEditBtn.onclick = () => leadEdit.open(lead);
   leadContextSummary.innerHTML = `
@@ -591,6 +634,11 @@ function renderLeadContext(lead: Lead) {
     ${lead.id ? `<button type="button" data-context-action="emails">E-mails</button>` : ""}
     ${lead.id ? `<button type="button" data-context-action="whatsapp">Wpp Msgs</button>` : ""}
     ${lead.id ? `<button type="button" data-context-action="export">Exportar dados</button>` : ""}
+    ${
+      lead.id && !isCustomer
+        ? `<button type="button" data-context-action="convert-customer">Transformar em Customer</button>`
+        : ""
+    }
   `;
   leadContextActions
     .querySelector("[data-context-action='gallery']")
@@ -598,16 +646,21 @@ function renderLeadContext(lead: Lead) {
   leadContextActions
     .querySelector("[data-context-action='emails']")
     ?.addEventListener("click", () => {
-      if (lead.id) leadEmails.open(lead.id);
+      if (lead.id) leadEmails.open(lead.id, kind);
     });
   leadContextActions
     .querySelector("[data-context-action='whatsapp']")
     ?.addEventListener("click", () => {
-      if (lead.id) leadWhatsApp.open(lead.id);
+      if (lead.id) leadWhatsApp.open(lead.id, kind);
     });
   leadContextActions
     .querySelector("[data-context-action='export']")
     ?.addEventListener("click", () => exportLeadJson(lead));
+  leadContextActions
+    .querySelector("[data-context-action='convert-customer']")
+    ?.addEventListener("click", () => {
+      if (lead.id) void convertLeadToCustomer(lead);
+    });
 
   void loadLeadHistory(lead);
 }
@@ -641,10 +694,16 @@ function fallbackHistory(lead: Lead): HistoryItem[] {
     history.push({ title: "Site gerado", at: formatDate(lead.landingBuiltAt) });
   }
   if (lead.updatedAt) {
-    history.push({ title: "Lead atualizado", at: formatDate(lead.updatedAt) });
+    history.push({
+      title: entityKindOf(lead) === "customer" ? "Customer atualizado" : "Lead atualizado",
+      at: formatDate(lead.updatedAt),
+    });
   }
   if (lead.createdAt) {
-    history.push({ title: "Lead criado", at: formatDate(lead.createdAt) });
+    history.push({
+      title: entityKindOf(lead) === "customer" ? "Customer criado" : "Lead criado",
+      at: formatDate(lead.createdAt),
+    });
   }
   return history;
 }
@@ -657,7 +716,9 @@ async function loadLeadHistory(lead: Lead) {
   }
   leadContextHistory.innerHTML = `<li><strong>Carregando histórico…</strong></li>`;
   try {
-    const res = await fetch(`/leads/${encodeURIComponent(lead.id)}/history`);
+    const res = await fetch(
+      profileApi(entityKindOf(lead), lead.id, "/history"),
+    );
     const data = (await res.json().catch(() => ({}))) as {
       items?: Array<{ title?: string; summary?: string | null; at?: string }>;
     };
@@ -686,12 +747,13 @@ function exportLeadJson(lead: Lead) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${lead.id || "lead"}.json`;
+  a.download = `${lead.id || entityKindOf(lead)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 function renderLead(lead: Lead) {
+  lead._entityKind = lead._entityKind || currentEntityKind;
   const imageList = lead.images || [];
   const sources = (lead.sources || [])
     .map((s) => s.provider)
@@ -715,7 +777,11 @@ function renderLead(lead: Lead) {
       <div class="lead-summary-main">
         <p class="lead-summary-title">
           <strong>${escapeHtml(lead.name || "Sem nome")}</strong>
-          <span class="lead-badge">Lead atualizado</span>
+          <span class="lead-badge">${
+            entityKindOf(lead) === "customer"
+              ? "Customer"
+              : "Lead atualizado"
+          }</span>
         </p>
         <p class="lead-summary-bits">
           ${place ? `<span>${escapeHtml(place)}</span>` : ""}
@@ -737,7 +803,7 @@ function renderLead(lead: Lead) {
 
   leadDataExtra.innerHTML = `
     <details class="lead-data-fold">
-      <summary>Dados do lead</summary>
+      <summary>${entityKindOf(lead) === "customer" ? "Dados do customer" : "Dados do lead"}</summary>
       <div class="lead-data-body">
         <dl>
           ${field("Categoria", lead.category)}
@@ -798,7 +864,7 @@ function renderLead(lead: Lead) {
     </details>
   `;
   const detailActions = document.getElementById("detail-actions");
-  if (detailActions && lead.id) {
+  if (detailActions && lead.id && entityKindOf(lead) !== "customer") {
     const refreshBtn = document.createElement("button");
     refreshBtn.type = "button";
     refreshBtn.textContent = "Enriquecer novamente";
@@ -831,7 +897,8 @@ function renderLead(lead: Lead) {
   }
   currentLeadId = nextId;
   currentLead = lead;
-  detailHeading.textContent = lead.name || "Lead";
+  currentEntityKind = entityKindOf(lead);
+  detailHeading.textContent = lead.name || (currentEntityKind === "customer" ? "Customer" : "Lead");
   leadSitePanel.hidden = !currentLeadId;
   siteActions.hidden = !currentLeadId;
   setSiteActionsEnabled(Boolean(currentLeadId));
@@ -841,11 +908,15 @@ function renderLead(lead: Lead) {
   setProgressGenerating(
     Boolean(lead.activeLandingJobId) || lead.landingStatus === "generating",
   );
-  void refreshOllamaStatus();
+  void refreshLlmStatus();
   void maybeReconnectJob(lead);
   if (currentLeadId) {
-    document.title = titleForRoute({ name: "lead", id: currentLeadId }, lead.name);
-    navigate({ name: "lead", id: currentLeadId });
+    const routeName = currentEntityKind === "customer" ? "customer" : "lead";
+    document.title = titleForRoute(
+      { name: routeName, id: currentLeadId },
+      lead.name,
+    );
+    navigate({ name: routeName, id: currentLeadId });
   } else {
     showTab("detail");
   }
@@ -952,6 +1023,34 @@ async function loadSavedLeads() {
   }
 }
 
+async function loadSavedCustomers() {
+  setStatus(savedCustomersStatus, "Carregando...");
+  refreshCustomersBtn.disabled = true;
+  try {
+    const res = await fetch("/customers");
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || "Falha ao listar customers");
+    }
+    savedCustomersCache = (data as Lead[]).map((item) => ({
+      ...item,
+      _entityKind: "customer" as const,
+    }));
+    populateNamedCategoryFilter(customersCategoryFilter, savedCustomersCache);
+    renderSavedCustomersList();
+  } catch (error) {
+    savedCustomersCache = [];
+    savedCustomers.innerHTML = "";
+    setStatus(
+      savedCustomersStatus,
+      errorMessage(error, "Erro ao carregar customers"),
+      true,
+    );
+  } finally {
+    refreshCustomersBtn.disabled = false;
+  }
+}
+
 function normalizeSearch(value: string) {
   return value
     .normalize("NFD")
@@ -960,8 +1059,11 @@ function normalizeSearch(value: string) {
     .trim();
 }
 
-function populateCategoryFilter(leads: Lead[]) {
-  const selected = leadsCategoryFilter.value;
+function populateNamedCategoryFilter(
+  select: HTMLSelectElement,
+  leads: Lead[],
+) {
+  const selected = select.value;
   const categories = [
     ...new Set(
       leads
@@ -970,31 +1072,36 @@ function populateCategoryFilter(leads: Lead[]) {
     ),
   ].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
-  leadsCategoryFilter.innerHTML = `<option value="">Todas</option>`;
+  select.innerHTML = `<option value="">Todas</option>`;
   if (leads.some((lead) => !String(lead.category || "").trim())) {
     const opt = document.createElement("option");
     opt.value = "__none__";
     opt.textContent = "Sem categoria";
-    leadsCategoryFilter.appendChild(opt);
+    select.appendChild(opt);
   }
   for (const category of categories) {
     const opt = document.createElement("option");
     opt.value = category;
     opt.textContent = category;
-    leadsCategoryFilter.appendChild(opt);
+    select.appendChild(opt);
   }
+  const stillValid = [...select.options].some((opt) => opt.value === selected);
+  select.value = stillValid ? selected : "";
+}
 
-  const stillValid = [...leadsCategoryFilter.options].some(
-    (opt) => opt.value === selected,
-  );
-  leadsCategoryFilter.value = stillValid ? selected : "";
+function populateCategoryFilter(leads: Lead[]) {
+  populateNamedCategoryFilter(leadsCategoryFilter, leads);
 }
 
 function filterSavedLeads(leads: Lead[]) {
   const query = normalizeSearch(leadsSearchInput.value);
   const category = leadsCategoryFilter.value;
+  const origin = leadsOriginFilter.value;
 
   return leads.filter((lead) => {
+    if (origin === "signup" && !lead.fromPublicSignup) return false;
+    if (origin === "discovery" && lead.fromPublicSignup) return false;
+
     if (category === "__none__") {
       if (String(lead.category || "").trim()) return false;
     } else if (category && String(lead.category || "").trim() !== category) {
@@ -1020,7 +1127,8 @@ function renderSavedLeadsList() {
 
   const filtering =
     Boolean(leadsSearchInput.value.trim()) ||
-    Boolean(leadsCategoryFilter.value);
+    Boolean(leadsCategoryFilter.value) ||
+    Boolean(leadsOriginFilter.value);
   setStatus(
     savedLeadsStatus,
     filtering
@@ -1044,6 +1152,7 @@ function renderSavedLeadsList() {
     li.innerHTML = `
       <strong>${escapeHtml(lead.name || "Sem nome")}</strong>
       ${landingBadgeHtml(lead.landingStatus, lead.publishedOrigin)}
+      ${lead.fromPublicSignup ? `<span class="landing-badge origin-badge">cadastro</span>` : ""}
       <div class="meta">
         ${category ? `<span class="lead-category-tag">${escapeHtml(category)}</span> · ` : ""}
         ${place ? escapeHtml(place) + " · " : ""}
@@ -1088,6 +1197,137 @@ leadsCategoryFilter.addEventListener("change", () => {
   renderSavedLeadsList();
 });
 
+leadsOriginFilter.addEventListener("change", () => {
+  renderSavedLeadsList();
+});
+
+function filterSavedCustomers(leads: Lead[]) {
+  const query = normalizeSearch(customersSearchInput.value);
+  const category = customersCategoryFilter.value;
+  return leads.filter((lead) => {
+    if (category === "__none__") {
+      if (String(lead.category || "").trim()) return false;
+    } else if (category && String(lead.category || "").trim() !== category) {
+      return false;
+    }
+    if (!query) return true;
+    const haystack = normalizeSearch(
+      [lead.name, lead.city, lead.state, lead.website].filter(Boolean).join(" "),
+    );
+    return haystack.includes(query);
+  });
+}
+
+function renderSavedCustomersList() {
+  const leads = filterSavedCustomers(savedCustomersCache);
+  savedCustomers.innerHTML = "";
+
+  if (!savedCustomersCache.length) {
+    setStatus(savedCustomersStatus, "Nenhum customer ainda.");
+    return;
+  }
+
+  const filtering =
+    Boolean(customersSearchInput.value.trim()) ||
+    Boolean(customersCategoryFilter.value);
+  setStatus(
+    savedCustomersStatus,
+    filtering
+      ? `${leads.length} de ${savedCustomersCache.length} customer(s).`
+      : `${savedCustomersCache.length} customer(s) no banco.`,
+  );
+
+  if (!leads.length) {
+    const empty = document.createElement("li");
+    empty.className = "empty-filter";
+    empty.textContent = "Nenhum customer corresponde aos filtros.";
+    savedCustomers.appendChild(empty);
+    return;
+  }
+
+  leads.forEach((lead) => {
+    const li = document.createElement("li");
+    const place = [lead.city, lead.state].filter(Boolean).join(" - ");
+    const counts = lead._count || {};
+    const category = String(lead.category || "").trim();
+    li.innerHTML = `
+      <strong>${escapeHtml(lead.name || "Sem nome")}</strong>
+      ${landingBadgeHtml(lead.landingStatus, lead.publishedOrigin)}
+      <div class="meta">
+        ${category ? `<span class="lead-category-tag">${escapeHtml(category)}</span> · ` : ""}
+        ${place ? escapeHtml(place) + " · " : ""}
+        atualizado ${escapeHtml(formatDate(lead.updatedAt))}
+      </div>
+      <div class="meta">
+        ${lead.website ? escapeHtml(lead.website) + " · " : ""}
+        ${lead.instagram ? escapeHtml(lead.instagram) + " · " : ""}
+        ${lead.phone ? escapeHtml(lead.phone) + " · " : ""}
+        ${counts.images ?? 0} imagem(ns) · ${counts.sources ?? 0} fonte(s)
+        ${lead.landingSlug ? ` · ${escapeHtml(lead.landingSlug)}` : ""}
+      </div>
+      <div class="actions"></div>
+    `;
+    const actions = li.querySelector(".actions");
+    if (lead.id) {
+      const openLink = document.createElement("a");
+      openLink.href = hrefFor({ name: "customer", id: lead.id });
+      openLink.className = "button-link secondary";
+      openLink.textContent = "Abrir";
+      actions?.appendChild(openLink);
+    }
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "danger";
+    deleteBtn.textContent = "Deletar";
+    deleteBtn.addEventListener("click", () => {
+      if (lead.id) void deleteSavedCustomer(lead.id, lead.name || "este customer");
+    });
+    actions?.appendChild(deleteBtn);
+    savedCustomers.appendChild(li);
+  });
+}
+
+customersSearchInput.addEventListener("input", () => {
+  if (customersSearchDebounce) clearTimeout(customersSearchDebounce);
+  customersSearchDebounce = setTimeout(() => renderSavedCustomersList(), 160);
+});
+
+customersCategoryFilter.addEventListener("change", () => {
+  renderSavedCustomersList();
+});
+
+async function deleteSavedCustomer(id: string, name: string) {
+  const confirmed = window.confirm(
+    `Deletar o customer "${name}"? Isso remove o registro e as imagens do storage.`,
+  );
+  if (!confirmed) return;
+  setStatus(savedCustomersStatus, `Deletando "${name}"...`);
+  try {
+    const res = await fetch(`/customers/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        (data as { message?: string }).message || "Falha ao deletar customer",
+      );
+    }
+    setStatus(savedCustomersStatus, `Customer "${name}" deletado.`);
+    if (currentLeadId === id && currentEntityKind === "customer") {
+      currentLeadId = null;
+      currentLead = null;
+      navigate({ name: "customers" });
+    }
+    await loadSavedCustomers();
+  } catch (error) {
+    setStatus(
+      savedCustomersStatus,
+      errorMessage(error, "Erro ao deletar customer"),
+      true,
+    );
+  }
+}
+
 
 async function deleteSavedLead(id: string, name: string) {
   const confirmed = window.confirm(
@@ -1124,33 +1364,73 @@ async function deleteSavedLead(id: string, name: string) {
 
 let openLeadRequest = 0;
 
-async function openSavedLead(id: string) {
-  const request = ++openLeadRequest;
-  setStatus(savedLeadsStatus, "Abrindo lead...");
+async function convertLeadToCustomer(lead: Lead) {
+  if (!lead.id) return;
+  const confirmed = window.confirm(
+    `Transformar "${lead.name || "este lead"}" em Customer? O lead será excluído e passará a ser um Customer.`,
+  );
+  if (!confirmed) return;
   try {
-    const res = await fetch(`/leads/${encodeURIComponent(id)}`);
+    const res = await fetch(
+      `/leads/${encodeURIComponent(lead.id)}/convert-to-customer`,
+      { method: "POST" },
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        (data as { message?: string }).message ||
+          "Falha ao transformar em Customer",
+      );
+    }
+    const customer = {
+      ...(data as Lead),
+      _entityKind: "customer" as const,
+    };
+    await loadSavedLeads();
+    await loadSavedCustomers();
+    renderLead(customer);
+  } catch (error) {
+    window.alert(errorMessage(error, "Falha ao transformar em Customer"));
+  }
+}
+
+async function openSavedLead(id: string, kind: EntityKind = "lead") {
+  const request = ++openLeadRequest;
+  currentEntityKind = kind;
+  const statusEl = kind === "customer" ? savedCustomersStatus : savedLeadsStatus;
+  setStatus(statusEl, kind === "customer" ? "Abrindo customer..." : "Abrindo lead...");
+  try {
+    const res = await fetch(profileApi(kind, id));
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.message || "Lead não encontrado");
+      throw new Error(
+        data.message ||
+          (kind === "customer" ? "Customer não encontrado" : "Lead não encontrado"),
+      );
     }
     if (request !== openLeadRequest) return;
-    setStatus(savedLeadsStatus, "");
-    renderLead(data as Lead);
+    setStatus(statusEl, "");
+    renderLead({ ...(data as Lead), _entityKind: kind });
   } catch (error) {
     if (request !== openLeadRequest) return;
     currentLeadId = id;
     currentLead = null;
+    currentEntityKind = kind;
     leadSitePanel.hidden = true;
     setSiteActionsEnabled(false);
-    detailHeading.textContent = "Lead não encontrado";
+    const label = kind === "customer" ? "Customer" : "Lead";
+    detailHeading.textContent = `${label} não encontrado`;
     leadDetail.innerHTML = `<p class="empty-detail">${escapeHtml(
-      errorMessage(error, "Erro ao abrir lead"),
+      errorMessage(error, `Erro ao abrir ${label.toLowerCase()}`),
     )}</p>`;
     leadDataExtra.innerHTML = "";
-    document.title = titleForRoute({ name: "lead", id }, "Lead não encontrado");
+    document.title = titleForRoute(
+      { name: kind, id },
+      `${label} não encontrado`,
+    );
     setStatus(
-      savedLeadsStatus,
-      errorMessage(error, "Erro ao abrir lead"),
+      statusEl,
+      errorMessage(error, `Erro ao abrir ${label.toLowerCase()}`),
       true,
     );
   }
@@ -1548,7 +1828,9 @@ enrichForm.addEventListener("submit", async (event: SubmitEvent) => {
 });
 
 refreshLeadsBtn.addEventListener("click", () => loadSavedLeads());
+refreshCustomersBtn.addEventListener("click", () => loadSavedCustomers());
 loadSavedLeads();
+loadSavedCustomers();
 startRouter(applyRoute);
 
 function setSiteActionsEnabled(enabled: boolean) {
@@ -1746,7 +2028,7 @@ function handleJobTerminal(payload: {
 async function reloadCurrentLead() {
   if (!currentLeadId) return;
   try {
-    const res = await fetch(`/leads/${encodeURIComponent(currentLeadId)}`);
+    const res = await fetch(currentProfileApi());
     const data = await res.json();
     if (res.ok) {
       updateLandingMeta(data as Lead);
@@ -1856,7 +2138,7 @@ async function maybeReconnectJob(lead: Lead) {
   await recoverJob(jobId, lead.id);
 }
 
-async function refreshOllamaStatus() {
+async function refreshLlmStatus() {
   try {
     const res = await fetch("/landing/status");
     const data = await res.json();
@@ -1892,10 +2174,10 @@ siteDownloadLogBtn.addEventListener("click", () => {
 });
 
 siteRefreshBtn.addEventListener("click", async () => {
-  await refreshOllamaStatus();
+  await refreshLlmStatus();
   if (currentLeadId) {
     try {
-      const res = await fetch(`/leads/${encodeURIComponent(currentLeadId)}`);
+      const res = await fetch(currentProfileApi());
       const data = await res.json();
       if (res.ok) renderLead(data as Lead);
     } catch {
@@ -1907,7 +2189,7 @@ siteRefreshBtn.addEventListener("click", async () => {
 
 siteAccountBtn.addEventListener("click", () => {
   if (!currentLeadId) return;
-  leadAccount.open(currentLeadId);
+  leadAccount.open(currentLeadId, currentEntityKind);
 });
 
 siteLocalBtn.addEventListener("click", async () => {
@@ -1967,7 +2249,7 @@ sitePublishBtn.addEventListener("click", async () => {
     const url = String(data.url || "");
     setStatus(siteStatus, url ? `Publicado: ${url}` : "Publicado na Vercel.");
     appendSiteLog(url ? `Vercel: ${url}` : "Deploy Vercel ok");
-    const leadRes = await fetch(`/leads/${encodeURIComponent(leadId)}`);
+    const leadRes = await fetch(currentProfileApi("", leadId));
     const leadData = await leadRes.json();
     if (leadRes.ok) {
       renderLead(leadData as Lead);
@@ -2014,7 +2296,7 @@ siteDeleteBtn.addEventListener("click", async () => {
         : "Status limpo (pasta já inexistente).",
     );
     appendSiteLog(`Site deletado · ${data.path || "?"}`);
-    const leadRes = await fetch(`/leads/${encodeURIComponent(leadId)}`);
+    const leadRes = await fetch(currentProfileApi("", leadId));
     const leadData = await leadRes.json();
     if (leadRes.ok) {
       updateLandingMeta(leadData as Lead);
@@ -2078,6 +2360,7 @@ siteCancelBtn.addEventListener("click", async () => {
 siteGenerateBtn.addEventListener("click", () => {
   if (!currentLeadId) return;
   setWizardLeadId(currentLeadId);
+  setWizardApiKind(currentEntityKind);
   openSiteWizard();
 });
 
@@ -2094,7 +2377,7 @@ async function startLandingGenerate() {
     siteEventSource = null;
   }
 
-  setStatus(siteStatus, "Iniciando geração Ollama...");
+  setStatus(siteStatus, "Iniciando geração Gemini...");
   siteGenerateBtn.disabled = true;
   siteProgressFill.style.width = "0%";
   siteProgressLabel.textContent = "Iniciando pipeline…";

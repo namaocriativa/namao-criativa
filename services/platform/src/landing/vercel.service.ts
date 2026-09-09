@@ -6,10 +6,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PrismaService } from '../prisma/prisma.service';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import { injectGtmIntoHtml, normalizeGtmContainerId } from './gtm-snippet';
 import {
   collectDistFiles,
+  sha1Buffer,
   type DistFile,
   vercelProjectName,
 } from './vercel-files';
@@ -39,7 +42,7 @@ export class VercelService {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly prisma: PrismaService,
+    private readonly owners: OwnerLookup,
   ) {}
 
   get token(): string {
@@ -84,7 +87,11 @@ export class VercelService {
       );
     }
     const distDir = path.join(opts.projectDir, 'dist');
-    const files = await collectDistFiles(distDir);
+    const files = await this.withGtmInjection(
+      await collectDistFiles(distDir),
+      distDir,
+      opts,
+    );
     if (!files.some((item) => item.file === 'index.html')) {
       throw new BadRequestException(
         'dist/index.html ausente. Gere o site e aguarde o build antes de publicar.',
@@ -111,16 +118,51 @@ export class VercelService {
       throw new ServiceUnavailableException('Vercel não retornou URL do deploy');
     }
 
-    await this.prisma.lead.update({
-      where: { id: opts.leadId },
-      data: {
-        publishedOrigin: url,
-        vercelProjectId: projectId || null,
-        vercelDeploymentId: deploymentId || null,
-      },
+    await this.owners.update(opts.leadId, {
+      publishedOrigin: url,
+      vercelProjectId: projectId || null,
+      vercelDeploymentId: deploymentId || null,
     });
 
     return { url, deploymentId, projectId, projectName };
+  }
+
+  private async withGtmInjection(
+    files: DistFile[],
+    distDir: string,
+    opts: { leadId: string; slug: string },
+  ): Promise<DistFile[]> {
+    const containerId = normalizeGtmContainerId(
+      this.config.get<string>('GTM_CONTAINER_ID'),
+    );
+    if (!containerId) return files;
+
+    const index = files.find((item) => item.file === 'index.html');
+    if (!index) return files;
+
+    const lead = await this.owners.findProfile(opts.leadId);
+    const html = injectGtmIntoHtml(index.data.toString('utf8'), {
+      containerId,
+      leadId: opts.leadId,
+      siteId: lead?.publicSiteId,
+      landingSlug: lead?.landingSlug || opts.slug,
+    });
+    const data = Buffer.from(html, 'utf8');
+    if (data.equals(index.data)) return files;
+
+    index.data = data;
+    index.sha = sha1Buffer(data);
+    index.size = data.byteLength;
+    try {
+      await fs.writeFile(path.join(distDir, 'index.html'), data);
+    } catch (error) {
+      this.logger.warn(
+        `Não foi possível gravar dist/index.html com GTM: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    return files;
   }
 
   private headers(): Record<string, string> {

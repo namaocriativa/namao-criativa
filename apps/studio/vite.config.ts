@@ -126,6 +126,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/leads': apiProxy(),
+      '/customers': apiProxy(),
       '/lead-discovery': apiProxy(),
       '/enrichment': apiProxy(),
       '/packages': apiProxy(),

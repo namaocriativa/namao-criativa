@@ -2,15 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { buildJsonRepairPrompt } from '../landing/pipeline-prompts';
+import type { GenerateOptions } from './generate-options';
 import {
-  parseJsonValue,
-  type GenerateOptions,
-} from '../landing/ollama.service';
+  extractGeminiText,
+  geminiHttpError,
+  parseGeminiSseStream,
+} from './gemini-sse';
+import { parseJsonValue } from './json-parse';
 import { GEMINI_DEFAULTS, GEMINI_SUGGESTED_MODELS } from './llm.types';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-type GeminiPart = { text?: string; inline_data?: { mime_type: string; data: string } };
+type GeminiPart = {
+  text?: string;
+  inline_data?: { mime_type: string; data: string };
+};
 
 @Injectable()
 export class GeminiService {
@@ -105,9 +111,7 @@ export class GeminiService {
         'GEMINI_API_KEY não configurada. Defina no .env (Google AI Studio).',
       );
     }
-    const model = this.normalizeModel(
-      options.model || GEMINI_DEFAULTS.code,
-    );
+    const model = this.normalizeModel(options.model || GEMINI_DEFAULTS.code);
     const parts: GeminiPart[] = [{ text: prompt }];
     const images = options.images || [];
     images.forEach((data, index) => {
@@ -135,6 +139,7 @@ export class GeminiService {
         {
           params: { key: this.apiKey },
           timeout: 180_000,
+          signal: options.signal,
         },
       );
       const text = extractGeminiText(res.data);
@@ -157,19 +162,45 @@ export class GeminiService {
     prompt: string,
     options: GenerateOptions = {},
   ): AsyncGenerator<string> {
-    const text = await this.generateRaw(prompt, options);
-    if (text) yield text;
+    if (!this.configured) {
+      throw new Error(
+        'GEMINI_API_KEY não configurada. Defina no .env (Google AI Studio).',
+      );
+    }
+    const model = this.normalizeModel(
+      options.model || GEMINI_DEFAULTS.chat,
+    );
+    const url = `${GEMINI_BASE}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(this.apiKey)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: options.temperature ?? 0.4,
+        },
+      }),
+      signal: options.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      const message = geminiHttpError(res.status, body);
+      this.logger.warn(`Gemini stream failed: ${message}`);
+      throw new Error(message);
+    }
+    if (!res.body) {
+      throw new Error('Gemini retornou resposta vazia');
+    }
+    let yielded = false;
+    for await (const delta of parseGeminiSseStream(res.body)) {
+      if (!delta) continue;
+      yielded = true;
+      yield delta;
+    }
+    if (!yielded) {
+      throw new Error('Gemini retornou resposta vazia');
+    }
   }
-}
-
-function extractGeminiText(data: unknown): string {
-  const candidates = (data as { candidates?: Array<{ content?: { parts?: GeminiPart[] } }> })
-    ?.candidates;
-  const parts = candidates?.[0]?.content?.parts || [];
-  return parts
-    .map((part) => part.text || '')
-    .filter(Boolean)
-    .join('');
 }
 
 function geminiErrorMessage(error: unknown): string {

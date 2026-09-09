@@ -14,12 +14,18 @@ describe('LeadMailService', () => {
   };
   const accounts = { getAccount: jest.fn(), sendPassword: jest.fn() };
   const activity = { record: jest.fn() };
+  const owners = {
+    kindOf: jest.fn().mockResolvedValue('lead'),
+    requireKind: jest.fn().mockResolvedValue('lead'),
+    findProfile: jest.fn(),
+  };
   const service = new LeadMailService(
     prisma as never,
     config as never,
     invites as never,
     accounts as never,
     activity as never,
+    owners as never,
   );
 
   beforeEach(() => {
@@ -40,6 +46,7 @@ describe('LeadMailService', () => {
       users: [],
       instagramConnections: [],
     });
+    owners.kindOf.mockResolvedValue('lead');
   });
 
   it('lista os modelos disponíveis', async () => {
@@ -204,7 +211,7 @@ describe('LeadMailService', () => {
   });
 
   it('404 se o lead não existe', async () => {
-    prisma.lead.findUnique.mockResolvedValue(null);
+    owners.kindOf.mockResolvedValue(null);
     await expect(service.list('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );

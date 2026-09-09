@@ -16,26 +16,52 @@ export type StackConfig = {
     health_check_path: string;
     domain: string;
   };
-  mongodb: {
-    name: string;
-    database: string;
-  };
   evolution: {
     name: string;
     instance: string;
     domain: string;
   };
+  website: {
+    pages_project: string;
+    production_branch: string;
+    domain: string;
+  };
 };
 
 export function loadEnv(): void {
-  loadDotenv({ path: join(cloudRoot(), '.env') });
+  // Root monorepo .env first (shared secrets), then cloud/.env overrides
+  const rootEnv = join(cloudRoot(), '..', '.env');
+  if (existsSync(rootEnv)) {
+    loadDotenv({ path: rootEnv });
+  }
+  loadDotenv({ path: join(cloudRoot(), '.env'), override: true });
+}
+
+export function resolveDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new Error(
+      'DATABASE_URL is required (PostgreSQL). Put it in the repo root .env or cloud/.env',
+    );
+  }
+  if (url.startsWith('file:')) {
+    throw new Error(
+      'DATABASE_URL must be PostgreSQL in cloud (file: SQLite is not reachable from Coolify).',
+    );
+  }
+  return url;
 }
 
 export function loadStackConfig(): StackConfig {
   const examplePath = join(cloudRoot(), 'config', 'stack.example.json');
   const localPath = join(cloudRoot(), 'config', 'stack.json');
   const path = existsSync(localPath) ? localPath : examplePath;
-  const file = JSON.parse(readFileSync(path, 'utf8')) as StackConfig;
+  const file = JSON.parse(readFileSync(path, 'utf8')) as Partial<StackConfig> & {
+    mongodb?: unknown;
+    website?: Partial<StackConfig['website']>;
+    runtime?: Partial<StackConfig['runtime']>;
+    evolution?: Partial<StackConfig['evolution']>;
+  };
 
   return {
     project_name:
@@ -47,26 +73,19 @@ export function loadStackConfig(): StackConfig {
     server_name:
       process.env.COOLIFY_SERVER_NAME?.trim() || file.server_name || 'localhost',
     runtime: {
-      name: file.runtime?.name || 'namao-runtime',
+      name: file.runtime?.name || 'namao-api',
       image_name:
         process.env.RUNTIME_IMAGE_NAME?.trim() ||
         file.runtime?.image_name ||
-        'ghcr.io/YOUR_ORG/namao-runtime',
+        'ghcr.io/namaocriativa/namao-api',
       image_tag:
         process.env.RUNTIME_IMAGE_TAG?.trim() ||
         file.runtime?.image_tag ||
         'latest',
-      ports_exposes: file.runtime?.ports_exposes || '3001',
+      ports_exposes: file.runtime?.ports_exposes || '3000',
       health_check_path: file.runtime?.health_check_path || '/health',
       domain:
         process.env.RUNTIME_DOMAIN?.trim() || file.runtime?.domain || '',
-    },
-    mongodb: {
-      name: file.mongodb?.name || 'namao-mongodb',
-      database:
-        process.env.MONGO_DATABASE?.trim() ||
-        file.mongodb?.database ||
-        'namao',
     },
     evolution: {
       name: file.evolution?.name || 'namao-evolution',
@@ -76,6 +95,18 @@ export function loadStackConfig(): StackConfig {
         'namao',
       domain:
         process.env.EVOLUTION_DOMAIN?.trim() || file.evolution?.domain || '',
+    },
+    website: {
+      pages_project:
+        process.env.CLOUDFLARE_PAGES_PROJECT?.trim() ||
+        file.website?.pages_project ||
+        'namao-website',
+      production_branch:
+        process.env.WEBSITE_PRODUCTION_BRANCH?.trim() ||
+        file.website?.production_branch ||
+        'main',
+      domain:
+        process.env.WEBSITE_DOMAIN?.trim() || file.website?.domain || '',
     },
   };
 }

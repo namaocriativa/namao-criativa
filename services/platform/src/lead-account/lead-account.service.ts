@@ -7,6 +7,8 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerCreateData, ownerWhere } from '../owner/owner.util';
 import {
   fallbackEmail,
   generatePassword,
@@ -27,6 +29,7 @@ export type LeadAccountUser = {
   name: string;
   role: string;
   leadId: string | null;
+  customerId: string | null;
 };
 
 @Injectable()
@@ -35,21 +38,24 @@ export class LeadAccountService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly owners: OwnerLookup,
   ) {}
 
   async ensureForLead(lead: LeadAccountSeed): Promise<LeadAccountUser> {
     const existing = await this.prisma.user.findFirst({
-      where: { leadId: lead.id, role: 'CLIENT' },
+      where: { ...ownerWhere(lead.id), role: 'CLIENT' },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
         leadId: true,
+        customerId: true,
       },
     });
     if (existing) return existing;
 
+    const kind = await this.owners.requireKind(lead.id);
     const email = await this.resolveLoginEmail(lead);
     const passwordHash = await bcrypt.hash(generatePassword(), 10);
     return this.prisma.user.create({
@@ -58,7 +64,7 @@ export class LeadAccountService {
         name: lead.name.trim() || 'Cliente',
         passwordHash,
         role: 'CLIENT',
-        leadId: lead.id,
+        ...ownerCreateData(kind, lead.id),
       },
       select: {
         id: true,
@@ -66,6 +72,7 @@ export class LeadAccountService {
         name: true,
         role: true,
         leadId: true,
+        customerId: true,
       },
     });
   }
@@ -120,14 +127,11 @@ export class LeadAccountService {
   }
 
   private async requireLead(leadId: string): Promise<LeadAccountSeed> {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-      select: { id: true, name: true, email: true },
-    });
-    if (!lead) {
+    const profile = await this.owners.findProfile(leadId);
+    if (!profile) {
       throw new NotFoundException(`Lead ${leadId} not found`);
     }
-    return lead;
+    return { id: profile.id, name: profile.name, email: profile.email };
   }
 
   private async resolveLoginEmail(lead: LeadAccountSeed): Promise<string> {

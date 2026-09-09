@@ -1,4 +1,22 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: namao-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: namao
+      POSTGRES_PASSWORD: namao
+      POSTGRES_DB: namao
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U namao -d namao"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: namao-redis
@@ -23,15 +41,6 @@ services:
     shm_size: 1g
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-data:/root/.ollama
-    restart: unless-stopped
-
   platform:
     build:
       context: .
@@ -45,9 +54,8 @@ services:
     environment:
       NODE_ENV: development
       PORT: "3000"
-      DATABASE_URL: file:./dev.db
+      DATABASE_URL: postgresql://namao:namao@postgres:5432/namao
       REDIS_URL: redis://redis:6379
-      OLLAMA_URL: http://ollama:11434
       CRAWL4AI_URL: http://crawl4ai:11235
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM: ${RESEND_FROM:-}
@@ -62,50 +70,15 @@ services:
       - ./packages/landing-kit/src:/app/packages/landing-kit/src
       - ./leads:/app/leads
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       crawl4ai:
-        condition: service_started
-      ollama:
-        condition: service_started
-    init: true
-    restart: unless-stopped
-
-  runtime:
-    build:
-      context: .
-      dockerfile: services/runtime/Dockerfile
-      target: development
-    container_name: namao-runtime
-    ports:
-      - "3001:3001"
-    env_file:
-      - services/runtime/.env
-    environment:
-      NODE_ENV: development
-      PORT: "3001"
-      DATABASE_URL: file:./dev.db
-      REDIS_URL: redis://redis:6379
-      TSC_WATCHFILE: UsePollingDelay
-      CHOKIDAR_USEPOLLING: "true"
-      CHOKIDAR_INTERVAL: "1000"
-      WATCHPACK_POLLING: "true"
-    volumes:
-      - ./services/runtime/src:/app/services/runtime/src
-      - ./services/runtime/prisma:/app/services/runtime/prisma
-      - ./services/platform/prisma:/app/services/platform/prisma
-      - ./leads:/app/leads
-      # Mantém engines Linux do Prisma Mongo gerados na imagem (evita misturar com Darwin do host)
-      - runtime-mongo-generated:/app/services/runtime/src/generated
-    depends_on:
-      redis:
-        condition: service_healthy
-      platform:
         condition: service_started
     init: true
     restart: unless-stopped
 
 volumes:
+  postgres-data:
   redis-data:
-  ollama-data:
-  runtime-mongo-generated:

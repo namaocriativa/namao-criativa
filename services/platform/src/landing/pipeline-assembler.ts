@@ -16,6 +16,7 @@ import type {
 import { PRESET_SECTION_IDS } from './pipeline.types';
 import { allowedSectionIds } from './lead-brief';
 import { fallbackSectionGuide, getPresetSection } from './section-catalog';
+import { buildGtmSnippets, gtmContainerIdFromEnv } from './gtm-snippet';
 
 export function parseVisionAnalysis(value: unknown): VisionAnalysis {
   if (!value || typeof value !== 'object') {
@@ -277,6 +278,9 @@ export function assembleLandingFiles(opts: {
   spec: PageSpec;
   publicSiteId?: string;
   apiBase?: string;
+  gtmContainerId?: string;
+  leadId?: string;
+  landingSlug?: string;
 }): GeneratedFile[] {
   const { brief, spec } = opts;
   const palette = getPalette(spec.theme.paletteId);
@@ -299,6 +303,15 @@ export function assembleLandingFiles(opts: {
       }).replace(/</g, '\\u003c')}</script>`
     : '';
 
+  const gtm = buildGtmSnippets({
+    containerId: opts.gtmContainerId ?? gtmContainerIdFromEnv(),
+    leadId: opts.leadId || brief.leadId,
+    siteId: opts.publicSiteId,
+    landingSlug: opts.landingSlug || brief.slug,
+  });
+  const gtmHead = gtm ? `    ${gtm.head}\n` : '';
+  const gtmBody = gtm ? `    ${gtm.body}\n` : '';
+
   const indexHtml = `<!doctype html>
 <html lang="pt-BR">
   <head>
@@ -308,9 +321,9 @@ export function assembleLandingFiles(opts: {
     <meta name="description" content="${escapeAttr(metaDescription(brief))}" />
 ${fontLink}
     ${overlayCss ? `<style>${overlayCss}</style>` : ''}
-  </head>
+${gtmHead}  </head>
   <body>
-    <div id="root"></div>
+${gtmBody}    <div id="root"></div>
     ${overlayHtml}
 ${discoveryBoot}
     <script type="module" src="/src/main.tsx"></script>

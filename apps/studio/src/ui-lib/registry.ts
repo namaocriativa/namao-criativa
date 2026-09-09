@@ -68,7 +68,7 @@ function coerce(schema: PropSchema, value: PropValue): PropValue {
 }
 
 /**
- * Completa props parciais (vindas do playground ou do Ollama) com os defaults,
+ * Completa props parciais (vindas do playground ou do Gemini) com os defaults,
  * descartando chaves desconhecidas e valores fora dos limites do schema.
  */
 export function resolveProps(
@@ -120,7 +120,7 @@ function toComponentManifest(definition: UiComponentDefinition): ComponentManife
   };
 }
 
-/** Catálogo legível por máquina — é o que se injeta no prompt do Ollama. */
+/** Catálogo legível por máquina — é o que se injeta no prompt do Gemini. */
 export function buildManifest(): UiLibManifest {
   return {
     version: MANIFEST_VERSION,
@@ -128,13 +128,13 @@ export function buildManifest(): UiLibManifest {
   };
 }
 
-/** Aplica uma spec do Ollama nesta página. */
+/** Aplica uma spec do Gemini nesta página. */
 export function mountSpec(spec: ComponentSpec, host?: HTMLElement): UiComponentInstance {
   const definition = requireComponent(spec.component);
   return definition.mount(resolveProps(definition, spec.props), host);
 }
 
-/** Converte uma spec do Ollama em código estático para páginas geradas. */
+/** Converte uma spec do Gemini em código estático para páginas geradas. */
 export function renderSpec(spec: ComponentSpec): StaticCode {
   const definition = requireComponent(spec.component);
   return definition.toStaticCode(resolveProps(definition, spec.props));

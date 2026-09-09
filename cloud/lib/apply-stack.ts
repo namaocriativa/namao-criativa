@@ -4,9 +4,9 @@ import {
   loadStackConfig,
   log,
   requireSecret,
+  resolveDatabaseUrl,
 } from './config.js';
 import { loadState, saveState } from './state.js';
-import { applyMongodb } from '../stacks/mongodb.js';
 import { applyEvolution } from '../stacks/evolution.js';
 import { applyRuntime } from '../stacks/runtime.js';
 
@@ -22,10 +22,9 @@ export async function runApply(opts: { dryRun: boolean }) {
     );
   }
 
-  state.mongo_password = requireSecret(
-    'MONGO_ROOT_PASSWORD',
-    state.mongo_password,
-  );
+  const databaseUrl = resolveDatabaseUrl();
+  log('apply', `PostgreSQL configured (${maskDatabaseUrl(databaseUrl)})`);
+
   state.evolution_postgres_password = requireSecret(
     'EVOLUTION_POSTGRES_PASSWORD',
     state.evolution_postgres_password,
@@ -39,12 +38,6 @@ export async function runApply(opts: { dryRun: boolean }) {
 
   log('apply', opts.dryRun ? 'dry-run (plan)' : 'applying stacks');
 
-  state = await applyMongodb({
-    client,
-    stack,
-    state,
-    dryRun: opts.dryRun,
-  });
   state = await applyEvolution({
     client,
     stack,
@@ -67,6 +60,16 @@ export async function runApply(opts: { dryRun: boolean }) {
   return state;
 }
 
+function maskDatabaseUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.password) u.password = '***';
+    return u.toString();
+  } catch {
+    return '(set)';
+  }
+}
+
 function printWireHints(
   state: {
     evolution_api_key: string;
@@ -80,15 +83,9 @@ function printWireHints(
   console.log(`EVOLUTION_API_URL=<https://evolution... or Coolify proxy URL>`);
   console.log(`EVOLUTION_API_KEY=${state.evolution_api_key || '<from state>'}`);
   console.log(`EVOLUTION_INSTANCE=${instance}`);
+  console.log(`PUBLIC_CHAT_API_ORIGIN=<https://api... when domain is ready>`);
+  console.log('\n--- API DATABASE_URL ---');
   console.log(
-    `PUBLIC_CHAT_API_ORIGIN=<https://runtime... when domain is ready>`,
+    'namao-api uses a single PostgreSQL DATABASE_URL (Coolify Postgres or managed).\n',
   );
-  console.log('\n--- Runtime DATABASE_URL ---');
-  console.log(
-    'Runtime shares the platform Prisma DB. Deploy platform to Coolify (phase 2)',
-  );
-  console.log(
-    'or point DATABASE_URL at a reachable shared database. SQLite on localhost',
-  );
-  console.log('cannot be used by a remote runtime container.\n');
 }

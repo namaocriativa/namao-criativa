@@ -1,8 +1,6 @@
 export type LlmRole = 'plan' | 'code' | 'vision' | 'chat';
-export type LlmProvider = 'ollama' | 'gemini';
 
 export type RoleConfig = {
-  provider: LlmProvider;
   model: string;
 };
 

@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import "@puckeditor/core/puck.css";
+import { profileApi, type EntityKind } from "../profile-api";
 import { SiteWizardModal } from "./SiteWizardModal";
 import {
   defaultGeneratePayload,
@@ -13,6 +14,7 @@ let root: Root | null = null;
 let latest: GeneratePayload = defaultGeneratePayload();
 let confirmHandler: (() => void) | null = null;
 let wizardLeadId: string | null = null;
+let wizardApiKind: EntityKind = "lead";
 
 export function setWizardLeadId(id: string | null): void {
   wizardLeadId = id;
@@ -20,6 +22,18 @@ export function setWizardLeadId(id: string | null): void {
 
 export function getWizardLeadId(): string | null {
   return wizardLeadId;
+}
+
+export function setWizardApiKind(kind: EntityKind): void {
+  wizardApiKind = kind;
+}
+
+export function getWizardApiKind(): EntityKind {
+  return wizardApiKind;
+}
+
+export function wizardProfileApi(id: string, suffix = ""): string {
+  return profileApi(wizardApiKind, id, suffix);
 }
 
 export function mountSiteWizard(host: HTMLElement): void {

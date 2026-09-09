@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerCreateData, ownerWhere } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type LeadActivityChannel = 'email' | 'whatsapp';
@@ -23,12 +25,16 @@ export type RecordLeadActivityInput = {
 
 @Injectable()
 export class LeadActivityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly owners: OwnerLookup,
+  ) {}
 
   async record(input: RecordLeadActivityInput) {
+    const kind = await this.owners.requireKind(input.leadId);
     return this.prisma.leadActivity.create({
       data: {
-        leadId: input.leadId,
+        ...ownerCreateData(kind, input.leadId),
         channel: input.channel,
         kind: input.kind,
         title: input.title,
@@ -39,19 +45,11 @@ export class LeadActivityService {
   }
 
   async listHistory(leadId: string) {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-      select: {
-        id: true,
-        createdAt: true,
-        updatedAt: true,
-        landingBuiltAt: true,
-      },
-    });
+    const lead = await this.owners.findProfile(leadId);
     if (!lead) throw new NotFoundException(`Lead ${leadId} not found`);
 
     const activities = await this.prisma.leadActivity.findMany({
-      where: { leadId },
+      where: ownerWhere(leadId),
       orderBy: { createdAt: 'desc' },
     });
 
@@ -90,7 +88,7 @@ export class LeadActivityService {
     if (lead.updatedAt) {
       items.push({
         id: 'system:updated',
-        title: 'Lead atualizado',
+        title: 'Perfil atualizado',
         summary: null,
         at: lead.updatedAt.toISOString(),
         channel: 'system',
@@ -100,7 +98,7 @@ export class LeadActivityService {
     if (lead.createdAt) {
       items.push({
         id: 'system:created',
-        title: 'Lead criado',
+        title: 'Perfil criado',
         summary: null,
         at: lead.createdAt.toISOString(),
         channel: 'system',

@@ -25,11 +25,12 @@
     <main class="auth-main">
       <p class="kicker">Cadastro</p>
       <h1>Criar conta</h1>
-      <p id="invite-hint" class="lede">Carregando convite…</p>
+      <p id="invite-hint" class="lede">A senha e o link de acesso chegam no e-mail.</p>
       <form id="register-form">
-        <label>Nome <input name="name" required autocomplete="name" /></label>
-        <label>E-mail <input name="email" type="email" required autocomplete="email" /></label>
-        <label>Senha <input name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+        <label>Nome <input name="name" required autocomplete="name" maxlength="120" /></label>
+        <label>E-mail <input name="email" type="email" required autocomplete="email" maxlength="254" /></label>
+        <label>Instagram do negócio <input name="instagram" required autocomplete="username" placeholder="@seu.negocio" maxlength="80" /></label>
+        <p class="form-note">Enviamos a senha e o link de acesso para este e-mail.</p>
         <button type="submit" id="register-btn">Criar conta</button>
       </form>
       <p class="status" id="register-status"></p>

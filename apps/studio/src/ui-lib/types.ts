@@ -1,7 +1,7 @@
 /**
  * Contratos da UI Lib.
  *
- * Cada componente é descrito por um schema de props (o que o Ollama lê para
+ * Cada componente é descrito por um schema de props (o que o Gemini lê para
  * saber como customizá-lo) e por duas formas de renderização:
  * - `mount`: instancia o componente vivo no DOM desta página (playground/app);
  * - `toStaticCode`: emite HTML/CSS/JS puros, sem dependências, para serem
@@ -86,7 +86,7 @@ export interface UiComponentDefinition {
   toStaticCode(props: ComponentProps): StaticCode;
 }
 
-/** Instrução que o Ollama emite para usar um componente na página. */
+/** Instrução que o Gemini emite para usar um componente na página. */
 export interface ComponentSpec {
   component: string;
   props?: ComponentProps;

@@ -1,19 +1,18 @@
 # Namão — lead discovery & enrichment
 
-Monorepo para **descobrir leads** em uma região, **enriquecê-los** com dados e imagens reais (SQLite + storage local) e gerar landing pages independentes.
+Monorepo para **descobrir leads** em uma região, **enriquecê-los** com dados e imagens reais (PostgreSQL + storage local) e gerar landing pages independentes.
 
 ## Stack
 
 - Studio interno: Vite + TypeScript (`apps/studio/`)
 - Website Namão: Vite (`apps/website/`) — marketing + cadastro/login
-- Platform API: NestJS (`services/platform/`) — discovery, enrichment, geração de LP
-- Runtime API: NestJS (`services/runtime/`) — chat IA com Gemini, endpoint público na nuvem
-- Prisma + SQLite (`services/platform/prisma/dev.db`, compartilhado com o runtime)
+- API NestJS (`services/platform/`) — discovery, enrichment, geração de LP, chat Gemini, dashboard, convites
+- Prisma + PostgreSQL
 - Imagens em `services/platform/storage/leads/{leadId}/images`
 - Landings geradas em `leads/<slug>/` (independentes, fora dos workspaces)
 - Crawl4AI para enrichment quando o lead já tem website (`services/platform/crawler/` ou Docker opcional)
 
-Postgres não é obrigatório. Docker sobe Redis, Crawl4AI, Ollama e as APIs Nest (watch). O Vite em `apps/studio/` continua no host e faz proxy para `http://localhost:3000`.
+Docker sobe Postgres, Redis, Crawl4AI e a API Nest (watch). O Vite em `apps/studio/` continua no host e faz proxy para `http://localhost:3000`.
 
 ## Estrutura
 
@@ -22,17 +21,16 @@ apps/
   studio/              # UI interna Vite
   website/             # site Namão + cadastro/login
 services/
-  platform/            # API interna NestJS + Prisma + storage
+  platform/            # API NestJS unificada + Prisma + storage
     src/
     crawler/           # script Python do Crawl4AI
     prisma/
     storage/
-  runtime/             # API pública (chat Gemini) — deploy na nuvem
 packages/
   landing-kit/         # componentes + PageSpec
-cloud/                 # IaC Coolify (runtime, MongoDB, Evolution) — ver cloud/README.md
+cloud/                 # IaC Coolify + Cloudflare Pages — ver cloud/README.md
 leads/                 # projetos Vite gerados (Root Directory na Vercel)
-docker-compose.yml     # Redis + Crawl4AI + Ollama + APIs Nest (watch)
+docker-compose.yml     # Postgres + Redis + Crawl4AI + API Nest (watch)
 ```
 
 ## Setup
@@ -40,36 +38,36 @@ docker-compose.yml     # Redis + Crawl4AI + Ollama + APIs Nest (watch)
 ```bash
 npm install
 cp services/platform/.env.example services/platform/.env
-cp services/runtime/.env.example services/runtime/.env
 docker compose up -d --build
 npm run dev:studio
 ```
 
 - Studio (Vite em `apps/studio/`): `http://localhost:5173` — proxy `/leads`, `/config`, etc. → API na 3000
-- Platform (NestJS no Docker): `http://localhost:3000` — discovery/enrichment/landing, com hot reload de `services/platform/src`
-- Runtime (NestJS no Docker): `http://localhost:3001` — chat Gemini, com hot reload de `services/runtime/src`
+- API (NestJS no Docker): `http://localhost:3000` — discovery, landing, chat Gemini, dashboard, com hot reload de `services/platform/src`
 
-Para rodar as APIs Nest no host em vez do Docker: `npm run dev` (sobe platform + studio + runtime). Não use host e Docker ao mesmo tempo nas mesmas portas (3000 / 3001).
+Para rodar a API Nest no host em vez do Docker: `npm run dev` (sobe platform + studio). Não use host e Docker ao mesmo tempo na porta 3000.
 
 ### Variáveis de ambiente
 
-Arquivo principal: `services/platform/.env` (runtime usa `services/runtime/.env`)
+Arquivo: `services/platform/.env`
 
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
-| `DATABASE_URL` | Sim | Default: `file:./dev.db` |
+| `DATABASE_URL` | Sim | Postgres, ex.: `postgresql://namao:namao@localhost:5432/namao` |
 | `PORT` | Não | Default: `3000` |
-| `REDIS_URL` | Não | Cache de discovery. Default local: `redis://localhost:6379`. Sem Redis, discovery segue sem cache |
-| `GOOGLE_PLACES_API_KEY` | Não | Se definida, discovery/enrich usam Google Places; senão, Overpass/OSM (negócios) + Nominatim |
+| `REDIS_URL` | Não | Cache de discovery e rate limit. Default local: `redis://localhost:6379` |
+| `GOOGLE_PLACES_API_KEY` | Não | Se definida, discovery/enrich usam Google Places; senão, Overpass/OSM + Nominatim |
 | `CRAWL4AI_URL` | Não | API Docker do Crawl4AI, ex.: `http://localhost:11235`. Se vazia, usa o script Python local |
 | `CRAWL4AI_API_TOKEN` | Não | Bearer token se o servidor Docker exigir JWT |
 | `CRAWL4AI_PYTHON` | Não | Python do venv do crawler. Default: `services/platform/crawler/.venv/bin/python` |
-| `OLLAMA_URL` | Não | API do Ollama. Default: `http://localhost:11434` (no compose: `http://ollama:11434`) |
-| `OLLAMA_MODEL` | Não | Modelo para gerar landing. Default: `qwen2.5-coder:7b` |
-| `PUBLIC_CHAT_API_ORIGIN` | Sim em LP publicada | URL absoluta do runtime injetada no widget. Dev: `http://localhost:3001` |
-| `VERCEL_TOKEN` | Sim para publicar | Token da conta Vercel (`vercel.com/account/tokens`). Com ele, o `dist/` de cada lead é publicado depois do build |
+| `GEMINI_API_KEY` | Sim para gerar/chat | Google AI Studio |
+| `PUBLIC_CHAT_API_ORIGIN` | Sim em LP publicada | URL absoluta da API injetada no widget. Dev: `http://localhost:3000` |
+| `VERCEL_TOKEN` | Sim para publicar | Token da conta Vercel (`vercel.com/account/tokens`) |
 | `VERCEL_TEAM_ID` | Não | Team/org da Vercel, se os projetos não forem da conta pessoal |
 | `VERCEL_AUTO_DEPLOY` | Não | Default: liga sozinho quando há token. `false` publica só no botão |
+| `GTM_CONTAINER_ID` | Não | Container GTM compartilhado (ex. `GTM-XXXX`) injetado no HTML das landings |
+| `GA4_PROPERTY_ID` | Não | Property ID numérico do GA4 — dashboard do cliente |
+| `GA4_SERVICE_ACCOUNT_JSON` | Não | JSON da service account (Viewer na propriedade GA4) |
 | `LEADS_DIR` | Não | Pasta dos projetos Vite. Default: `<monorepo>/leads` |
 | `JWT_SECRET` | Sim em produção | Segredo JWT (login Namão / clientes) |
 | `NAMAO_PUBLIC_URL` | Não | URL do site Namão. Default: `http://localhost:5174` |
@@ -93,6 +91,20 @@ REDIS_URL=redis://localhost:6379
 
 Respostas de discovery ficam em cache sem TTL até clicar em **Limpar cache** na UI. Sem Redis, o discovery funciona normalmente sem cache.
 
+### GTM / Google Analytics (landings + dashboard)
+
+Um container GTM e uma propriedade GA4 da Namão cobrem todos os sites publicados. O cliente vê as estatísticas do **próprio hostname** depois do login em `apps/website` (`/dashboard.html`).
+
+Setup uma vez no Google:
+
+1. Crie uma propriedade GA4 (ex. “Namão Landings”) e um data stream Web.
+2. Crie um container GTM. Tag de configuração GA4 + page view. Eventos opcionais do dataLayer: `whatsapp_click`, `cta_click`, `chat_open`. Dimensões personalizadas opcionais: `lead_id`, `site_id`, `landing_slug`.
+3. No GCP, ative a **Google Analytics Data API**, crie uma service account e conceda **Viewer** na propriedade GA4. Cole o JSON da key em `GA4_SERVICE_ACCOUNT_JSON` (uma linha).
+4. API: `GTM_CONTAINER_ID=GTM-XXXX`, `GA4_PROPERTY_ID` (só o número) e `GA4_SERVICE_ACCOUNT_JSON`.
+5. **Republique** as landings já no ar. Sites novos recebem o snippet na geração; o publish também injeta no `dist/index.html` se o GTM ainda não estiver lá.
+
+O dashboard chama `GET /dashboard/analytics?range=7d|28d|90d` (JWT). Sem `publishedOrigin`, a UI mostra que o site ainda não foi publicado. O GA4 pode atrasar até ~24h após as primeiras visitas.
+
 ### Crawl4AI (leads com website)
 
 Quando o lead já tem `website`, o enrichment usa o [Crawl4AI](https://github.com/unclecode/crawl4ai) (Playwright) na homepage e em páginas de contato/sobre/serviços. Se o crawler não estiver disponível, cai no parser HTTP + Cheerio.
@@ -115,23 +127,11 @@ No `services/platform/.env`:
 CRAWL4AI_URL=http://localhost:11235
 ```
 
-### Ollama (geração de landing)
+### Gemini (geração de landing)
 
-Sobe o serviço e baixa o modelo (uma vez):
+Defina `GEMINI_API_KEY` em `services/platform/.env` (https://aistudio.google.com/apikey). Na aba Config do studio escolha o modelo por papel (default: `gemini-2.5-flash`).
 
-```bash
-docker compose up -d ollama
-docker exec -it ollama ollama pull qwen2.5-coder:7b
-```
-
-No `server/.env` (dev no host):
-
-```bash
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5-coder:7b
-```
-
-Na UI, abra um lead e use **Gerar site** (um clique: scaffold se necessário + pipeline Ollama + build). Há preview embutido após build OK, cancelamento de job e badge de status na lista.
+Na UI, abra um lead e use **Gerar site** (um clique: scaffold se necessário + pipeline Gemini + build). Há preview embutido após build OK, cancelamento de job e badge de status na lista.
 
 Enrichment faz **dedupe**: se já existir lead com o mesmo website (host) ou mesmo `nome+cidade+estado`, atualiza o existente em vez de criar outro.
 
@@ -224,7 +224,7 @@ GET /leads/:id
 
 Retorna o lead persistido com imagens e fontes.
 
-### Landing (Ollama)
+### Landing (Gemini)
 
 ```http
 GET /landing/status
@@ -257,57 +257,58 @@ Falhas de um provider não interrompem o enrichment.
 
 | Script | Descrição |
 |--------|-----------|
-| `npm run dev` | Sobe platform + studio + runtime |
-| `npm run dev:platform` | Só a API platform |
-| `npm run dev:runtime` | Só a API runtime (chat Gemini na :3001) |
+| `npm run dev` | Sobe platform + studio |
+| `npm run dev:platform` | Só a API |
 | `npm run dev:studio` | Só o studio Vite |
 | `npm run dev:website` | Só o site Namão (:5174) |
-| `npm run build` | Build de platform, runtime, studio e landing-kit |
+| `npm run build` | Build de platform, studio e landing-kit |
 | `npm run prisma:migrate` | Migrações Prisma |
 | `npm run crawler:setup` | Cria venv e instala Crawl4AI + Chromium |
 | `npm run cloud:bootstrap` | Resolve server/projeto no Coolify |
 | `npm run cloud:plan` | Dry-run do IaC Coolify |
-| `npm run cloud:apply` | Cria/atualiza MongoDB, Evolution e runtime |
+| `npm run cloud:apply` | Cria/atualiza Evolution e API |
 | `npm run cloud:deploy` | Dispara deploy dos recursos no Coolify |
 
-## Runtime API (chat público)
+## API pública (chat, dashboard, convites)
 
-Servidor em `services/runtime/` para features dos clientes que precisam de backend. Roda na nuvem, usa **Gemini** (nada local) e reutiliza o mesmo Prisma/Redis.
-
-```bash
-cp services/runtime/.env.example services/runtime/.env
-# defina GEMINI_API_KEY
-npm run dev:runtime
-```
-
-Endpoints públicos:
+A mesma API em `services/platform/` expõe os endpoints dos clientes. Usa **Gemini** e o Postgres único.
 
 ```http
 GET  /health
 POST /public/chat/session
 POST /public/chat
 POST /public/chat/events
+POST /namao-chat/session
+GET  /namao-chat/history
+POST /namao-chat
+POST /namao-chat/events
+POST /auth/login
+GET  /auth/me
+GET  /dashboard/analytics
+POST /invite-requests
 ```
 
-Segurança: CORS por `publishedOrigin`, sessão com token hasheado, rate limit por IP/sessão/site, DTO sem `model`/`systemPrompt`, IP hasheado. Na nuvem, `trust proxy` lê `X-Forwarded-For`.
+Segurança do chat: CORS por `publishedOrigin`, sessão com token hasheado, rate limit por IP/sessão/site, DTO sem `model`/`systemPrompt`, IP hasheado. Na nuvem, `trust proxy` lê `X-Forwarded-For`.
 
-Deploy: `services/runtime/Dockerfile`. Em produção, `PUBLIC_CHAT_API_ORIGIN` em `services/platform/.env` deve ser a URL pública do runtime.
+Em produção, `PUBLIC_CHAT_API_ORIGIN` deve ser a URL pública da API (`https://api.namaocriativa.com.br`).
 
 ## Coolify (produção na VPS)
 
 IaC em [`cloud/`](cloud/README.md) via API HTTP do Coolify (`https://coolify.fungalia.com.br`):
 
-- MongoDB com replica set (Prisma / invite-requests)
+- PostgreSQL (`DATABASE_URL`) — leads, chat, users, invite-requests
 - Evolution API (`evoapicloud/evolution-api:latest`) + Postgres + Redis
-- Runtime como aplicação Docker image (build/push GHCR → Coolify pull)
+- API (`namao-api`) como aplicação Docker image (`ghcr.io/namaocriativa/namao-api`). CD em push para `main`: [`.github/workflows/cd-runtime.yml`](.github/workflows/cd-runtime.yml)
+- Website (`apps/website`) no Cloudflare Pages (`namao-website`). CD: [`.github/workflows/cd-website.yml`](.github/workflows/cd-website.yml) — secrets e IaC em [`cloud/README.md`](cloud/README.md)
 
 ```bash
 cp cloud/.env.example cloud/.env
 npm run cloud:bootstrap
 npm run cloud:apply
+npm run cloud:website
 ```
 
-**Importante:** o runtime na nuvem precisa de `DATABASE_URL` apontando para o mesmo banco Prisma do platform (SQLite local não funciona entre máquinas). Detalhes e wiring de `EVOLUTION_*` / `PUBLIC_CHAT_API_ORIGIN` em [`cloud/README.md`](cloud/README.md).
+Detalhes e wiring de `EVOLUTION_*` / `PUBLIC_CHAT_API_ORIGIN` em [`cloud/README.md`](cloud/README.md).
 
 This project uses Crawl4AI (https://github.com/unclecode/crawl4ai) for web data extraction.
 

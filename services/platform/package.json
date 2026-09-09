@@ -1,7 +1,7 @@
 {
   "name": "@namao/platform",
   "version": "0.0.1",
-  "description": "Internal platform API — discovery, enrichment, landing generation",
+  "description": "Namão API — discovery, enrichment, landing generation, chat, dashboard",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
@@ -24,6 +24,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@google-analytics/data": "^7.0.0",
     "@namao/landing-kit": "*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",

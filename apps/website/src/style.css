@@ -42,9 +42,58 @@ a {
   text-decoration: none;
 }
 
-.has-cursor,
-.has-cursor * {
+.has-cursor {
   cursor: none;
+}
+
+.has-cursor *:not(input):not(textarea):not(select):not(option) {
+  cursor: none;
+}
+
+.has-cursor input,
+.has-cursor textarea,
+.has-cursor select {
+  cursor: text;
+}
+
+.has-cursor input:disabled,
+.has-cursor textarea:disabled,
+.has-cursor select:disabled,
+.has-cursor button:disabled {
+  cursor: not-allowed;
+}
+
+.has-cursor:has(dialog[open]),
+.has-cursor.dialog-open {
+  cursor: auto;
+}
+
+.has-cursor:has(dialog[open]) *:not(input):not(textarea):not(select),
+.has-cursor.dialog-open *:not(input):not(textarea):not(select) {
+  cursor: auto;
+}
+
+.has-cursor:has(dialog[open]) input,
+.has-cursor:has(dialog[open]) textarea,
+.has-cursor:has(dialog[open]) select,
+.has-cursor.dialog-open input,
+.has-cursor.dialog-open textarea,
+.has-cursor.dialog-open select {
+  cursor: text;
+}
+
+.has-cursor:has(dialog[open]) a,
+.has-cursor:has(dialog[open]) button,
+.has-cursor:has(dialog[open]) label,
+.has-cursor.dialog-open a,
+.has-cursor.dialog-open button,
+.has-cursor.dialog-open label {
+  cursor: pointer;
+}
+
+.has-cursor:has(dialog[open]) .cursor,
+.has-cursor.dialog-open .cursor {
+  display: none;
 }
 
 .cursor {
@@ -445,6 +494,7 @@ a.clients-name:hover {
 }
 
 .invite-dialog {
+  position: relative;
   width: min(480px, calc(100% - 2rem));
   padding: 1.9rem 1.5rem 1.6rem;
   border: 1px solid var(--line);
@@ -589,6 +639,10 @@ a.clients-name:hover {
   margin: 0;
 }
 
+.dash-dl a {
+  color: inherit;
+}
+
 @media (min-width: 800px) {
   .dash-grid {
     grid-template-columns: 1.1fr 0.9fr;
@@ -596,6 +650,140 @@ a.clients-name:hover {
 
   .dash-card:first-child {
     grid-column: 1 / -1;
+  }
+}
+
+.dash-banner {
+  margin-top: 1.6rem;
+  border: 1px solid var(--line);
+  padding: 1.35rem 1.25rem 1.25rem;
+}
+
+.dash-banner h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.04em;
+}
+
+.dash-banner p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  max-width: 42rem;
+}
+
+.dash-banner .btn {
+  margin-top: 0.35rem;
+}
+
+#dash-ig-card .btn {
+  margin-top: 1rem;
+}
+
+#dash-ig-status {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.dash-stats {
+  margin-top: 2.2rem;
+}
+
+.dash-stats-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.dash-stats-host {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.dash-range {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.dash-range button {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.dash-range button.is-active {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.dash-kpis {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dash-kpi {
+  border: 1px solid var(--line);
+  padding: 1rem 1.05rem 0.9rem;
+}
+
+.dash-kpi-value {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  letter-spacing: -0.04em;
+  color: var(--fg);
+}
+
+.dash-stats-split {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.dash-rank {
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.dash-rank li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.92rem;
+}
+
+.dash-rank em {
+  font-style: normal;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-rank span {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+@media (min-width: 800px) {
+  .dash-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .dash-stats-split {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -625,11 +813,25 @@ input {
   font: inherit;
   color: var(--fg);
   background: transparent;
+  pointer-events: auto;
 }
 
 input:focus {
   outline: 1px solid var(--fg);
   border-color: var(--fg);
+}
+
+input:disabled,
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.form-note {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .status {

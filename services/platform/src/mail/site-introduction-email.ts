@@ -1,11 +1,14 @@
 export function namaoWhatsAppUrl(
   phone: string | null | undefined,
   leadName: string,
+  message?: string,
 ): string | null {
   const digits = String(phone || '').replace(/\D/g, '');
   if (digits.length < 10) return null;
   const who = leadName?.trim() || 'meu negócio';
-  const text = `Olá! Sou responsável pela ${who}. Vi o site que a Namão montou e quero conversar.`;
+  const text =
+    message?.trim() ||
+    `Olá! Sou responsável pela ${who}. Vi o site que a Namão montou e quero conversar.`;
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
 

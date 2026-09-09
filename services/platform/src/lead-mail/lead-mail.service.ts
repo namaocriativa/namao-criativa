@@ -26,6 +26,8 @@ import {
   siteIntroductionEmailText,
 } from '../mail/site-introduction-email';
 import { LeadActivityService } from '../lead-activity/lead-activity.service';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerWhere } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const LEAD_EMAIL_KINDS = [
@@ -66,6 +68,7 @@ export class LeadMailService {
     private readonly invites: InvitesService,
     private readonly accounts: LeadAccountService,
     private readonly activity: LeadActivityService,
+    private readonly owners: OwnerLookup,
   ) {}
 
   async list(leadId: string) {
@@ -309,7 +312,7 @@ export class LeadMailService {
     email: string | null;
   }) {
     const user = await this.prisma.user.findFirst({
-      where: { leadId: lead.id, role: 'CLIENT' },
+      where: { ...ownerWhere(lead.id), role: 'CLIENT' },
       select: { email: true },
     });
     const email = normalizeEmail(user?.email) || normalizeEmail(lead.email);
@@ -318,24 +321,30 @@ export class LeadMailService {
   }
 
   private async requireLead(leadId: string) {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        publishedOrigin: true,
-        users: {
-          where: { role: 'CLIENT' },
-          select: { email: true },
-          take: 1,
-        },
-        instagramConnections: {
-          select: { username: true },
-          take: 1,
-        },
+    const kind = await this.owners.kindOf(leadId);
+    if (!kind) throw new NotFoundException(`Lead ${leadId} not found`);
+    const select = {
+      id: true,
+      name: true,
+      email: true,
+      publishedOrigin: true,
+      users: {
+        where: { role: 'CLIENT' },
+        select: { email: true },
+        take: 1,
       },
-    });
+      instagramConnections: {
+        select: { username: true },
+        take: 1,
+      },
+    };
+    const lead =
+      kind === 'lead'
+        ? await this.prisma.lead.findUnique({ where: { id: leadId }, select })
+        : await this.prisma.customer.findUnique({
+            where: { id: leadId },
+            select,
+          });
     if (!lead) throw new NotFoundException(`Lead ${leadId} not found`);
     return lead;
   }

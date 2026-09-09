@@ -2,13 +2,16 @@
   "name": "@namao/cloud",
   "private": true,
   "version": "0.0.1",
-  "description": "Infra as Code for Coolify (runtime, MongoDB, Evolution)",
+  "description": "Infra as Code for Coolify (API, Evolution) and Cloudflare Pages",
   "type": "module",
   "scripts": {
     "bootstrap": "tsx scripts/bootstrap.ts",
     "plan": "tsx scripts/plan.ts",
     "apply": "tsx scripts/apply.ts",
-    "deploy": "tsx scripts/deploy.ts"
+    "deploy": "tsx scripts/deploy.ts",
+    "website": "tsx scripts/website.ts",
+    "website:plan": "tsx scripts/website.ts --plan",
+    "website:redirects": "tsx scripts/write-website-redirects.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7"

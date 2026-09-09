@@ -1,8 +1,7 @@
 import type { CoolifyClient } from '../lib/coolify-client.js';
 import type { StackConfig } from '../lib/config.js';
-import { log } from '../lib/config.js';
+import { log, resolveDatabaseUrl } from '../lib/config.js';
 import type { CloudState } from '../lib/state.js';
-import { mongoConnectionUrl } from './mongodb.js';
 
 type AppCreated = { uuid?: string };
 type AppEnv = { uuid?: string; key?: string; value?: string };
@@ -45,17 +44,10 @@ export function buildRuntimeEnvs(opts: {
   state: CloudState;
   stack: StackConfig;
 }): Record<string, string> {
-  const user = process.env.MONGO_ROOT_USERNAME?.trim() || 'root';
-  const mongoUrl = mongoConnectionUrl({
-    user,
-    password: opts.state.mongo_password,
-    database: opts.stack.mongodb.database,
-  });
-
   const envs: Record<string, string> = {
-    PORT: '3001',
+    PORT: '3000',
     NODE_ENV: 'production',
-    MONGODB_URL: mongoUrl,
+    DATABASE_URL: resolveDatabaseUrl(),
     JWT_SECRET:
       process.env.JWT_SECRET?.trim() || 'dev-jwt-secret-change-me',
   };
@@ -63,16 +55,13 @@ export function buildRuntimeEnvs(opts: {
   const gemini = process.env.GEMINI_API_KEY?.trim();
   if (gemini) envs.GEMINI_API_KEY = gemini;
 
-  const databaseUrl = process.env.DATABASE_URL?.trim();
-  if (databaseUrl) {
-    envs.DATABASE_URL = databaseUrl;
-  } else {
-    // Placeholder — runtime needs the shared platform Prisma DB.
-    envs.DATABASE_URL = 'file:./dev.db';
-  }
-
   const redis = process.env.REDIS_URL?.trim();
   if (redis) envs.REDIS_URL = redis;
+
+  const ga4Property = process.env.GA4_PROPERTY_ID?.trim();
+  if (ga4Property) envs.GA4_PROPERTY_ID = ga4Property;
+  const ga4Json = process.env.GA4_SERVICE_ACCOUNT_JSON?.trim();
+  if (ga4Json) envs.GA4_SERVICE_ACCOUNT_JSON = ga4Json;
 
   const namao =
     process.env.NAMAO_PUBLIC_URL?.trim() || opts.stack.runtime.domain;
@@ -91,13 +80,6 @@ export async function applyRuntime(opts: {
   const state = { ...opts.state };
   const envs = buildRuntimeEnvs({ state, stack });
 
-  if (!process.env.DATABASE_URL?.trim()) {
-    log(
-      'runtime',
-      'WARN: DATABASE_URL unset — runtime needs the shared platform Prisma DB. Using placeholder file:./dev.db',
-    );
-  }
-
   if (state.runtime_application_uuid) {
     log('runtime', `exists uuid=${state.runtime_application_uuid}`);
     if (!dryRun) {
@@ -108,7 +90,7 @@ export async function applyRuntime(opts: {
         ports_exposes: stack.runtime.ports_exposes,
         health_check_enabled: true,
         health_check_path: stack.runtime.health_check_path,
-        health_check_port: '3001',
+        health_check_port: '3000',
       };
       if (stack.runtime.domain.trim()) {
         patch.domains = stack.runtime.domain.trim();
@@ -126,7 +108,7 @@ export async function applyRuntime(opts: {
 
   const body: Record<string, unknown> = {
     name: stack.runtime.name,
-    description: 'Namão runtime — public chat API (@namao/runtime)',
+    description: 'Namão API — platform + chat + dashboard (@namao/platform)',
     project_uuid: state.project_uuid,
     server_uuid: state.server_uuid,
     environment_name: state.environment_name,
@@ -136,7 +118,7 @@ export async function applyRuntime(opts: {
     ports_exposes: stack.runtime.ports_exposes,
     health_check_enabled: true,
     health_check_path: stack.runtime.health_check_path,
-    health_check_port: '3001',
+    health_check_port: '3000',
     health_check_method: 'GET',
     health_check_return_code: 200,
     instant_deploy: true,

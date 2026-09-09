@@ -53,14 +53,17 @@ function escapeHtml(value: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
+import { profileApi, type EntityKind } from "./profile-api";
+
 export function initLeadEmailsModal(
   host: HTMLElement,
   opts?: { onSent?: () => void },
 ): {
-  open: (leadId: string) => void;
+  open: (leadId: string, kind?: EntityKind) => void;
   close: () => void;
 } {
   let leadId: string | null = null;
+  let apiKind: EntityKind = "lead";
   let busy = false;
   let view: "list" | "preview" = "list";
   let items: EmailListItem[] = [];
@@ -219,7 +222,7 @@ export function initLeadEmailsModal(
     setBusy(true);
     setStatus("Carregando e-mails…");
     try {
-      const res = await fetch(`/leads/${encodeURIComponent(leadId)}/emails`);
+      const res = await fetch(profileApi(apiKind, leadId, "/emails"));
       const data = (await res.json().catch(() => ({}))) as {
         items?: EmailListItem[];
         message?: string | string[];
@@ -246,7 +249,7 @@ export function initLeadEmailsModal(
     setStatus("Carregando prévia…");
     try {
       const res = await fetch(
-        `/leads/${encodeURIComponent(leadId)}/emails/${encodeURIComponent(kind)}/preview`,
+        profileApi(apiKind, leadId, `/emails/${encodeURIComponent(kind)}/preview`),
       );
       const data = (await res.json().catch(() => ({}))) as EmailPreview & {
         message?: string | string[];
@@ -268,7 +271,7 @@ export function initLeadEmailsModal(
     setStatus("Enviando…");
     try {
       const res = await fetch(
-        `/leads/${encodeURIComponent(leadId)}/emails/${encodeURIComponent(preview.id)}`,
+        profileApi(apiKind, leadId, `/emails/${encodeURIComponent(preview.id)}`),
         { method: "POST" },
       );
       const data = (await res.json().catch(() => ({}))) as SendResult;
@@ -309,8 +312,9 @@ export function initLeadEmailsModal(
     frameEl.srcdoc = "";
   }
 
-  function open(nextId: string) {
+  function open(nextId: string, kind: EntityKind = "lead") {
     leadId = nextId;
+    apiKind = kind;
     items = [];
     preview = null;
     sent = false;

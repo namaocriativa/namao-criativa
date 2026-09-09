@@ -13,6 +13,7 @@ export {
   getCatalogEntry,
 } from './registry/catalog';
 export { enableMotion } from './lib/motion/policy';
+export { trackEvent, isWhatsappHref } from './lib/analytics';
 export { SAMPLE_PROPS, previewPageSpec } from './registry/examples';
 export type {
   ComponentCapability,

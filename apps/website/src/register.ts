@@ -1,56 +1,62 @@
 import './chrome';
-import { api, setSession } from './session';
+import { api } from './session';
+import { SIGNUP_MAIL_FAILED, createCustomerAccount } from './signup';
 
 const form = document.getElementById('register-form') as HTMLFormElement;
 const hint = document.getElementById('invite-hint') as HTMLElement;
 const statusEl = document.getElementById('register-status') as HTMLElement;
+const submitBtn = document.getElementById('register-btn') as HTMLButtonElement;
 const params = new URLSearchParams(location.search);
-const invite = params.get('invite') || '';
+let inviteToken = params.get('invite') || '';
 
-async function loadInvite() {
-  if (!invite) {
-    hint.textContent =
-      'É necessário um convite. Se você recebeu um link da Namão, use-o para abrir esta página.';
-    form.querySelectorAll('input, button').forEach((el) => {
-      (el as HTMLInputElement).disabled = true;
-    });
+async function loadInviteHint() {
+  if (!inviteToken) {
+    hint.textContent = 'A senha e o link de acesso chegam no e-mail.';
     return;
   }
   try {
-    const data = await api(`/invites/${encodeURIComponent(invite)}`);
+    const data = await api(`/invites/${encodeURIComponent(inviteToken)}`);
     if (data.status !== 'PENDING') {
-      hint.textContent = `Este convite está ${String(data.status).toLowerCase()}.`;
+      inviteToken = '';
+      hint.textContent = 'A senha e o link de acesso chegam no e-mail.';
       return;
     }
-    hint.textContent = `Convite para ${data.lead?.name || 'o seu negócio'}.`;
-  } catch (error) {
-    hint.textContent =
-      error instanceof Error ? error.message : 'Convite inválido';
+    hint.textContent = `Convite para ${data.lead?.name || 'o seu negócio'}. A senha chega no e-mail.`;
+  } catch {
+    inviteToken = '';
+    hint.textContent = 'A senha e o link de acesso chegam no e-mail.';
   }
 }
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const fd = new FormData(form);
-  statusEl.textContent = 'Criando conta…';
+  statusEl.textContent = 'Criando conta e enviando acesso…';
   statusEl.classList.remove('error');
+  submitBtn.disabled = true;
   try {
-    const data = await api('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        inviteToken: invite,
-        name: String(fd.get('name') || ''),
-        email: String(fd.get('email') || ''),
-        password: String(fd.get('password') || ''),
-      }),
+    const created = await createCustomerAccount({
+      name: String(fd.get('name') || ''),
+      email: String(fd.get('email') || ''),
+      instagram: String(fd.get('instagram') || ''),
+      inviteToken,
     });
-    setSession(data.accessToken);
-    location.href = '/conectar.html';
+    if (created.mailed) {
+      const email = String(fd.get('email') || '').trim();
+      const next = new URL('/login.html', location.origin);
+      next.searchParams.set('registered', '1');
+      if (email) next.searchParams.set('email', email);
+      location.href = `${next.pathname}${next.search}`;
+      return;
+    }
+    statusEl.textContent = SIGNUP_MAIL_FAILED;
+    submitBtn.disabled = false;
   } catch (error) {
     statusEl.textContent =
       error instanceof Error ? error.message : 'Falha no cadastro';
     statusEl.classList.add('error');
+    submitBtn.disabled = false;
   }
 });
 
-void loadInvite();
+void loadInviteHint();

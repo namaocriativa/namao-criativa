@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { trackEvent } from '../../lib/analytics';
 import { parseSseStream } from './sse';
 import './ai-chat.css';
 
@@ -263,6 +264,12 @@ export function AiChatWidget({ props = {} }: { props?: AiChatProps }) {
               href={whatsapp}
               target="_blank"
               rel="noreferrer"
+              onClick={() =>
+                trackEvent('whatsapp_click', {
+                  source: 'ai_chat',
+                  link_url: whatsapp,
+                })
+              }
             >
               Falar no WhatsApp
             </a>
@@ -294,7 +301,10 @@ export function AiChatWidget({ props = {} }: { props?: AiChatProps }) {
         className="lk-ai-chat__fab"
         aria-label={concierge ? 'Abrir concierge' : 'Abrir chat'}
         onClick={() => {
-          setOpen((current) => !current);
+          setOpen((current) => {
+            if (!current) trackEvent('chat_open');
+            return !current;
+          });
           const name = open ? undefined : 'chat_opened';
           if (name) {
             const session = sessionRef.current;

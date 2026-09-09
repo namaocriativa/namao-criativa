@@ -57,4 +57,10 @@ describe('site-introduction-email', () => {
     expect(url).toContain('https://wa.me/5519997306695?text=');
     expect(url).toContain(encodeURIComponent('Firma'));
   });
+
+  it('aceita mensagem customizada no WhatsApp', () => {
+    const url = namaoWhatsAppUrl('+5519997306695', 'Firma', 'Quero pagar o serviço.');
+    expect(url).toContain(encodeURIComponent('Quero pagar o serviço.'));
+    expect(url).not.toContain(encodeURIComponent('Vi o site'));
+  });
 });

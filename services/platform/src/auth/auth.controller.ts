@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request } from 'express';
+import { AuthRateLimitService } from './auth-rate-limit.service';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
 import { LoginDto } from './dto/login.dto';
@@ -8,7 +19,10 @@ import type { JwtUser } from './jwt.strategy';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly rateLimit: AuthRateLimitService,
+  ) {}
 
   @Post('register')
   register(@Body() dto: RegisterDto) {
@@ -16,7 +30,13 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() dto: LoginDto) {
+  async login(@Req() req: Request, @Body() dto: LoginDto) {
+    if (await this.rateLimit.tooMany(this.clientIp(req))) {
+      throw new HttpException(
+        'Muitas tentativas. Tente de novo em alguns minutos.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
     return this.authService.login(dto);
   }
 
@@ -24,5 +44,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: JwtUser) {
     return this.authService.me(user);
+  }
+
+  private clientIp(req: Request): string {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string' && forwarded.trim()) {
+      return forwarded.split(',')[0].trim();
+    }
+    return req.ip || req.socket.remoteAddress || '0.0.0.0';
   }
 }

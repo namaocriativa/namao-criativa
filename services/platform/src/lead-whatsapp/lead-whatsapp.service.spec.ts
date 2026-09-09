@@ -18,6 +18,11 @@ describe('LeadWhatsAppService', () => {
   const invites = { create: jest.fn() };
   const accounts = { resetPassword: jest.fn() };
   const activity = { record: jest.fn() };
+  const owners = {
+    kindOf: jest.fn().mockResolvedValue('lead'),
+    requireKind: jest.fn().mockResolvedValue('lead'),
+    findProfile: jest.fn(),
+  };
   const service = new LeadWhatsAppService(
     prisma as never,
     config as never,
@@ -25,6 +30,7 @@ describe('LeadWhatsAppService', () => {
     invites as never,
     accounts as never,
     activity as never,
+    owners as never,
   );
 
   const lead = {
@@ -43,6 +49,7 @@ describe('LeadWhatsAppService', () => {
     evolution.configured.mockReturnValue(true);
     prisma.lead.findUnique.mockResolvedValue({ ...lead });
     prisma.user.findFirst.mockResolvedValue({ id: 'user-1' });
+    owners.kindOf.mockResolvedValue('lead');
   });
 
   it('lista os modelos disponíveis', async () => {
@@ -237,7 +244,7 @@ describe('LeadWhatsAppService', () => {
   });
 
   it('404 se o lead não existe', async () => {
-    prisma.lead.findUnique.mockResolvedValue(null);
+    owners.kindOf.mockResolvedValue(null);
     await expect(service.list('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );

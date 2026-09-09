@@ -10,24 +10,25 @@
     "cloud"
   ],
   "scripts": {
-    "dev": "concurrently -n platform,studio,runtime -c blue,green,magenta \"npm run start:dev -w @namao/platform\" \"npm run dev -w @namao/studio\" \"npm run start:dev -w @namao/runtime\"",
+    "dev": "concurrently -n platform,studio -c blue,green \"npm run start:dev -w @namao/platform\" \"npm run dev -w @namao/studio\"",
     "dev:platform": "npm run start:dev -w @namao/platform",
     "dev:studio": "npm run dev -w @namao/studio",
     "dev:website": "npm run dev -w @namao/website",
-    "dev:runtime": "npm run start:dev -w @namao/runtime",
-    "build": "npm run build -w @namao/landing-kit && npm run build -w @namao/platform && npm run build -w @namao/runtime && npm run build -w @namao/studio",
+    "build": "npm run build -w @namao/landing-kit && npm run build -w @namao/platform && npm run build -w @namao/studio",
     "build:kit": "npm run build -w @namao/landing-kit",
     "start": "npm run start:prod -w @namao/platform",
     "lint": "npm run lint -w @namao/platform",
-    "test": "npm run test -w @namao/platform && npm run test -w @namao/runtime",
-    "test:e2e": "npm run test:e2e -w @namao/platform && npm run test:e2e -w @namao/runtime",
-    "prisma:generate": "npm run prisma:generate -w @namao/platform && npm run prisma:generate -w @namao/runtime",
+    "test": "npm run test -w @namao/platform",
+    "test:e2e": "npm run test:e2e -w @namao/platform",
+    "prisma:generate": "npm run prisma:generate -w @namao/platform",
     "prisma:migrate": "npm run prisma:migrate -w @namao/platform",
     "crawler:setup": "npm run crawler:setup -w @namao/platform",
     "cloud:bootstrap": "npm run bootstrap -w @namao/cloud",
     "cloud:plan": "npm run plan -w @namao/cloud",
     "cloud:apply": "npm run apply -w @namao/cloud",
-    "cloud:deploy": "npm run deploy -w @namao/cloud"
+    "cloud:deploy": "npm run deploy -w @namao/cloud",
+    "cloud:website": "npm run website -w @namao/cloud",
+    "cloud:website:plan": "npm run website:plan -w @namao/cloud"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

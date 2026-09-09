@@ -13,6 +13,8 @@ import {
 } from '../lead-account/lead-account.util';
 import { MailService } from '../mail/mail.service';
 import { namaoWhatsAppUrl } from '../mail/site-introduction-email';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerCreateData } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 
@@ -25,6 +27,7 @@ export class InvitesService {
     private readonly config: ConfigService,
     private readonly evolution: EvolutionClient,
     private readonly mail: MailService,
+    private readonly owners: OwnerLookup,
   ) {}
 
   publicBaseUrl(): string {
@@ -51,18 +54,20 @@ export class InvitesService {
   }
 
   async create(dto: CreateInviteDto) {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: dto.leadId },
-      select: { id: true, name: true, phone: true, whatsapp: true },
+    const lead = await this.requireOwner(dto.leadId, {
+      id: true,
+      name: true,
+      phone: true,
+      whatsapp: true,
     });
-    if (!lead) throw new NotFoundException('Lead não encontrado');
+    const kind = await this.owners.requireKind(lead.id);
 
     const phone = dto.phone?.trim() || lead.whatsapp || lead.phone || null;
     const token = randomBytes(24).toString('hex');
     const invite = await this.prisma.invite.create({
       data: {
         token,
-        leadId: lead.id,
+        ...ownerCreateData(kind, lead.id),
         phone,
         status: 'PENDING',
         expiresAt: new Date(Date.now() + INVITE_TTL_MS),
@@ -99,21 +104,24 @@ export class InvitesService {
       where: { token },
       include: {
         lead: { select: { id: true, name: true, city: true, state: true } },
+        customer: { select: { id: true, name: true, city: true, state: true } },
       },
     });
     if (!invite) throw new NotFoundException('Convite não encontrado');
 
     const expired = invite.expiresAt.getTime() < Date.now();
     const status = expired && invite.status === 'PENDING' ? 'EXPIRED' : invite.status;
+    const owner = invite.lead || invite.customer;
+    if (!owner) throw new NotFoundException('Convite sem perfil');
 
     return {
       token: invite.token,
       status,
       expiresAt: invite.expiresAt,
       lead: {
-        name: invite.lead.name,
-        city: invite.lead.city,
-        state: invite.lead.state,
+        name: owner.name,
+        city: owner.city,
+        state: owner.state,
       },
     };
   }
@@ -121,15 +129,19 @@ export class InvitesService {
   async sendWhatsApp(id: string) {
     const invite = await this.prisma.invite.findUnique({
       where: { id },
-      include: { lead: { select: { name: true } } },
+      include: {
+        lead: { select: { name: true } },
+        customer: { select: { name: true } },
+      },
     });
     if (!invite) throw new NotFoundException('Convite não encontrado');
     if (!invite.phone) {
       throw new BadRequestException('Convite sem telefone para WhatsApp');
     }
     const registerUrl = this.registerUrl(invite.token);
+    const owner = invite.lead || invite.customer;
     const text = this.buildWhatsAppMessage({
-      leadName: invite.lead.name,
+      leadName: owner?.name || 'cliente',
       registerUrl,
     });
     const result = await this.evolution.sendText({
@@ -144,23 +156,19 @@ export class InvitesService {
   }
 
   async sendInstagramPermission(leadId: string) {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        whatsapp: true,
-        users: {
-          where: { role: 'CLIENT' },
-          select: { email: true },
-          take: 1,
-        },
-        instagramConnections: { select: { id: true, username: true }, take: 1 },
+    const lead = await this.requireOwner(leadId, {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      whatsapp: true,
+      users: {
+        where: { role: 'CLIENT' },
+        select: { email: true },
+        take: 1,
       },
+      instagramConnections: { select: { id: true, username: true }, take: 1 },
     });
-    if (!lead) throw new NotFoundException('Lead não encontrado');
 
     if (lead.instagramConnections.length) {
       return {
@@ -192,7 +200,7 @@ export class InvitesService {
       const invite = await this.prisma.invite.create({
         data: {
           token,
-          leadId: lead.id,
+          ...ownerCreateData(await this.owners.requireKind(lead.id), lead.id),
           phone,
           status: 'PENDING',
           expiresAt: new Date(Date.now() + INVITE_TTL_MS),
@@ -220,23 +228,19 @@ export class InvitesService {
   }
 
   async sendSiteIntroduction(leadId: string) {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        whatsapp: true,
-        publishedOrigin: true,
-        users: {
-          where: { role: 'CLIENT' },
-          select: { email: true },
-          take: 1,
-        },
+    const lead = await this.requireOwner(leadId, {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      whatsapp: true,
+      publishedOrigin: true,
+      users: {
+        where: { role: 'CLIENT' },
+        select: { email: true },
+        take: 1,
       },
     });
-    if (!lead) throw new NotFoundException('Lead não encontrado');
 
     const to =
       normalizeEmail(lead.email) ||
@@ -267,7 +271,7 @@ export class InvitesService {
       const invite = await this.prisma.invite.create({
         data: {
           token,
-          leadId: lead.id,
+          ...ownerCreateData(await this.owners.requireKind(lead.id), lead.id),
           phone,
           status: 'PENDING',
           expiresAt: new Date(Date.now() + INVITE_TTL_MS),
@@ -305,5 +309,16 @@ export class InvitesService {
       this.config.get<string>('PHONE_NUMBER')?.trim() ||
       null
     );
+  }
+
+  private async requireOwner<T extends object>(id: string, select: T) {
+    const kind = await this.owners.kindOf(id);
+    if (!kind) throw new NotFoundException('Lead não encontrado');
+    const row =
+      kind === 'lead'
+        ? await this.prisma.lead.findUnique({ where: { id }, select })
+        : await this.prisma.customer.findUnique({ where: { id }, select });
+    if (!row) throw new NotFoundException('Lead não encontrado');
+    return row;
   }
 }

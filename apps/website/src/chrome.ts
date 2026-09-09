@@ -33,6 +33,22 @@ function initCursor() {
   const isHot = (target: EventTarget | null) =>
     target instanceof Element && Boolean(target.closest('a, button, input, label'));
 
+  const syncDialogCursor = () => {
+    const open = Boolean(document.querySelector('dialog[open]'));
+    document.body.classList.toggle('dialog-open', open);
+  };
+
+  document.addEventListener(
+    'toggle',
+    (event) => {
+      if (event.target instanceof HTMLDialogElement) syncDialogCursor();
+    },
+    true,
+  );
+  document.querySelectorAll('dialog').forEach((dialog) => {
+    dialog.addEventListener('close', syncDialogCursor);
+  });
+
   document.addEventListener('pointerover', (event) => {
     if (isHot(event.target)) el.classList.add('is-hot');
   });

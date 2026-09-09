@@ -20,15 +20,27 @@ describe('LeadAccountService', () => {
     get: jest.fn().mockReturnValue('http://localhost:5174'),
   };
 
+  const owners = {
+    requireKind: jest.fn().mockResolvedValue('lead'),
+    findProfile: jest.fn(),
+  };
+
   const service = new LeadAccountService(
     prisma as never,
     mail as never,
     config as never,
+    owners as never,
   );
 
   beforeEach(() => {
     jest.resetAllMocks();
     config.get.mockReturnValue('http://localhost:5174');
+    owners.requireKind.mockResolvedValue('lead');
+    owners.findProfile.mockResolvedValue({
+      id: 'lead-1',
+      name: 'Firma',
+      email: 'ana@loja.com',
+    });
   });
 
   it('não recria senha se o lead já tem CLIENT', async () => {
@@ -73,20 +85,21 @@ describe('LeadAccountService', () => {
           email: 'ana@loja.com',
           role: 'CLIENT',
           leadId: 'lead-1',
+          customerId: null,
         }),
       }),
     );
   });
 
   it('GET account 404 se lead não existe', async () => {
-    prisma.lead.findUnique.mockResolvedValue(null);
+    owners.findProfile.mockResolvedValue(null);
     await expect(service.getAccount('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });
 
   it('sendPassword recusa fallback', async () => {
-    prisma.lead.findUnique.mockResolvedValue({
+    owners.findProfile.mockResolvedValue({
       id: 'lead-1',
       name: 'Firma',
       email: null,

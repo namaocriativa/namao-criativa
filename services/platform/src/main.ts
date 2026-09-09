@@ -3,16 +3,11 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
-
-const APP_CORS_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174',
-];
+import { ChatCorsService } from './public-chat/chat-cors.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.set('trust proxy', 1);
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -20,19 +15,19 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-  const extraOrigin = process.env.NAMAO_PUBLIC_URL?.replace(/\/$/, '') || '';
-  const allowed = new Set(
-    [...APP_CORS_ORIGINS, extraOrigin].filter(Boolean),
-  );
+  const chatCors = app.get(ChatCorsService);
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin || allowed.has(origin.replace(/\/$/, ''))) {
-        callback(null, true);
-        return;
+    origin: async (origin, callback) => {
+      try {
+        const allowed = await chatCors.isAllowed(origin);
+        callback(null, allowed);
+      } catch (error) {
+        callback(error as Error, false);
       }
-      callback(null, false);
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   const serverRoot = join(__dirname, '..');
@@ -40,6 +35,6 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
-  console.log(`discovery-lead-enrichment listening on http://localhost:${port}`);
+  console.log(`namao-api listening on http://localhost:${port}`);
 }
-bootstrap();
+void bootstrap();

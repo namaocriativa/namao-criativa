@@ -10,6 +10,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { InstagramGraphClient } from './instagram-graph.client';
+import { OwnerLookup } from '../owner/owner-lookup.service';
+import {
+  jwtOwnerId,
+  ownerCreateData,
+  ownerWhere,
+} from '../owner/owner.util';
 
 @Injectable()
 export class InstagramService {
@@ -19,6 +25,7 @@ export class InstagramService {
     private readonly jwt: JwtService,
     private readonly storage: StorageService,
     private readonly config: ConfigService,
+    private readonly owners: OwnerLookup,
   ) {}
 
   statusConfigured() {
@@ -34,7 +41,7 @@ export class InstagramService {
         'Instagram Graph API não configurada. Defina META_APP_ID e META_APP_SECRET.',
       );
     }
-    if (!user.leadId) {
+    if (!jwtOwnerId(user)) {
       throw new BadRequestException(
         'Conta sem lead vinculado. Use um convite para se registrar.',
       );
@@ -69,7 +76,8 @@ export class InstagramService {
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.leadId) {
+    const ownerId = user ? jwtOwnerId(user) : null;
+    if (!user || !ownerId) {
       return fail('user_without_lead');
     }
 
@@ -80,36 +88,49 @@ export class InstagramService {
         return fail('no_instagram_business_account');
       }
 
-      await this.prisma.instagramConnection.upsert({
-        where: { leadId: user.leadId },
-        create: {
-          userId: user.id,
-          leadId: user.leadId,
-          igUserId: account.igUserId,
-          username: account.username,
-          accessToken: tokens.accessToken,
-          tokenExpiresAt: tokens.expiresAt,
-          scopes: 'instagram_basic,pages_show_list',
-        },
-        update: {
-          userId: user.id,
-          igUserId: account.igUserId,
-          username: account.username,
-          accessToken: tokens.accessToken,
-          tokenExpiresAt: tokens.expiresAt,
-        },
+      const kind = await this.owners.requireKind(ownerId);
+      const existing = await this.prisma.instagramConnection.findFirst({
+        where: ownerWhere(ownerId),
       });
-
-      if (account.username) {
-        await this.prisma.lead.update({
-          where: { id: user.leadId },
+      if (existing) {
+        await this.prisma.instagramConnection.update({
+          where: { id: existing.id },
           data: {
-            instagram: `https://www.instagram.com/${account.username}/`,
+            userId: user.id,
+            igUserId: account.igUserId,
+            username: account.username,
+            accessToken: tokens.accessToken,
+            tokenExpiresAt: tokens.expiresAt,
+          },
+        });
+      } else {
+        await this.prisma.instagramConnection.create({
+          data: {
+            userId: user.id,
+            ...ownerCreateData(kind, ownerId),
+            igUserId: account.igUserId,
+            username: account.username,
+            accessToken: tokens.accessToken,
+            tokenExpiresAt: tokens.expiresAt,
+            scopes: 'instagram_basic,pages_show_list',
           },
         });
       }
 
-      await this.syncLead(user.leadId, user);
+      if (account.username) {
+        await this.owners.update(ownerId, {
+          instagram: `https://www.instagram.com/${account.username}/`,
+        });
+      }
+
+      await this.syncLead(ownerId, {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        leadId: user.leadId,
+        customerId: user.customerId,
+      });
       return `${namao}/conectar.html?ig=ok`;
     } catch {
       return fail('graph_error');
@@ -117,9 +138,10 @@ export class InstagramService {
   }
 
   async connectionForUser(user: JwtUser) {
-    if (!user.leadId) return { connected: false as const };
-    const conn = await this.prisma.instagramConnection.findUnique({
-      where: { leadId: user.leadId },
+    const ownerId = jwtOwnerId(user);
+    if (!ownerId) return { connected: false as const };
+    const conn = await this.prisma.instagramConnection.findFirst({
+      where: ownerWhere(ownerId),
       select: {
         id: true,
         igUserId: true,
@@ -133,11 +155,12 @@ export class InstagramService {
   }
 
   async syncLead(leadId: string, user?: JwtUser) {
-    if (user && user.role !== 'ADMIN' && user.leadId !== leadId) {
+    if (user && user.role !== 'ADMIN' && jwtOwnerId(user) !== leadId) {
       throw new ForbiddenException('Sem permissão para este lead');
     }
-    const conn = await this.prisma.instagramConnection.findUnique({
-      where: { leadId },
+    const kind = await this.owners.requireKind(leadId);
+    const conn = await this.prisma.instagramConnection.findFirst({
+      where: ownerWhere(leadId),
     });
     if (!conn) {
       throw new NotFoundException('Lead sem Instagram autorizado');
@@ -150,7 +173,9 @@ export class InstagramService {
     });
 
     let imported = 0;
-    const existingCount = await this.prisma.leadImage.count({ where: { leadId } });
+    const existingCount = await this.prisma.leadImage.count({
+      where: ownerWhere(leadId),
+    });
     let index = existingCount + 1;
 
     for (const item of media) {
@@ -159,7 +184,7 @@ export class InstagramService {
       try {
         await this.prisma.leadImage.create({
           data: {
-            leadId,
+            ...ownerCreateData(kind, leadId),
             source: 'instagram',
             sourceUrl: saved.sourceUrl,
             localPath: saved.localPath,
@@ -172,7 +197,7 @@ export class InstagramService {
         imported += 1;
         index += 1;
       } catch {
-        // unique leadId+sourceUrl
+        // unique owner+sourceUrl
       }
     }
 

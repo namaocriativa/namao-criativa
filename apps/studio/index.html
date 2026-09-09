@@ -26,6 +26,7 @@
         </a>
         <nav class="nav-tabs" aria-label="Seções">
           <a href="/leads" data-route="leads" class="active">Leads</a>
+          <a href="/customers" data-route="customers">Customers</a>
           <a href="/discovery" data-route="discovery">Discovery</a>
           <a href="/enrichment" data-route="enrichment">Enrichment</a>
           <a href="/packages" data-route="packages">Pacotes</a>
@@ -40,6 +41,10 @@
         <a href="/leads" data-route="leads" class="active">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           Leads
+        </a>
+        <a href="/customers" data-route="customers">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20.5v-8.2M12 20.5v-12M17 20.5V8.3M4.5 20.5h15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M7 12.3c1.4-1.6 3.2-2.6 5-2.6s3.6 1 5 2.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          Customers
         </a>
         <a href="/discovery" data-route="discovery">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 16.5 20 20.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
@@ -65,7 +70,7 @@
       <div class="sidebar-footer">
         <div class="sidebar-card">
           <strong>Ambiente local</strong>
-          <p>Vite em :5173 · API em :3000. Docker só para Redis, Crawl4AI e Ollama.</p>
+          <p>Vite em :5173 · API em :3000. Docker para Postgres, Redis e Crawl4AI.</p>
         </div>
       </div>
     </aside>
@@ -89,12 +94,46 @@
               <option value="">Todas</option>
             </select>
           </label>
+          <label class="leads-origin">
+            Origem
+            <select id="leads-origin-filter">
+              <option value="">Todas</option>
+              <option value="signup">Cadastro Namão</option>
+              <option value="discovery">Discovery</option>
+            </select>
+          </label>
           <button type="button" class="secondary" id="refresh-leads-btn">
             Atualizar lista
           </button>
         </div>
         <div class="status" id="saved-leads-status"></div>
         <ul class="results" id="saved-leads"></ul>
+      </section>
+
+      <section id="tab-customers" class="tab-panel">
+        <h2>Customers</h2>
+        <div class="leads-toolbar">
+          <label class="leads-search">
+            Buscar por nome
+            <input
+              type="search"
+              id="customers-search-input"
+              placeholder="Digite o nome do negócio…"
+              autocomplete="off"
+            />
+          </label>
+          <label class="leads-category">
+            Categoria
+            <select id="customers-category-filter">
+              <option value="">Todas</option>
+            </select>
+          </label>
+          <button type="button" class="secondary" id="refresh-customers-btn">
+            Atualizar lista
+          </button>
+        </div>
+        <div class="status" id="saved-customers-status"></div>
+        <ul class="results" id="saved-customers"></ul>
       </section>
 
       <section id="tab-discovery" class="tab-panel">
@@ -408,31 +447,18 @@
         <h2>Config</h2>
         <p class="prompt-hint">
           O LLM só entra na geração de landing. Discovery e Enrichment não usam
-          IA. Escolha Gemini (Google AI Studio) ou Ollama por papel — a chave
-          Gemini fica só no <code>.env</code> (<code>GEMINI_API_KEY</code>).
+          IA. Escolha o modelo Gemini por papel — a chave fica só no
+          <code>.env</code> (<code>GEMINI_API_KEY</code>). Abaixo, o status de
+          cada variável de <code>services/platform/.env</code> (valores secretos
+          não aparecem).
         </p>
 
-        <div class="config-status-grid">
-          <div class="config-status-card">
-            <h3>Gemini</h3>
-            <div id="config-gemini-status" class="status">Checando…</div>
-          </div>
-          <div class="config-status-card">
-            <h3>Ollama</h3>
-            <div id="config-ollama-status" class="status">Checando…</div>
-          </div>
-          <div class="config-status-card">
-            <h3>Vercel</h3>
-            <div id="config-vercel-status" class="status">Checando…</div>
-          </div>
-        </div>
+        <p class="config-env-summary" id="config-env-summary">Checando…</p>
+        <div class="config-status-grid" id="config-env-grid"></div>
 
         <div class="config-shortcuts">
           <button type="button" id="config-use-gemini-btn">
-            Usar Gemini em tudo
-          </button>
-          <button type="button" class="secondary" id="config-use-ollama-btn">
-            Usar Ollama em tudo
+            Usar Gemini Flash em tudo
           </button>
         </div>
 
@@ -442,8 +468,7 @@
               <tr>
                 <th>Papel</th>
                 <th>Etapas</th>
-                <th>Provider</th>
-                <th>Modelo</th>
+                <th>Modelo Gemini</th>
               </tr>
             </thead>
             <tbody>
@@ -453,12 +478,6 @@
                   <span class="config-role-hint">Planejamento</span>
                 </td>
                 <td class="config-stages" data-stages-for="plan"></td>
-                <td>
-                  <select id="config-role-plan-provider" aria-label="Provider plan">
-                    <option value="ollama">Ollama</option>
-                    <option value="gemini">Gemini</option>
-                  </select>
-                </td>
                 <td>
                   <div class="config-model-picker">
                     <select id="config-role-plan-model" aria-label="Modelo plan"></select>
@@ -480,12 +499,6 @@
                 </td>
                 <td class="config-stages" data-stages-for="code"></td>
                 <td>
-                  <select id="config-role-code-provider" aria-label="Provider code">
-                    <option value="ollama">Ollama</option>
-                    <option value="gemini">Gemini</option>
-                  </select>
-                </td>
-                <td>
                   <div class="config-model-picker">
                     <select id="config-role-code-model" aria-label="Modelo code"></select>
                     <p class="config-model-tags" data-tags-for="code" hidden></p>
@@ -505,15 +518,6 @@
                   <span class="config-role-hint">Imagens</span>
                 </td>
                 <td class="config-stages" data-stages-for="vision"></td>
-                <td>
-                  <select
-                    id="config-role-vision-provider"
-                    aria-label="Provider vision"
-                  >
-                    <option value="ollama">Ollama</option>
-                    <option value="gemini">Gemini</option>
-                  </select>
-                </td>
                 <td>
                   <div class="config-model-picker">
                     <select
@@ -537,15 +541,6 @@
                   <span class="config-role-hint">Chat da LP</span>
                 </td>
                 <td class="config-stages" data-stages-for="chat"></td>
-                <td>
-                  <select
-                    id="config-role-chat-provider"
-                    aria-label="Provider chat"
-                  >
-                    <option value="ollama">Ollama</option>
-                    <option value="gemini">Gemini</option>
-                  </select>
-                </td>
                 <td>
                   <div class="config-model-picker">
                     <select

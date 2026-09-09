@@ -1,0 +1,5 @@
+# Cloudflare Pages — @namao/website
+# Projeto criado/atualizado por `npm run cloud:website`. Deploy: .github/workflows/cd-website.yml
+name = "namao-website"
+compatibility_date = "2026-09-01"
+pages_build_output_dir = "dist"
