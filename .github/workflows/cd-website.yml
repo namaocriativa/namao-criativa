@@ -51,7 +51,9 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu
 
       - name: Write API proxy redirects
         run: npm run website:redirects -w @namao/cloud
