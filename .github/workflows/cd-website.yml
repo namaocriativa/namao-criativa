@@ -32,6 +32,7 @@ jobs:
               - 'apps/website/**'
               - 'cloud/lib/website-redirects.ts'
               - 'cloud/scripts/write-website-redirects.ts'
+              - '.github/workflows/cd-website.yml'
 
   deploy:
     name: Build and deploy Pages
@@ -50,7 +51,7 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Write API proxy redirects
         run: npm run website:redirects -w @namao/cloud
