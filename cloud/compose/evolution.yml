@@ -1,5 +1,8 @@
-# Evolution API + Postgres + Redis
-# Image: evoapicloud/evolution-api:latest
+# Evolution API + Postgres + Redis — referência para dev local.
+# Produção no Coolify NÃO usa este compose: Application `namao-evolution`
+# + database `namao-redis` + schema `evolution_api` em `namao-postgres`.
+#
+# Image: evoapicloud/evolution-api:v2.3.7
 #
 # Env (set via Coolify service envs / apply script):
 #   SERVER_URL

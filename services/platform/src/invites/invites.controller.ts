@@ -1,8 +1,11 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Public } from '../auth/public.decorator';
+import { StudioAuth } from '../auth/studio-auth.decorator';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { SendInstagramPermissionDto } from './dto/send-instagram-permission.dto';
 import { InvitesService } from './invites.service';
 
+@StudioAuth()
 @Controller('invites')
 export class InvitesController {
   constructor(private readonly invitesService: InvitesService) {}
@@ -17,6 +20,7 @@ export class InvitesController {
     return this.invitesService.sendInstagramPermission(dto.leadId);
   }
 
+  @Public()
   @Get(':token')
   getPublic(@Param('token') token: string) {
     return this.invitesService.getPublic(token);

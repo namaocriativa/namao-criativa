@@ -1,8 +1,11 @@
 import { ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import cookieParser from 'cookie-parser';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { createStorageJwtMiddleware } from './auth/storage-jwt.middleware';
 import { ChatCorsService } from './public-chat/chat-cors.service';
 
 async function bootstrap() {
@@ -16,6 +19,7 @@ async function bootstrap() {
     }),
   );
   const chatCors = app.get(ChatCorsService);
+  app.use(cookieParser());
   app.enableCors({
     origin: async (origin, callback) => {
       try {
@@ -31,6 +35,7 @@ async function bootstrap() {
   });
 
   const serverRoot = join(__dirname, '..');
+  app.use(createStorageJwtMiddleware(app.get(JwtService)));
   app.useStaticAssets(join(serverRoot, 'storage'), { prefix: '/storage' });
 
   const port = process.env.PORT ?? 3000;

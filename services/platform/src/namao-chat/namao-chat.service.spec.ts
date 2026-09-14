@@ -445,4 +445,44 @@ describe('NamaoChatService', () => {
     expect(prisma.chatSession.create).toHaveBeenCalled();
     expect(result.messages[0].content).toContain('assistente na Namão');
   });
+
+  it('autentica createSession pelo cookie HttpOnly do cliente', async () => {
+    const prisma = prismaMock();
+    prisma.chatSession.findMany.mockResolvedValue([]);
+    prisma.chatSession.findUniqueOrThrow.mockResolvedValue(
+      guestSession({
+        id: 'sess_cookie',
+        userId: 'u1',
+        metadata: { kind: 'auth', registered: true, slots: {} },
+      }),
+    );
+    prisma.chatMessage.findMany.mockResolvedValue([
+      {
+        id: 'a1',
+        role: 'assistant',
+        content: authGreeting('Carla Mendes'),
+        createdAt: new Date(),
+      },
+    ]);
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'u1',
+      email: 'carla@loja.com',
+      name: 'Carla Mendes',
+      role: 'CLIENT',
+      leadId: null,
+      customerId: null,
+    });
+    const service = makeService(prisma, {
+      jwt: { verify: jest.fn().mockReturnValue({ sub: 'u1' }) },
+    });
+    const result = await service.createSession({
+      ...req,
+      headers: {
+        origin: 'http://localhost:5174',
+        cookie: 'namao_client_token=header.payload.sig',
+      },
+    } as never);
+    expect(result.mode).toBe('auth');
+    expect(prisma.user.findUnique).toHaveBeenCalled();
+  });
 });

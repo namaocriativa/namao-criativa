@@ -1,0 +1,91 @@
+name: CD studio
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-studio-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      studio: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.filter.outputs.studio }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            studio:
+              - 'apps/studio/**'
+              - 'packages/landing-kit/**'
+              - 'cloud/stacks/studio-pages.ts'
+              - 'cloud/scripts/studio.ts'
+              - 'cloud/scripts/check-studio-pages-env.ts'
+              - 'cloud/lib/studio-pages-env.ts'
+              - '.github/workflows/cd-studio.yml'
+
+  deploy:
+    name: Build and deploy Pages
+    needs: changes
+    if: needs.changes.outputs.studio == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu
+
+      - name: Build landing-kit
+        run: npm run build -w @namao/landing-kit
+
+      - name: Build
+        run: npm run build -w @namao/studio
+
+      - id: cf
+        name: Check Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "Skipping Pages deploy until CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require Pages JWT_SECRET and STUDIO_API_ORIGIN
+        if: steps.cf.outputs.ok == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run studio:check-env -w @namao/cloud
+
+      - name: Deploy Cloudflare Pages
+        if: steps.cf.outputs.ok == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/studio
+          command: pages deploy dist --project-name=namao-studio --branch=main --commit-hash=${{ github.sha }} --commit-dirty=true

@@ -20,7 +20,9 @@ import { GenerateLandingDto } from './dto/generate-landing.dto';
 import { RateGenerationDto } from './dto/rate-generation.dto';
 import { LandingJobEvent } from './landing-jobs.service';
 import { LandingService } from './landing.service';
+import { StudioAuth } from '../auth/studio-auth.decorator';
 
+@StudioAuth()
 @Controller('landing')
 export class LandingController {
   constructor(private readonly landingService: LandingService) {}

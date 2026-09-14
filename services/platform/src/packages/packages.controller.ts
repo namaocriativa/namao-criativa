@@ -13,7 +13,9 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { CreatePackageDto } from './dto/create-package.dto';
 import { UpdatePackageDto } from './dto/update-package.dto';
 import { PackagesService, type PackageUploadFile } from './packages.service';
+import { StudioAuth } from '../auth/studio-auth.decorator';
 
+@StudioAuth()
 @Controller('packages')
 export class PackagesController {
   constructor(private readonly packagesService: PackagesService) {}

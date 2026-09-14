@@ -1,4 +1,5 @@
 import type { Lead, LeadImage } from "./types";
+import { api } from "./api";
 import { entityKindOf, profileApi } from "./profile-api";
 
 type GalleryHandlers = {
@@ -141,7 +142,7 @@ export function initLeadGallery(
     try {
       const body = new FormData();
       for (const file of list) body.append("files", file);
-      const res = await fetch(
+      const res = await api(
         `${profileApi(entityKindOf(lead), lead.id, "/images")}`,
         { method: "POST", body },
       );
@@ -171,7 +172,7 @@ export function initLeadGallery(
     busy = true;
     setStatus("Excluindo…");
     try {
-      const res = await fetch(
+      const res = await api(
         `${profileApi(entityKindOf(lead), lead.id, `/images/${encodeURIComponent(imageId)}`)}`,
         { method: "DELETE" },
       );

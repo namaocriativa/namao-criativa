@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import type { JwtUser } from '../auth/jwt.strategy';
+import { isStudioRole } from '../auth/roles';
 import { InstagramGraphClient } from './instagram-graph.client';
 import { OwnerLookup } from '../owner/owner-lookup.service';
 import {
@@ -155,7 +156,7 @@ export class InstagramService {
   }
 
   async syncLead(leadId: string, user?: JwtUser) {
-    if (user && user.role !== 'ADMIN' && jwtOwnerId(user) !== leadId) {
+    if (user && !isStudioRole(user.role) && jwtOwnerId(user) !== leadId) {
       throw new ForbiddenException('Sem permissão para este lead');
     }
     const kind = await this.owners.requireKind(leadId);

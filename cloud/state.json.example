@@ -3,9 +3,10 @@
   "project_uuid": "",
   "environment_uuid": "",
   "environment_name": "production",
-  "evolution_service_uuid": "",
+  "postgres_database_uuid": "",
+  "redis_database_uuid": "",
+  "evolution_application_uuid": "",
   "runtime_application_uuid": "",
-  "evolution_postgres_password": "",
   "evolution_api_key": "",
   "updated_at": ""
 }

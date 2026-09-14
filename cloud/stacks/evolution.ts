@@ -1,53 +1,110 @@
-import type { CoolifyClient } from '../lib/coolify-client.js';
-import { encodeComposeFile } from '../lib/encode.js';
+import { CoolifyError, type CoolifyClient } from '../lib/coolify-client.js';
+import { upsertAppEnvs } from '../lib/app-envs.js';
 import type { StackConfig } from '../lib/config.js';
 import { log } from '../lib/config.js';
+import {
+  applicationExists,
+  findApplicationByName,
+} from '../lib/coolify-database.js';
 import type { CloudState } from '../lib/state.js';
+import { resolveEvolutionDatabaseUrl } from './postgres.js';
+import { resolveRedisUrl } from './redis.js';
 
-type ServiceCreated = { uuid?: string; domains?: string[] };
-type ServiceEnv = { uuid?: string; key?: string; value?: string };
+type AppCreated = { uuid?: string; fqdn?: string };
+type AppDetail = { uuid?: string; fqdn?: string };
+type Storages = {
+  persistent_storages?: Array<{ uuid?: string; mount_path?: string }>;
+};
 
-async function upsertServiceEnvs(
+const INSTANCES_MOUNT = '/evolution/instances';
+
+async function ensureInstancesVolume(
   client: CoolifyClient,
-  serviceUuid: string,
-  envs: Record<string, string>,
+  appUuid: string,
 ): Promise<void> {
-  const existing = await client.get<ServiceEnv[]>(
-    `/services/${serviceUuid}/envs`,
+  const storages = await client.get<Storages>(
+    `/applications/${appUuid}/storages`,
   );
-  const byKey = new Map(
-    (Array.isArray(existing) ? existing : [])
-      .filter((e) => e.key)
-      .map((e) => [e.key as string, e]),
-  );
-
-  for (const [key, value] of Object.entries(envs)) {
-    const found = byKey.get(key);
-    if (found?.uuid) {
-      await client.patch(`/services/${serviceUuid}/envs`, {
-        uuid: found.uuid,
-        key,
-        value,
-        is_literal: true,
-      });
-    } else {
-      await client.post(`/services/${serviceUuid}/envs`, {
-        key,
-        value,
-        is_literal: true,
-      });
-    }
-  }
+  const mounts = storages?.persistent_storages || [];
+  if (mounts.some((s) => s.mount_path === INSTANCES_MOUNT)) return;
+  await client.post(`/applications/${appUuid}/storages`, {
+    type: 'persistent',
+    name: 'evolution-instances',
+    mount_path: INSTANCES_MOUNT,
+  });
+  log('evolution', `volume ${INSTANCES_MOUNT} attached`);
 }
 
-export function evolutionConnectionUri(opts: {
-  user: string;
-  password: string;
-  database: string;
-}): string {
-  const user = encodeURIComponent(opts.user);
-  const pass = encodeURIComponent(opts.password);
-  return `postgresql://${user}:${pass}@evolution-postgres:5432/${opts.database}?schema=public`;
+async function readFqdn(
+  client: CoolifyClient,
+  appUuid: string,
+): Promise<string> {
+  const app = await client.get<AppDetail>(`/applications/${appUuid}`);
+  return (app?.fqdn || '').replace(/\/$/, '');
+}
+
+function resolveServerUrl(stack: StackConfig, fqdn: string): string {
+  const configured =
+    process.env.EVOLUTION_SERVER_URL?.trim() ||
+    stack.evolution.domain.trim() ||
+    fqdn;
+  return configured.replace(/\/$/, '');
+}
+
+export function buildEvolutionEnvs(opts: {
+  stack: StackConfig;
+  state: CloudState;
+  serverUrl: string;
+}): Record<string, string> {
+  const databaseUrl = resolveEvolutionDatabaseUrl(opts.state, opts.stack);
+  const redisUrl = resolveRedisUrl(opts.state, 1);
+  return {
+    SERVER_URL: opts.serverUrl,
+    SERVER_PORT: '8080',
+    AUTHENTICATION_API_KEY: opts.state.evolution_api_key,
+    AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: 'true',
+    DATABASE_PROVIDER: 'postgresql',
+    DATABASE_CONNECTION_URI: databaseUrl,
+    DATABASE_CONNECTION_CLIENT_NAME: 'evolution_namao',
+    DATABASE_SAVE_DATA_INSTANCE: 'true',
+    DATABASE_SAVE_DATA_NEW_MESSAGE: 'true',
+    DATABASE_SAVE_MESSAGE_UPDATE: 'true',
+    DATABASE_SAVE_DATA_CONTACTS: 'true',
+    DATABASE_SAVE_DATA_CHATS: 'true',
+    CACHE_REDIS_ENABLED: 'true',
+    CACHE_REDIS_URI: redisUrl,
+    CACHE_REDIS_PREFIX_KEY: 'evolution',
+    CACHE_LOCAL_ENABLED: 'false',
+    RABBITMQ_ENABLED: 'false',
+    SQS_ENABLED: 'false',
+    WEBHOOK_GLOBAL_ENABLED: 'false',
+  };
+}
+
+async function removeLegacyComposeService(
+  client: CoolifyClient,
+  state: CloudState,
+  dryRun: boolean,
+): Promise<void> {
+  if (!state.evolution_service_uuid) return;
+  if (dryRun) {
+    log(
+      'evolution',
+      `would DELETE compose service uuid=${state.evolution_service_uuid}`,
+    );
+    return;
+  }
+  try {
+    await client.delete(`/services/${state.evolution_service_uuid}`);
+    log('evolution', `deleted compose service uuid=${state.evolution_service_uuid}`);
+  } catch (err) {
+    if (err instanceof CoolifyError && err.status === 404) {
+      log('evolution', 'compose service already gone');
+    } else {
+      throw err;
+    }
+  }
+  state.evolution_service_uuid = '';
 }
 
 export async function applyEvolution(opts: {
@@ -59,73 +116,112 @@ export async function applyEvolution(opts: {
   const { client, stack, dryRun } = opts;
   const state = { ...opts.state };
 
-  const pgUser = process.env.EVOLUTION_POSTGRES_USER?.trim() || 'evolution';
-  const pgPass = state.evolution_postgres_password;
-  const pgDb = process.env.EVOLUTION_POSTGRES_DB?.trim() || 'evolution';
-  const apiKey = state.evolution_api_key;
-  const serverUrl =
-    process.env.EVOLUTION_SERVER_URL?.trim() ||
-    stack.evolution.domain ||
-    'http://evolution-api:8080';
+  await removeLegacyComposeService(client, state, dryRun);
 
-  const envs = {
-    SERVER_URL: serverUrl,
-    AUTHENTICATION_API_KEY: apiKey,
-    POSTGRES_USER: pgUser,
-    POSTGRES_PASSWORD: pgPass,
-    POSTGRES_DB: pgDb,
-    DATABASE_CONNECTION_URI: evolutionConnectionUri({
-      user: pgUser,
-      password: pgPass,
-      database: pgDb,
-    }),
-  };
+  if (state.evolution_application_uuid) {
+    const exists = await applicationExists(
+      client,
+      state.evolution_application_uuid,
+    );
+    if (!exists) {
+      log(
+        'evolution',
+        `uuid=${state.evolution_application_uuid} missing — will recreate`,
+      );
+      state.evolution_application_uuid = '';
+    }
+  }
 
-  const urls =
-    stack.evolution.domain.trim() !== ''
-      ? [{ name: 'evolution-api', url: stack.evolution.domain.trim() }]
-      : undefined;
+  if (!state.evolution_application_uuid) {
+    const existing = await findApplicationByName(client, stack.evolution.name);
+    if (existing) {
+      state.evolution_application_uuid = existing;
+      log('evolution', `adopted existing uuid=${existing}`);
+    }
+  }
 
-  if (state.evolution_service_uuid) {
-    log('evolution', `exists uuid=${state.evolution_service_uuid}`);
+  const image = `${stack.evolution.image_name}:${stack.evolution.image_tag}`;
+
+  if (state.evolution_application_uuid) {
+    log('evolution', `exists uuid=${state.evolution_application_uuid}`);
     if (!dryRun) {
-      await upsertServiceEnvs(client, state.evolution_service_uuid, envs);
-      if (urls) {
-        await client.patch(`/services/${state.evolution_service_uuid}`, {
-          urls,
-        });
+      const fqdn = await readFqdn(client, state.evolution_application_uuid);
+      const serverUrl = resolveServerUrl(stack, fqdn);
+      await upsertAppEnvs(
+        client,
+        state.evolution_application_uuid,
+        buildEvolutionEnvs({ stack, state, serverUrl }),
+      );
+      const patch: Record<string, unknown> = {
+        docker_registry_image_name: stack.evolution.image_name,
+        docker_registry_image_tag: stack.evolution.image_tag,
+        ports_exposes: stack.evolution.ports_exposes,
+        health_check_enabled: true,
+        health_check_path: stack.evolution.health_check_path,
+        health_check_port: '8080',
+      };
+      if (stack.evolution.domain.trim()) {
+        patch.domains = stack.evolution.domain.trim();
       }
-      log('evolution', 'envs updated');
+      await client.patch(
+        `/applications/${state.evolution_application_uuid}`,
+        patch,
+      );
+      await ensureInstancesVolume(client, state.evolution_application_uuid);
+      log('evolution', 'envs + image settings updated');
     } else {
-      log('evolution', 'would update envs' + (urls ? ' + urls' : ''));
+      log('evolution', 'would update envs + image settings');
     }
     return state;
   }
 
   const body: Record<string, unknown> = {
     name: stack.evolution.name,
-    description: 'Namão Evolution API (WhatsApp) + Postgres + Redis',
+    description: 'Namão Evolution API (WhatsApp)',
     project_uuid: state.project_uuid,
+    server_uuid: state.server_uuid,
     environment_name: state.environment_name,
     environment_uuid: state.environment_uuid || undefined,
-    server_uuid: state.server_uuid,
+    docker_registry_image_name: stack.evolution.image_name,
+    docker_registry_image_tag: stack.evolution.image_tag,
+    ports_exposes: stack.evolution.ports_exposes,
+    health_check_enabled: true,
+    health_check_path: stack.evolution.health_check_path,
+    health_check_port: '8080',
+    health_check_method: 'GET',
+    health_check_return_code: 200,
     instant_deploy: true,
-    docker_compose_raw: encodeComposeFile('compose/evolution.yml'),
   };
-  if (urls) body.urls = urls;
+  if (state.destination_uuid) {
+    body.destination_uuid = state.destination_uuid;
+  }
+  if (stack.evolution.domain.trim()) {
+    body.domains = stack.evolution.domain.trim();
+  }
 
   if (dryRun) {
-    log('evolution', `would CREATE service ${stack.evolution.name}`);
+    log('evolution', `would CREATE application ${stack.evolution.name} from ${image}`);
     return state;
   }
 
-  const created = await client.post<ServiceCreated>('/services', body);
+  const created = await client.post<AppCreated>(
+    '/applications/dockerimage',
+    body,
+  );
   if (!created?.uuid) {
-    throw new Error('Coolify did not return evolution service uuid');
+    throw new Error('Coolify did not return evolution application uuid');
   }
-  state.evolution_service_uuid = created.uuid;
+  state.evolution_application_uuid = created.uuid;
   log('evolution', `created uuid=${created.uuid}`);
-  await upsertServiceEnvs(client, created.uuid, envs);
-  log('evolution', 'envs set');
+
+  const fqdn = created.fqdn?.replace(/\/$/, '') || (await readFqdn(client, created.uuid));
+  const serverUrl = resolveServerUrl(stack, fqdn);
+  await upsertAppEnvs(
+    client,
+    created.uuid,
+    buildEvolutionEnvs({ stack, state, serverUrl }),
+  );
+  await ensureInstancesVolume(client, created.uuid);
+  log('evolution', 'envs + volume set');
   return state;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { api } from "../api";
 import type { Lead, LeadImage } from "../types";
 import type { LandingSectionConfig } from "./section-catalog";
 import { wizardProfileApi } from "./mount-wizard";
@@ -122,7 +123,7 @@ export function MediaStep({
       return;
     }
     let cancelled = false;
-    void fetch(wizardProfileApi(leadId))
+    void api(wizardProfileApi(leadId))
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Lead não encontrado"))))
       .then((data: Lead) => {
         if (!cancelled) setLead(data);
@@ -134,7 +135,7 @@ export function MediaStep({
           );
         }
       });
-    void fetch(wizardProfileApi(leadId, "/videos"))
+    void api(wizardProfileApi(leadId, "/videos"))
       .then((res) => (res.ok ? res.json() : { videos: [] }))
       .then((data: { videos?: Array<{ filename?: string; publicPath?: string; localPath?: string; slot?: string }> }) => {
         if (cancelled) return;
@@ -226,7 +227,7 @@ export function MediaStep({
     const body = new FormData();
     for (const file of list) body.append("files", file);
     try {
-      const res = await fetch(wizardProfileApi(leadId, "/images"), {
+      const res = await api(wizardProfileApi(leadId, "/images"), {
         method: "POST",
         body,
       });
@@ -250,7 +251,7 @@ export function MediaStep({
     const body = new FormData();
     body.append("file", file);
     try {
-      const res = await fetch(
+      const res = await api(
         wizardProfileApi(leadId, `/videos?slot=${slot}`),
         { method: "POST", body },
       );

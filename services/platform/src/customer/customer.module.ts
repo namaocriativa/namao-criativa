@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { LeadAccountModule } from '../lead-account/lead-account.module';
 import { LeadActivityModule } from '../lead-activity/lead-activity.module';
 import { LeadMailModule } from '../lead-mail/lead-mail.module';
@@ -9,6 +10,7 @@ import { CustomerService } from './customer.service';
 
 @Module({
   imports: [
+    AuthModule,
     StorageModule,
     LeadAccountModule,
     LeadMailModule,

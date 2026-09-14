@@ -14,8 +14,13 @@ export type CloudState = {
   postgres_user: string;
   postgres_db: string;
   postgres_password: string;
+  redis_database_uuid: string;
+  redis_password: string;
+  /** @deprecated compose service — deleted after Evolution becomes an Application */
   evolution_service_uuid: string;
+  evolution_application_uuid: string;
   runtime_application_uuid: string;
+  /** @deprecated Evolution now uses namao-postgres ?schema=evolution_api */
   evolution_postgres_password: string;
   evolution_api_key: string;
   cloudflare_pages_project?: string;
@@ -37,7 +42,10 @@ export function emptyState(): CloudState {
     postgres_user: '',
     postgres_db: '',
     postgres_password: '',
+    redis_database_uuid: '',
+    redis_password: '',
     evolution_service_uuid: '',
+    evolution_application_uuid: '',
     runtime_application_uuid: '',
     evolution_postgres_password: '',
     evolution_api_key: '',

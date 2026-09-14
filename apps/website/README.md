@@ -11,7 +11,7 @@ npm install
 npm run dev:website
 ```
 
-UI em `http://localhost:5174`. A API unificada deve estar em `http://localhost:3000`. O Vite faz proxy das rotas `/auth`, `/invites`, `/leads`, `/dashboard/analytics`, `/invite-requests` e `/namao-chat`.
+UI em `http://localhost:5174`. A API unificada deve estar em `http://localhost:4000` (ou `PLATFORM_PORT` / `VITE_API_URL`). O Vite faz proxy das rotas `/auth`, `/invites`, `/leads`, `/dashboard/analytics`, `/invite-requests` e `/namao-chat`.
 
 Build:
 
@@ -40,7 +40,7 @@ Secrets e DNS: [`cloud/README.md`](../../cloud/README.md#cd--cloudflare-pages-na
 ## Fluxo do lead
 
 1. O time interno gera um convite no studio de enrichment.
-2. O lead abre `/register.html?invite=TOKEN` e cria conta (JWT).
+2. O lead abre `/register.html?invite=TOKEN` e cria conta (cookie HttpOnly).
 3. Em `/conectar.html` autoriza o Instagram (OAuth Graph). Só contas que autorizarem enviam mídia.
 4. Em `/dashboard.html` vê os dados do negócio e as estatísticas do site publicado (GA4, filtrado pelo hostname de `publishedOrigin`).
 

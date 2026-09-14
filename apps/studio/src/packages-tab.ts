@@ -1,3 +1,4 @@
+import { api } from "./api";
 import type { AgencyPackage, PackageImage } from "./types";
 import { hrefFor, navigate, type AppRoute } from "./router";
 
@@ -234,7 +235,7 @@ export function initPackagesTab(): {
   async function loadList() {
     setListStatus("Carregando pacotes…");
     try {
-      const res = await fetch("/packages");
+      const res = await api("/packages");
       if (!res.ok) {
         throw new Error(await readError(res, "Falha ao listar pacotes"));
       }
@@ -255,7 +256,7 @@ export function initPackagesTab(): {
     setDetailStatus("Carregando pacote…");
     mediaSection.hidden = true;
     try {
-      const res = await fetch(`/packages/${encodeURIComponent(id)}`);
+      const res = await api(`/packages/${encodeURIComponent(id)}`);
       if (!res.ok) {
         throw new Error(await readError(res, "Pacote não encontrado"));
       }
@@ -274,7 +275,7 @@ export function initPackagesTab(): {
     newBtn.disabled = true;
     setListStatus("Criando pacote…");
     try {
-      const res = await fetch("/packages", {
+      const res = await api("/packages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -309,7 +310,7 @@ export function initPackagesTab(): {
     saveBtn.disabled = true;
     setDetailStatus("Salvando…");
     try {
-      const res = await fetch(`/packages/${encodeURIComponent(current.id)}`, {
+      const res = await api(`/packages/${encodeURIComponent(current.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -333,7 +334,7 @@ export function initPackagesTab(): {
     if (!confirm("Excluir este pacote e suas mídias?")) return;
     busy = true;
     try {
-      const res = await fetch(`/packages/${encodeURIComponent(id)}`, {
+      const res = await api(`/packages/${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -362,7 +363,7 @@ export function initPackagesTab(): {
     try {
       const body = new FormData();
       for (const file of list) body.append("files", file);
-      const res = await fetch(
+      const res = await api(
         `/packages/${encodeURIComponent(current.id)}/images`,
         { method: "POST", body },
       );
@@ -386,7 +387,7 @@ export function initPackagesTab(): {
     mediaBusy = true;
     setMediaStatus("Excluindo imagem…");
     try {
-      const res = await fetch(
+      const res = await api(
         `/packages/${encodeURIComponent(current.id)}/images/${encodeURIComponent(imageId)}`,
         { method: "DELETE" },
       );

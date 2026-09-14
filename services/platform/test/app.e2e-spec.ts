@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -13,6 +14,7 @@ describe('Discovery Lead Enrichment (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -27,37 +29,62 @@ describe('Discovery Lead Enrichment (e2e)', () => {
     await app.close();
   });
 
-  it('POST /lead-discovery validates body', () => {
+  it('POST /lead-discovery sem JWT responde 401', () => {
     return request(app.getHttpServer())
       .post('/lead-discovery')
       .send({})
-      .expect(400);
+      .expect(401);
   });
 
-  it('POST /enrichment validates body', () => {
+  it('POST /enrichment sem JWT responde 401', () => {
     return request(app.getHttpServer())
       .post('/enrichment')
       .send({})
-      .expect(400);
+      .expect(401);
   });
 
-  it('GET /leads returns an array', async () => {
-    const res = await request(app.getHttpServer()).get('/leads').expect(200);
-    expect(Array.isArray(res.body)).toBe(true);
+  it('GET /leads sem JWT responde 401', () => {
+    return request(app.getHttpServer()).get('/leads').expect(401);
   });
 
-  it('GET /customers returns an array', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/customers')
-      .expect(200);
-    expect(Array.isArray(res.body)).toBe(true);
+  it('GET /customers sem JWT responde 401', () => {
+    return request(app.getHttpServer()).get('/customers').expect(401);
   });
 
-  it('POST /lead-discovery validates radiusKm', () => {
+  it('GET /locations/neighborhoods sem JWT responde 401', () => {
     return request(app.getHttpServer())
-      .post('/lead-discovery')
-      .send({ city: 'São Paulo', state: 'SP', radiusKm: 100 })
+      .get('/locations/neighborhoods')
+      .query({ city: 'Rio de Janeiro', state: 'RJ', q: 'Copa' })
+      .expect(401);
+  });
+
+  it('GET /studio/users sem JWT responde 401', () => {
+    return request(app.getHttpServer()).get('/studio/users').expect(401);
+  });
+
+  it('POST /auth/studio/login valida o body', () => {
+    return request(app.getHttpServer())
+      .post('/auth/studio/login')
+      .send({ email: 'nao-e-email' })
       .expect(400);
+  });
+
+  it('POST /auth/studio/login sem credenciais válidas não devolve token', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/studio/login')
+      .send({ email: 'nobody@namao.local', password: 'password1' })
+      .expect(401);
+    expect(res.body.accessToken).toBeUndefined();
+    expect(res.headers['set-cookie']).toBeFalsy();
+  });
+
+  it('POST /auth/login sem credenciais válidas não devolve token', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'nobody@namao.local', password: 'password1' })
+      .expect(401);
+    expect(res.body.accessToken).toBeUndefined();
+    expect(res.headers['set-cookie']).toBeFalsy();
   });
 
   it('GET /health retorna status', async () => {
@@ -123,8 +150,8 @@ describe('Discovery Lead Enrichment (e2e)', () => {
       .expect(400);
   });
 
-  it('POST /lead-discovery accepts neighborhood and radiusKm', async () => {
-    const res = await request(app.getHttpServer())
+  it('POST /lead-discovery sem JWT responde 401 mesmo com body válido', () => {
+    return request(app.getHttpServer())
       .post('/lead-discovery')
       .send({
         city: 'zzzzinvalidcity',
@@ -132,34 +159,7 @@ describe('Discovery Lead Enrichment (e2e)', () => {
         neighborhood: 'Centro',
         radiusKm: 5,
         limit: 1,
-      });
-
-    expect(res.status).not.toBe(400);
-    expect(Array.isArray(res.body.results)).toBe(true);
-  });
-
-  it('GET /locations/neighborhoods valida query', async () => {
-    const empty = await request(app.getHttpServer())
-      .get('/locations/neighborhoods')
-      .query({ q: 'Cop' })
-      .expect(200);
-    expect(empty.body).toEqual([]);
-
-    const res = await request(app.getHttpServer())
-      .get('/locations/neighborhoods')
-      .query({ city: 'Rio de Janeiro', state: 'RJ', q: 'Copa', limit: 5 })
-      .expect(200);
-
-    expect(Array.isArray(res.body)).toBe(true);
-    if (res.body.length) {
-      expect(res.body[0]).toEqual(
-        expect.objectContaining({
-          name: expect.any(String),
-          city: expect.any(String),
-          state: expect.any(String),
-          label: expect.any(String),
-        }),
-      );
-    }
+      })
+      .expect(401);
   });
 });

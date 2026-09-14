@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { api } from "../api";
 import type { Lead } from "../types";
 import type { CopywriterPayload } from "./wizard-payload";
 import { wizardProfileApi } from "./mount-wizard";
@@ -76,7 +77,7 @@ export function CopywriterStep({ leadId, value, onChange }: CopywriterStepProps)
     }
     let cancelled = false;
     setStatus("Carregando enrichment…");
-    void fetch(wizardProfileApi(leadId))
+    void api(wizardProfileApi(leadId))
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Lead não encontrado"))))
       .then((data: Lead) => {
         if (cancelled) return;

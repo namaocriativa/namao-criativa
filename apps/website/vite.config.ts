@@ -1,6 +1,10 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { resolveLocalApiUrl } from '../local-api-url';
 
-const api = process.env.VITE_API_URL || 'http://localhost:3000';
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const api = resolveLocalApiUrl(path.resolve(rootDir, '../..'));
 
 export default defineConfig({
   root: '.',

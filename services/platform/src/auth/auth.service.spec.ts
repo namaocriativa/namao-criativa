@@ -217,4 +217,52 @@ describe('AuthService', () => {
     );
     expect(result.instagram).toEqual({ connected: false });
   });
+
+  it('studioLogin rejeita CLIENT', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...createdUser,
+      passwordHash: await require('bcryptjs').hash('password1', 4),
+    });
+    await expect(
+      service.studioLogin({ email: 'ana@loja.com', password: 'password1' }),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('studioLogin aceita ADMIN', async () => {
+    const hash = await require('bcryptjs').hash('password1', 4);
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'a1',
+      email: 'admin@namao.local',
+      name: 'Admin',
+      role: 'ADMIN',
+      leadId: null,
+      customerId: null,
+      passwordHash: hash,
+    });
+    const result = await service.studioLogin({
+      email: 'admin@namao.local',
+      password: 'password1',
+    });
+    expect(result.user.role).toBe('ADMIN');
+    expect(result.accessToken).toBe('token');
+  });
+
+  it('ensureStudioAdmin cria o primeiro admin', async () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === 'STUDIO_ADMIN_EMAIL') return 'admin@namao.local';
+      if (key === 'STUDIO_ADMIN_PASSWORD') return 'changeme123';
+      return undefined;
+    });
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue({});
+    await service.ensureStudioAdmin();
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          email: 'admin@namao.local',
+          role: 'ADMIN',
+        }),
+      }),
+    );
+  });
 });

@@ -1,3 +1,4 @@
+import { Public } from '../auth/public.decorator';
 import {
   Body,
   Controller,
@@ -15,6 +16,7 @@ import {
 } from './dto/namao-chat.dto';
 import { NamaoChatService } from './namao-chat.service';
 
+@Public()
 @Controller('namao-chat')
 export class NamaoChatController {
   constructor(private readonly chat: NamaoChatService) {}

@@ -9,6 +9,7 @@ import {
   extraHostnames,
 } from '../lib/pages-custom-domains.js';
 import type { CloudState } from '../lib/state.js';
+import { requireJwtSecret } from '../lib/jwt-secret.js';
 
 type PagesProject = {
   id?: string;
@@ -41,9 +42,9 @@ async function upsertPagesEnv(
     return;
   }
   await client.patch(projectPath, {
+    preview_deployment_setting: 'none',
     deployment_configs: {
       production: { env_vars: vars },
-      preview: { env_vars: vars },
     },
   });
   log('studio', `Pages env updated (${Object.keys(vars).join(', ')})`);
@@ -108,17 +109,16 @@ export async function applyStudioPages(opts: {
 
   const envVars: Record<string, PagesEnvVar> = {};
   const apiOrigin = resolveStudioApiOrigin();
-  if (apiOrigin) {
-    envVars.STUDIO_API_ORIGIN = { type: 'plain_text', value: apiOrigin };
-  } else {
-    log('studio', 'no STUDIO_API_ORIGIN / WEBSITE_API_ORIGIN (set before deploy)');
+  if (!apiOrigin) {
+    throw new Error(
+      'STUDIO_API_ORIGIN (or WEBSITE_API_ORIGIN) is required for studio Pages',
+    );
   }
-  const jwt = process.env.JWT_SECRET?.trim();
-  if (jwt) {
-    envVars.JWT_SECRET = { type: 'secret_text', value: jwt };
-  } else {
-    log('studio', 'no JWT_SECRET — Pages middleware cannot validate cookies');
-  }
+  envVars.STUDIO_API_ORIGIN = { type: 'plain_text', value: apiOrigin };
+  envVars.JWT_SECRET = {
+    type: 'secret_text',
+    value: requireJwtSecret(process.env.JWT_SECRET, 'production'),
+  };
   if (existing || !dryRun) {
     await upsertPagesEnv(client, projectPath, envVars, dryRun);
   }

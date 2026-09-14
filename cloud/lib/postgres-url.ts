@@ -11,10 +11,23 @@ export function buildCoolifyPostgresUrl(opts: {
   password: string;
   uuid: string;
   database: string;
+  schema?: string;
 }): string {
   const user = encodeURIComponent(opts.user);
   const password = encodeURIComponent(opts.password);
-  return `postgresql://${user}:${password}@${opts.uuid}:5432/${opts.database}`;
+  const url = `postgresql://${user}:${password}@${opts.uuid}:5432/${opts.database}`;
+  if (!opts.schema) return url;
+  return `${url}?schema=${encodeURIComponent(opts.schema)}`;
+}
+
+export function buildCoolifyRedisUrl(opts: {
+  password: string;
+  uuid: string;
+  db?: number;
+}): string {
+  const password = encodeURIComponent(opts.password);
+  const db = opts.db ?? 0;
+  return `redis://:${password}@${opts.uuid}:6379/${db}`;
 }
 
 export function maskDatabaseUrl(url: string): string {

@@ -1,6 +1,6 @@
 import './chrome';
 import { clearChatSession, mountWebsiteChat } from './chat/mount';
-import { api, clearSession, getToken } from './session';
+import { api, clearSession, probeLoggedIn } from './session';
 
 type MeResponse = {
   user?: { name?: string; email?: string };
@@ -81,16 +81,21 @@ const kpiEngagement = document.getElementById('kpi-engagement') as HTMLElement;
 
 let selectedRange: AnalyticsRange = '7d';
 
-if (!getToken()) {
-  location.href = '/login.html';
-} else {
+void (async () => {
+  if (!(await probeLoggedIn())) {
+    location.href = '/login.html';
+    return;
+  }
   mountWebsiteChat();
-}
+  await boot();
+})();
 
 logoutBtn.addEventListener('click', () => {
-  clearSession();
-  clearChatSession();
-  location.href = '/login.html';
+  void (async () => {
+    await clearSession();
+    clearChatSession();
+    location.href = '/login.html';
+  })();
 });
 
 rangeGroup.addEventListener('click', (event) => {
@@ -237,7 +242,7 @@ async function loadAnalytics() {
         : '';
   } catch (error) {
     if (error instanceof Error && /401|403/.test(error.message)) {
-      clearSession();
+      await clearSession();
       location.href = '/login.html';
       return;
     }
@@ -303,9 +308,7 @@ async function boot() {
     statsSection.hidden = false;
     await loadAnalytics();
   } catch {
-    clearSession();
+    await clearSession();
     location.href = '/login.html';
   }
 }
-
-void boot();

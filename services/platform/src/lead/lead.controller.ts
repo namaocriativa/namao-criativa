@@ -17,10 +17,12 @@ import { LeadActivityService } from '../lead-activity/lead-activity.service';
 import { LeadMailService } from '../lead-mail/lead-mail.service';
 import { SendLeadWhatsAppDto } from '../lead-whatsapp/dto/send-lead-whatsapp.dto';
 import { LeadWhatsAppService } from '../lead-whatsapp/lead-whatsapp.service';
+import { StudioAuth } from '../auth/studio-auth.decorator';
 import { ConvertToCustomerService } from '../owner/convert-to-customer.service';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadService, type LeadUploadFile } from './lead.service';
 
+@StudioAuth()
 @Controller('leads')
 export class LeadController {
   constructor(

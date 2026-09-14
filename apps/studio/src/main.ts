@@ -1,7 +1,14 @@
 import "./style.css";
 import type { CitySuggestion, Lead, NeighborhoodSuggestion } from "./types";
+import { api } from "./api";
 import { initConfigTab } from "./config-tab";
 import { initPackagesTab } from "./packages-tab";
+import { initUsersTab } from "./users-tab";
+import {
+  logoutStudio,
+  requireStudioSession,
+  type StudioUser,
+} from "./session";
 import {
   hrefFor,
   navigate,
@@ -188,6 +195,8 @@ function syncNav(route: AppRoute) {
 }
 
 const packagesTab = initPackagesTab();
+const usersTab = initUsersTab();
+let currentUser: StudioUser | null = null;
 
 function currentProfileApi(suffix = "", id = currentLeadId) {
   if (!id) return "";
@@ -213,6 +222,14 @@ function applyRoute(route: AppRoute) {
     }
   }
   packagesTab.onRoute(route);
+  if (route.name === "users") {
+    if (currentUser?.role !== "ADMIN") {
+      showTab("not-found");
+      document.title = titleForRoute({ name: "not-found" });
+      return;
+    }
+    usersTab.reload();
+  }
 }
 
 initUiLib(el<HTMLElement>("ui-lib-root"));
@@ -329,7 +346,7 @@ function setupCityAutocomplete({
     }
     const id = ++requestId;
     try {
-      const res = await fetch(
+      const res = await api(
         `/locations/cities?q=${encodeURIComponent(q)}&limit=8`,
       );
       const data = await res.json();
@@ -456,7 +473,7 @@ function setupNeighborhoodAutocomplete({
     }
     const id = ++requestId;
     try {
-      const res = await fetch(
+      const res = await api(
         `/locations/neighborhoods?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}&limit=8`,
       );
       const data = await res.json();
@@ -716,7 +733,7 @@ async function loadLeadHistory(lead: Lead) {
   }
   leadContextHistory.innerHTML = `<li><strong>Carregando histórico…</strong></li>`;
   try {
-    const res = await fetch(
+    const res = await api(
       profileApi(entityKindOf(lead), lead.id, "/history"),
     );
     const data = (await res.json().catch(() => ({}))) as {
@@ -934,7 +951,7 @@ async function reenrichLead(id: string, button: HTMLButtonElement) {
   }
 
   try {
-    const res = await fetch(`/enrichment/${encodeURIComponent(id)}/refresh`, {
+    const res = await api(`/enrichment/${encodeURIComponent(id)}/refresh`, {
       method: "POST",
     });
     const data = await res.json().catch(() => ({}));
@@ -960,7 +977,7 @@ async function createLeadInvite(lead: Lead) {
   output.hidden = false;
   output.textContent = "Gerando convite…";
   try {
-    const res = await fetch("/invites", {
+    const res = await api("/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -997,7 +1014,7 @@ async function loadSavedLeads() {
   setStatus(savedLeadsStatus, "Carregando...");
   refreshLeadsBtn.disabled = true;
   try {
-    const res = await fetch("/leads");
+    const res = await api("/leads");
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.message || "Falha ao listar leads");
@@ -1027,7 +1044,7 @@ async function loadSavedCustomers() {
   setStatus(savedCustomersStatus, "Carregando...");
   refreshCustomersBtn.disabled = true;
   try {
-    const res = await fetch("/customers");
+    const res = await api("/customers");
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.message || "Falha ao listar customers");
@@ -1303,7 +1320,7 @@ async function deleteSavedCustomer(id: string, name: string) {
   if (!confirmed) return;
   setStatus(savedCustomersStatus, `Deletando "${name}"...`);
   try {
-    const res = await fetch(`/customers/${encodeURIComponent(id)}`, {
+    const res = await api(`/customers/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     const data = await res.json().catch(() => ({}));
@@ -1337,7 +1354,7 @@ async function deleteSavedLead(id: string, name: string) {
 
   setStatus(savedLeadsStatus, `Deletando "${name}"...`);
   try {
-    const res = await fetch(`/leads/${encodeURIComponent(id)}`, {
+    const res = await api(`/leads/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     const data = await res.json().catch(() => ({}));
@@ -1371,7 +1388,7 @@ async function convertLeadToCustomer(lead: Lead) {
   );
   if (!confirmed) return;
   try {
-    const res = await fetch(
+    const res = await api(
       `/leads/${encodeURIComponent(lead.id)}/convert-to-customer`,
       { method: "POST" },
     );
@@ -1400,7 +1417,7 @@ async function openSavedLead(id: string, kind: EntityKind = "lead") {
   const statusEl = kind === "customer" ? savedCustomersStatus : savedLeadsStatus;
   setStatus(statusEl, kind === "customer" ? "Abrindo customer..." : "Abrindo lead...");
   try {
-    const res = await fetch(profileApi(kind, id));
+    const res = await api(profileApi(kind, id));
     const data = await res.json();
     if (!res.ok) {
       throw new Error(
@@ -1679,7 +1696,7 @@ discoveryForm.addEventListener("submit", async (event: SubmitEvent) => {
 
   // Refresh saved-lead index so tags stay accurate.
   try {
-    const savedRes = await fetch("/leads");
+    const savedRes = await api("/leads");
     if (savedRes.ok) {
       indexSavedLeads((await savedRes.json()) as Lead[]);
     }
@@ -1705,7 +1722,7 @@ discoveryForm.addEventListener("submit", async (event: SubmitEvent) => {
   if (neighborhood) payload.neighborhood = neighborhood;
 
   try {
-    const res = await fetch("/lead-discovery", {
+    const res = await api("/lead-discovery", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1759,7 +1776,7 @@ discoveryClearCacheBtn.addEventListener("click", async () => {
   discoveryClearCacheBtn.disabled = true;
   setStatus(discoveryStatus, "Limpando cache...");
   try {
-    const res = await fetch("/lead-discovery/cache", { method: "DELETE" });
+    const res = await api("/lead-discovery/cache", { method: "DELETE" });
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.message || "Falha ao limpar cache");
@@ -1805,7 +1822,7 @@ enrichForm.addEventListener("submit", async (event: SubmitEvent) => {
   }
 
   try {
-    const res = await fetch("/enrichment", {
+    const res = await api("/enrichment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1829,9 +1846,35 @@ enrichForm.addEventListener("submit", async (event: SubmitEvent) => {
 
 refreshLeadsBtn.addEventListener("click", () => loadSavedLeads());
 refreshCustomersBtn.addEventListener("click", () => loadSavedCustomers());
-loadSavedLeads();
-loadSavedCustomers();
-startRouter(applyRoute);
+
+function applyStudioChrome(user: StudioUser) {
+  currentUser = user;
+  document.body.classList.remove("is-auth-pending");
+  document.querySelectorAll<HTMLElement>("[data-admin-only]").forEach((node) => {
+    node.hidden = user.role !== "ADMIN";
+  });
+  const nameEl = document.getElementById("studio-user-name");
+  if (nameEl) nameEl.textContent = user.name;
+  const roleEl = document.getElementById("studio-user-role");
+  if (roleEl) {
+    roleEl.textContent = user.role === "ADMIN" ? "Administrador" : "Operador";
+  }
+}
+
+document.getElementById("studio-logout-btn")?.addEventListener("click", () => {
+  void logoutStudio();
+});
+
+void requireStudioSession()
+  .then((user) => {
+    applyStudioChrome(user);
+    loadSavedLeads();
+    loadSavedCustomers();
+    startRouter(applyRoute);
+  })
+  .catch(() => {
+    /* redirect em requireStudioSession */
+  });
 
 function setSiteActionsEnabled(enabled: boolean) {
   siteGenerateBtn.disabled = !enabled || !llmReady;
@@ -2028,7 +2071,7 @@ function handleJobTerminal(payload: {
 async function reloadCurrentLead() {
   if (!currentLeadId) return;
   try {
-    const res = await fetch(currentProfileApi());
+    const res = await api(currentProfileApi());
     const data = await res.json();
     if (res.ok) {
       updateLandingMeta(data as Lead);
@@ -2091,7 +2134,7 @@ function subscribeJobEvents(jobId: string, leadId: string, replayLog = false) {
 
 async function recoverJob(jobId: string, leadId: string) {
   try {
-    const res = await fetch(`/landing/jobs/${encodeURIComponent(jobId)}`);
+    const res = await api(`/landing/jobs/${encodeURIComponent(jobId)}`);
     const data = await res.json();
     if (!res.ok) {
       clearRememberedJob();
@@ -2140,7 +2183,7 @@ async function maybeReconnectJob(lead: Lead) {
 
 async function refreshLlmStatus() {
   try {
-    const res = await fetch("/landing/status");
+    const res = await api("/landing/status");
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.message || "Falha ao checar LLM");
@@ -2177,7 +2220,7 @@ siteRefreshBtn.addEventListener("click", async () => {
   await refreshLlmStatus();
   if (currentLeadId) {
     try {
-      const res = await fetch(currentProfileApi());
+      const res = await api(currentProfileApi());
       const data = await res.json();
       if (res.ok) renderLead(data as Lead);
     } catch {
@@ -2199,7 +2242,7 @@ siteLocalBtn.addEventListener("click", async () => {
   setStatus(siteStatus, "Iniciando site local…");
   const popup = window.open("about:blank", "_blank");
   try {
-    const res = await fetch(`/landing/local/${encodeURIComponent(leadId)}`, {
+    const res = await api(`/landing/local/${encodeURIComponent(leadId)}`, {
       method: "POST",
     });
     const data = (await res.json()) as {
@@ -2237,7 +2280,7 @@ sitePublishBtn.addEventListener("click", async () => {
   setStatus(siteStatus, "Publicando na Vercel…");
   appendSiteLog("Publicando dist/ na Vercel…");
   try {
-    const res = await fetch("/landing/publish", {
+    const res = await api("/landing/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leadId }),
@@ -2249,7 +2292,7 @@ sitePublishBtn.addEventListener("click", async () => {
     const url = String(data.url || "");
     setStatus(siteStatus, url ? `Publicado: ${url}` : "Publicado na Vercel.");
     appendSiteLog(url ? `Vercel: ${url}` : "Deploy Vercel ok");
-    const leadRes = await fetch(currentProfileApi("", leadId));
+    const leadRes = await api(currentProfileApi("", leadId));
     const leadData = await leadRes.json();
     if (leadRes.ok) {
       renderLead(leadData as Lead);
@@ -2277,7 +2320,7 @@ siteDeleteBtn.addEventListener("click", async () => {
       siteEventSource.close();
       siteEventSource = null;
     }
-    const res = await fetch(
+    const res = await api(
       `/landing/site/${encodeURIComponent(leadId)}`,
       { method: "DELETE" },
     );
@@ -2296,7 +2339,7 @@ siteDeleteBtn.addEventListener("click", async () => {
         : "Status limpo (pasta já inexistente).",
     );
     appendSiteLog(`Site deletado · ${data.path || "?"}`);
-    const leadRes = await fetch(currentProfileApi("", leadId));
+    const leadRes = await api(currentProfileApi("", leadId));
     const leadData = await leadRes.json();
     if (leadRes.ok) {
       updateLandingMeta(leadData as Lead);
@@ -2318,7 +2361,7 @@ sitePromptBtn.addEventListener("click", async () => {
   if (!leadId) return;
   sitePromptBtn.disabled = true;
   try {
-    const res = await fetch("/landing/prompt", {
+    const res = await api("/landing/prompt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leadId }),
@@ -2341,7 +2384,7 @@ siteCancelBtn.addEventListener("click", async () => {
   if (!activeJobId) return;
   siteCancelBtn.disabled = true;
   try {
-    const res = await fetch(
+    const res = await api(
       `/landing/jobs/${encodeURIComponent(activeJobId)}/cancel`,
       { method: "POST" },
     );
@@ -2385,7 +2428,7 @@ async function startLandingGenerate() {
   appendSiteLog("Generate iniciado...");
 
   try {
-    const res = await fetch("/landing/generate", {
+    const res = await api("/landing/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

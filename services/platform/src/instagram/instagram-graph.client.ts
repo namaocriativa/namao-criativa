@@ -31,7 +31,7 @@ export class InstagramGraphClient {
   get redirectUri(): string {
     return (
       this.config.get<string>('META_REDIRECT_URI')?.trim() ||
-      'http://localhost:3000/auth/instagram/callback'
+      `http://localhost:${process.env.PLATFORM_PORT || process.env.PORT || '3000'}/auth/instagram/callback`
     );
   }
 

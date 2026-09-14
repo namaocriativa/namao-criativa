@@ -84,7 +84,7 @@ Arquivo: `services/platform/.env`
 | `GA4_PROPERTY_ID` | Não | Property ID numérico do GA4 — dashboard do cliente |
 | `GA4_SERVICE_ACCOUNT_JSON` | Não | JSON da service account (Viewer na propriedade GA4) |
 | `LEADS_DIR` | Não | Pasta dos projetos Vite. Default: `<monorepo>/leads` |
-| `JWT_SECRET` | Sim em produção | Segredo JWT (login Namão / clientes / studio) |
+| `JWT_SECRET` | Sim | Segredo JWT. Em produção a API recusa vazio ou placeholder de desenvolvimento |
 | `NAMAO_PUBLIC_URL` | Não | URL do site Namão. Default: `http://localhost:5174` |
 | `NAMAO_STUDIO_URL` | Não | URL do studio (CORS). Default local: `http://localhost:5173` |
 | `STUDIO_ADMIN_EMAIL` | Não | Bootstrap do primeiro admin do studio |
@@ -293,7 +293,7 @@ Falhas de um provider não interrompem o enrichment.
 | `npm run crawler:setup` | Cria venv e instala Crawl4AI + Chromium |
 | `npm run cloud:bootstrap` | Resolve server/projeto no Coolify |
 | `npm run cloud:plan` | Dry-run do IaC Coolify |
-| `npm run cloud:apply` | Cria/atualiza Postgres, Evolution e API |
+| `npm run cloud:apply` | Cria/atualiza Postgres, Redis, Evolution e API |
 | `npm run cloud:deploy` | Dispara deploy dos recursos no Coolify |
 
 ## API pública (chat, dashboard, convites)
@@ -323,8 +323,9 @@ Em produção, `PUBLIC_CHAT_API_ORIGIN` deve ser a URL pública da API (`https:/
 
 IaC em [`cloud/`](cloud/README.md) via API HTTP do Coolify (`https://coolify.fungalia.com.br`):
 
-- PostgreSQL (`namao-postgres` via IaC) — leads, chat, users, invite-requests
-- Evolution API (`evoapicloud/evolution-api:latest`) + Postgres + Redis
+- PostgreSQL (`namao-postgres` via IaC) — leads, chat, users, invite-requests + schema `evolution_api`
+- Redis (`namao-redis` via IaC) — cache da API + Evolution
+- Evolution API (`evoapicloud/evolution-api:v2.3.7`) como Application Docker image
 - API (`namao-api`) como aplicação Docker image (`ghcr.io/namaocriativa/namao-api`). CD em push para `main`: [`.github/workflows/cd-runtime.yml`](.github/workflows/cd-runtime.yml)
 - Website (`apps/website`) no Cloudflare Pages (`namao-website`). CD: [`.github/workflows/cd-website.yml`](.github/workflows/cd-website.yml)
 - Studio (`apps/studio`) no Cloudflare Pages (`namao-studio`), protegido por JWT. CD: [`.github/workflows/cd-studio.yml`](.github/workflows/cd-studio.yml) — secrets e IaC em [`cloud/README.md`](cloud/README.md)

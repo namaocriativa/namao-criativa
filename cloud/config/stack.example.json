@@ -8,7 +8,7 @@
     "image_tag": "latest",
     "ports_exposes": "3000",
     "health_check_path": "/health",
-    "domain": ""
+    "domain": "https://api.namaocriativa.com.br"
   },
   "postgres": {
     "name": "namao-postgres",
@@ -16,10 +16,18 @@
     "database": "namao",
     "image": "postgres:16-alpine"
   },
+  "redis": {
+    "name": "namao-redis",
+    "image": "redis:7-alpine"
+  },
   "evolution": {
     "name": "namao-evolution",
     "instance": "namao",
-    "domain": ""
+    "domain": "",
+    "image_name": "evoapicloud/evolution-api",
+    "image_tag": "v2.3.7",
+    "ports_exposes": "8080",
+    "health_check_path": "/"
   },
   "website": {
     "pages_project": "namao-website",

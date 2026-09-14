@@ -3,7 +3,7 @@ FROM node:22-bookworm-slim AS base
 WORKDIR /app
 
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl ca-certificates wget \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./

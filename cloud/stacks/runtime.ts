@@ -1,63 +1,46 @@
 import type { CoolifyClient } from '../lib/coolify-client.js';
+import { upsertAppEnvs } from '../lib/app-envs.js';
 import type { StackConfig } from '../lib/config.js';
 import { log } from '../lib/config.js';
 import type { CloudState } from '../lib/state.js';
+import { requireJwtSecret } from '../lib/jwt-secret.js';
 
 type AppCreated = { uuid?: string };
-type AppEnv = { uuid?: string; key?: string; value?: string };
 
-async function upsertAppEnvs(
-  client: CoolifyClient,
-  appUuid: string,
-  envs: Record<string, string>,
-): Promise<void> {
-  const existing = await client.get<AppEnv[]>(`/applications/${appUuid}/envs`);
-  const byKey = new Map(
-    (Array.isArray(existing) ? existing : [])
-      .filter((e) => e.key)
-      .map((e) => [e.key as string, e]),
-  );
-
-  const missing: Array<{ key: string; value: string; is_literal: boolean }> =
-    [];
-  for (const [key, value] of Object.entries(envs)) {
-    const found = byKey.get(key);
-    if (found?.uuid) {
-      await client.patch(`/applications/${appUuid}/envs`, {
-        uuid: found.uuid,
-        key,
-        value,
-        is_literal: true,
-      });
-    } else {
-      missing.push({ key, value, is_literal: true });
-    }
-  }
-  if (missing.length) {
-    for (const env of missing) {
-      await client.post(`/applications/${appUuid}/envs`, env);
-    }
-  }
+function runtimeHealthCheck(stack: StackConfig): Record<string, unknown> {
+  return {
+    health_check_enabled: true,
+    health_check_path: stack.runtime.health_check_path,
+    health_check_port: '3000',
+    health_check_host: 'localhost',
+    health_check_scheme: 'http',
+    health_check_method: 'GET',
+    health_check_return_code: 200,
+    // prisma migrate deploy runs before listen
+    health_check_start_period: 90,
+    health_check_interval: 10,
+    health_check_retries: 15,
+    health_check_timeout: 5,
+  };
 }
 
 export function buildRuntimeEnvs(opts: {
   state: CloudState;
   stack: StackConfig;
   databaseUrl: string;
+  redisUrl?: string;
 }): Record<string, string> {
   const envs: Record<string, string> = {
     PORT: '3000',
     NODE_ENV: 'production',
     DATABASE_URL: opts.databaseUrl,
-    JWT_SECRET:
-      process.env.JWT_SECRET?.trim() || 'dev-jwt-secret-change-me',
+    JWT_SECRET: requireJwtSecret(process.env.JWT_SECRET, 'production'),
   };
 
   const gemini = process.env.GEMINI_API_KEY?.trim();
   if (gemini) envs.GEMINI_API_KEY = gemini;
 
-  const redis = process.env.REDIS_URL?.trim();
-  if (redis) envs.REDIS_URL = redis;
+  if (opts.redisUrl) envs.REDIS_URL = opts.redisUrl;
 
   const ga4Property = process.env.GA4_PROPERTY_ID?.trim();
   if (ga4Property) envs.GA4_PROPERTY_ID = ga4Property;
@@ -85,10 +68,11 @@ export async function applyRuntime(opts: {
   state: CloudState;
   dryRun: boolean;
   databaseUrl: string;
+  redisUrl?: string;
 }): Promise<CloudState> {
-  const { client, stack, dryRun, databaseUrl } = opts;
+  const { client, stack, dryRun, databaseUrl, redisUrl } = opts;
   const state = { ...opts.state };
-  const envs = buildRuntimeEnvs({ state, stack, databaseUrl });
+  const envs = buildRuntimeEnvs({ state, stack, databaseUrl, redisUrl });
 
   if (state.runtime_application_uuid) {
     log('runtime', `exists uuid=${state.runtime_application_uuid}`);
@@ -98,9 +82,7 @@ export async function applyRuntime(opts: {
         docker_registry_image_name: stack.runtime.image_name,
         docker_registry_image_tag: stack.runtime.image_tag,
         ports_exposes: stack.runtime.ports_exposes,
-        health_check_enabled: true,
-        health_check_path: stack.runtime.health_check_path,
-        health_check_port: '3000',
+        ...runtimeHealthCheck(stack),
       };
       if (stack.runtime.domain.trim()) {
         patch.domains = stack.runtime.domain.trim();
@@ -126,11 +108,7 @@ export async function applyRuntime(opts: {
     docker_registry_image_name: stack.runtime.image_name,
     docker_registry_image_tag: stack.runtime.image_tag,
     ports_exposes: stack.runtime.ports_exposes,
-    health_check_enabled: true,
-    health_check_path: stack.runtime.health_check_path,
-    health_check_port: '3000',
-    health_check_method: 'GET',
-    health_check_return_code: 200,
+    ...runtimeHealthCheck(stack),
     instant_deploy: true,
   };
   if (state.destination_uuid) {

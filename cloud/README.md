@@ -4,20 +4,21 @@ Provisiona via [API do Coolify](https://coolify.io/docs/api-reference/api/author
 
 | Recurso | Tipo | Conteúdo |
 |---------|------|----------|
-| `namao-postgres` | Coolify Database (PostgreSQL) | `postgres:16-alpine` — banco da API |
-| `namao-evolution` | Coolify Service (compose) | `evoapicloud/evolution-api:latest` + Postgres + Redis |
+| `namao-postgres` | Coolify Database (PostgreSQL) | `postgres:16-alpine` — API (`public`) + Evolution (`evolution_api`) |
+| `namao-redis` | Coolify Database (Redis) | `redis:7-alpine` — API db0 + Evolution db1 |
+| `namao-evolution` | Coolify Application (Docker image) | `evoapicloud/evolution-api:v2.3.7` |
 | `namao-api` | Coolify Application (Docker image) | `@namao/platform` — API unificada |
 | `namao-website` | Cloudflare Pages | `@namao/website` — site público |
 | `namao-studio` | Cloudflare Pages | `@namao/studio` — painel interno (JWT) |
 
-**PostgreSQL:** o `apply` cria `namao-postgres` no Coolify (mesmo destination da API) e injeta o Internal URL em `DATABASE_URL`. Para usar um Postgres gerenciado, defina `DATABASE_URL` no `cloud/.env` e o recurso Coolify é omitido.
+**PostgreSQL:** o `apply` cria `namao-postgres` no Coolify (mesmo destination da API) e injeta o Internal URL em `DATABASE_URL`. A Evolution usa o **mesmo** Postgres com `?schema=evolution_api`. Para um Postgres gerenciado, defina `DATABASE_URL` no `cloud/.env` e o recurso Coolify é omitido.
 
 ```text
 cloud/
-  compose/          # evolution.yml → base64 em docker_compose_raw
+  compose/          # referência local (dev); produção não usa compose
   config/           # stack.example.json (copie para stack.json)
   lib/              # cliente HTTP Coolify/Cloudflare + state
-  stacks/           # postgres, evolution, runtime, website-pages, studio-pages
+  stacks/           # postgres, redis, evolution, runtime, website-pages, studio-pages
   scripts/          # bootstrap | plan | apply | deploy | website | studio
 ```
 
@@ -38,7 +39,7 @@ cp cloud/config/stack.example.json cloud/config/stack.json
 
 npm run cloud:bootstrap   # resolve server + cria projeto "namao"
 npm run cloud:plan        # dry-run
-npm run cloud:apply       # cria/atualiza Postgres + Evolution + API + grava cloud/state.json
+npm run cloud:apply       # cria/atualiza Postgres + Redis + Evolution + API + grava cloud/state.json
 npm run cloud:deploy      # GET /api/v1/deploy?uuid=...
 # force rebuild:
 npm run cloud:deploy -- --force
@@ -55,6 +56,8 @@ O `apply` cria o banco `namao-postgres` (`postgres:16-alpine`) no mesmo destinat
 ```text
 postgresql://USER:PASSWORD@<uuid-do-banco>:5432/namao
 ```
+
+A Evolution aponta para o mesmo host com `?schema=evolution_api` (Prisma separado do schema `public` da API).
 
 A senha é gerada na primeira vez e gravada em `cloud/state.json` (`postgres_password`). Opcional no `cloud/.env`:
 
@@ -192,13 +195,14 @@ npm run cloud:studio:plan
 npm run cloud:studio
 ```
 
-Isso cria (ou atualiza) o projeto `namao-studio`, grava o `*.pages.dev` em `state.json`, injeta `JWT_SECRET` / `STUDIO_API_ORIGIN` nas env do Pages e, se `STUDIO_DOMAIN` estiver setado, anexa o hostname.
+Isso cria (ou atualiza) o projeto `namao-studio`, grava o `*.pages.dev` em `state.json`, injeta `JWT_SECRET` / `STUDIO_API_ORIGIN` **só na produção**, desliga preview deployments e, se `STUDIO_DOMAIN` estiver setado, anexa o hostname. Sem esses valores o apply falha.
 
 Em push/merge em `main`, [`.github/workflows/cd-studio.yml`](../.github/workflows/cd-studio.yml):
 
 1. Detecta mudanças em `apps/studio/**` e `packages/landing-kit/**`
 2. `npm run build -w @namao/landing-kit` + `npm run build -w @namao/studio`
-3. `wrangler pages deploy` (inclui `functions/_middleware.ts`)
+3. Confere se o projeto Pages já tem `JWT_SECRET` e `STUDIO_API_ORIGIN` (`npm run studio:check-env -w @namao/cloud`)
+4. `wrangler pages deploy` (inclui `functions/_middleware.ts`)
 
 `workflow_dispatch` força o deploy. O `wrangler.toml` em `apps/studio/` é a config versionada.
 
@@ -206,7 +210,8 @@ A Function:
 
 - Libera `/login.html` e o bundle do login
 - Faz proxy same-origin das rotas da API (`Accept` não HTML) para `STUDIO_API_ORIGIN`
-- Exige JWT HS256 no cookie para o resto do HTML (role `ADMIN` ou `OPERATOR`)
+- Exige JWT no cookie para o proxy (exceto `POST /auth/studio/login|logout`) e para o HTML (`ADMIN` ou `OPERATOR`)
+- Recusa `Origin` de outro host (CSRF entre `namaocriativa.com.br` e `studio.*`)
 
 O mesmo `JWT_SECRET` da API Coolify precisa estar no projeto Pages.
 
@@ -214,7 +219,7 @@ O mesmo `JWT_SECRET` da API Coolify precisa estar no projeto Pages.
 
 | Nome | Tipo | Valor |
 |------|------|--------|
-| `STUDIO_API_ORIGIN` | Variable | Origem da API (fallback: `WEBSITE_API_ORIGIN`) |
+| `STUDIO_API_ORIGIN` | Variable no dashboard **e** `[vars]` em `apps/studio/wrangler.toml` | Origem da API. Direct Upload só injeta plaintext no Function se estiver no Wrangler; o dashboard sozinho não basta. |
 | `JWT_SECRET` | Secret (Coolify + Pages) | O mesmo valor da API |
 
 ### DNS do studio
@@ -238,7 +243,7 @@ npx wrangler pages deploy apps/studio/dist --project-name=namao-studio
 | `JWT_SECRET` | sim | Assina login/register e o cookie do studio |
 | `GEMINI_API_KEY` | sim | Google AI Studio (pipeline + chat) |
 | `DATABASE_URL` | sim | Injetada pelo apply (Coolify Internal URL) |
-| `REDIS_URL` | recomendada | rate limit + cache de discovery/GA4 |
+| `REDIS_URL` | sim | Injetada pelo apply (Coolify Redis db0) |
 | `NAMAO_PUBLIC_URL` | não | CORS extra do website |
 | `NAMAO_STUDIO_URL` | não | CORS extra do studio |
 | `STUDIO_ADMIN_EMAIL` | não | Bootstrap do primeiro ADMIN |
@@ -250,7 +255,7 @@ Health check Coolify: `GET /health` na porta `3000`.
 
 ## Evolution API
 
-Compose: [`compose/evolution.yml`](compose/evolution.yml).
+Application Docker image `evoapicloud/evolution-api:v2.3.7` (sem compose). Redis em `CACHE_REDIS_URI` db `/1` + prefixo `evolution`. Volume persistente `/evolution/instances`.
 
 Após o `apply`, configure o **platform** local/futuro:
 
@@ -273,12 +278,12 @@ Depois escaneie o QR no manager da Evolution.
 
 ## Domínios (`namaocriativa.com.br`)
 
-Sem DNS ainda, o apply **omite** `domains` / `urls` públicos.
-
-Quando o domínio existir, em `cloud/config/stack.json` ou `.env`:
+O apply grava o FQDN da API no Coolify e cria o DNS na zona Cloudflare:
 
 ```env
 RUNTIME_DOMAIN=https://api.namaocriativa.com.br
+# opcional se o FQDN sslip.io da API já tiver sido trocado:
+# COOLIFY_SERVER_PUBLIC_IP=169.58.59.253
 EVOLUTION_DOMAIN=https://evolution.namaocriativa.com.br
 EVOLUTION_SERVER_URL=https://evolution.namaocriativa.com.br
 NAMAO_PUBLIC_URL=https://namaocriativa.com.br
@@ -293,6 +298,8 @@ npm run cloud:website
 npm run cloud:studio
 npm run cloud:deploy -- --force
 ```
+
+`api.namaocriativa.com.br` vira um **A** DNS-only (nuvem cinza) para o IP da VPS, para o Let's Encrypt do Traefik responder no HTTP-01. Site e studio continuam CNAME proxied para Pages.
 
 No platform:
 
@@ -314,7 +321,7 @@ PUBLIC_CHAT_API_ORIGIN=https://api.namaocriativa.com.br
 | `npm run cloud:studio` | Cria/atualiza Pages `namao-studio` + JWT/API env + DNS |
 | `npm run cloud:pages` | Website + studio (projetos, domínios, DNS) |
 
-Ordem do apply: Postgres (`namao-postgres`) → Evolution → API (`namao-api`).
+Ordem do apply: Postgres → Redis → Evolution (Application) → API (`namao-api`).
 
 ## Troubleshooting
 
@@ -327,6 +334,8 @@ Ordem do apply: Postgres (`namao-postgres`) → Evolution → API (`namao-api`).
 | invite-requests falha | Postgres inacessível / migrate não rodou |
 | 401 Coolify | Token inválido ou sem ability |
 | API pull falha | Imagem não publicada / registry privado sem login GHCR no Coolify |
+| API `exited:unhealthy` + P1000 | Senha do `namao-postgres` ≠ `DATABASE_URL`. Recrie o banco (volume vazio) ou copie a senha real para `POSTGRES_PASSWORD` |
+| Healthcheck Coolify falha com app no ar | A imagem precisa de `wget`/`curl` (já no `Dockerfile`) e `health_check_start_period` ≥ migrate |
 | Action não faz deploy | Path filter (API inalterada) ou secrets `COOLIFY_*` / variable `COOLIFY_BASE_URL` faltando |
 | Action website não faz deploy | Path filter (`apps/website` inalterado) ou `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` faltando |
 | Action studio não faz deploy | Path filter (`apps/studio` inalterado) ou `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` faltando |
@@ -335,7 +344,7 @@ Ordem do apply: Postgres (`namao-postgres`) → Evolution → API (`namao-api`).
 | Studio redireciona sempre para login | `JWT_SECRET` do Pages diferente da API, ou cookie sem `Secure` em HTTP |
 | Pages 403 no wrangler | Token sem ability *Cloudflare Pages Edit*, ou Account ID de outra conta |
 | Convite / login 404 no site | `WEBSITE_API_ORIGIN` não gerou `_redirects` |
-| Evolution ignora envs | Confira envs no Coolify UI; `AUTHENTICATION_API_KEY` e `DATABASE_CONNECTION_URI` |
+| Evolution ignora envs | Confira envs na Application; `AUTHENTICATION_API_KEY`, `DATABASE_CONNECTION_URI`, `CACHE_REDIS_URI` |
 | Domain conflict 409 | Remova domínio de outro recurso ou use `force_domain_override` na UI |
 
 ## Referências

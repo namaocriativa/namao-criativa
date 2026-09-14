@@ -1,0 +1,10 @@
+# Cloudflare Pages — @namao/studio
+# Projeto criado/atualizado por `npm run cloud:studio`. Deploy: .github/workflows/cd-studio.yml
+name = "namao-studio"
+compatibility_date = "2026-09-01"
+pages_build_output_dir = "dist"
+
+# Direct Upload does not copy dashboard plaintext vars onto the Function.
+# Keep this in wrangler so every `pages deploy` binds the API origin.
+[vars]
+STUDIO_API_ORIGIN = "https://api.namaocriativa.com.br"

@@ -1,6 +1,6 @@
 import './chrome';
 import { clearChatSession } from './chat/api';
-import { api, setSession } from './session';
+import { api } from './session';
 import { SIGNUP_SUCCESS } from './signup';
 
 const form = document.getElementById('login-form') as HTMLFormElement;
@@ -23,14 +23,13 @@ form.addEventListener('submit', async (event) => {
   statusEl.textContent = 'Entrando…';
   statusEl.classList.remove('error');
   try {
-    const data = await api('/auth/login', {
+    await api('/auth/login', {
       method: 'POST',
       body: JSON.stringify({
         email: String(fd.get('email') || ''),
         password: String(fd.get('password') || ''),
       }),
     });
-    setSession(data.accessToken);
     clearChatSession();
     location.href = '/dashboard.html';
   } catch (error) {

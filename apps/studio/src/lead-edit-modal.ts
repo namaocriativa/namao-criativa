@@ -1,4 +1,5 @@
 import type { Lead } from "./types";
+import { api } from "./api";
 import { entityKindOf, profileApi } from "./profile-api";
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -123,7 +124,7 @@ export function initLeadEditModal(
     saveBtn.disabled = true;
     setStatus("Salvando…");
     try {
-      const res = await fetch(profileApi(entityKindOf(lead), lead.id), {
+      const res = await api(profileApi(entityKindOf(lead), lead.id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

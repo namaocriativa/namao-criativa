@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { join } from 'path';
+import { StudioUsersModule } from './studio-users/studio-users.module';
 import { EnrichmentModule } from './enrichment/enrichment.module';
 import { CustomerModule } from './customer/customer.module';
 import { LeadModule } from './lead/lead.module';
@@ -49,6 +50,7 @@ import { NamaoChatModule } from './namao-chat/namao-chat.module';
     NamaoChatModule,
     InviteRequestsModule,
     DashboardModule,
+    StudioUsersModule,
   ],
   controllers: [HealthController],
 })

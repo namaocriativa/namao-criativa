@@ -77,10 +77,10 @@ body.is-lead-view .app-shell {
 .topbar-inner {
   height: var(--topbar);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  padding: 0 max(1rem, var(--safe-right)) 0 max(0.85rem, var(--safe-left));
   gap: 0.75rem;
+  padding: 0 max(1rem, var(--safe-right)) 0 max(0.85rem, var(--safe-left));
 }
 
 .brand {
@@ -191,6 +191,11 @@ body.is-lead-view .app-shell {
   color: #047857;
 }
 
+.nav-tabs a[hidden],
+.side-nav a[hidden] {
+  display: none !important;
+}
+
 .sidebar-footer {
   display: none;
   gap: 0.65rem;
@@ -292,7 +297,7 @@ body.is-lead-view .app-context {
   }
 
   .topbar-inner {
-    grid-template-columns: var(--sidebar) minmax(0, 1fr);
+    grid-template-columns: var(--sidebar) minmax(0, 1fr) auto;
     padding: 0 1.1rem 0 0.85rem;
   }
 
@@ -3772,4 +3777,149 @@ select {
 
 .lead-whatsapp-editor:disabled {
   opacity: 0.72;
+}
+
+body.is-auth-pending .app-shell {
+  visibility: hidden;
+}
+
+.topbar-logout {
+  border: 1px solid #334155;
+  background: transparent;
+  color: #e2e8f0;
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.75rem;
+  min-height: 36px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.topbar-logout:hover {
+  background: #1e293b;
+  color: #fff;
+}
+
+.users-create {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 1.25rem;
+  max-width: 520px;
+}
+
+.users-create h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.users-create label,
+.auth-card label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.users-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.users-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.users-role {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.users-email {
+  margin: 0.35rem 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.users-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+body.auth-screen {
+  min-height: var(--app-vh);
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--bg);
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem 1.4rem 1.35rem;
+}
+
+.auth-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.auth-card h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.45rem;
+}
+
+.auth-hint {
+  margin: 0 0 1.1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.auth-card form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.auth-card input {
+  width: 100%;
+  min-height: var(--touch-min);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+}
+
+.auth-card button[type="submit"] {
+  min-height: var(--touch-min);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-card button[type="submit"]:hover {
+  background: var(--accent-hover);
+}
+
+.auth-card .status.error {
+  color: var(--danger);
 }

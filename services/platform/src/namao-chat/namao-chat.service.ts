@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { AuthService } from '../auth/auth.service';
+import { cookieJwtToken } from '../auth/jwt-cookie';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { namaoWhatsAppUrl } from '../mail/site-introduction-email';
 import { GeminiService } from '../llm/gemini.service';
@@ -66,6 +67,10 @@ type Resolved = {
   mode: 'guest' | 'auth';
 };
 
+function isJwtShape(token: string): boolean {
+  return token.split('.').length === 3;
+}
+
 @Injectable()
 export class NamaoChatService {
   private readonly logger = new Logger(NamaoChatService.name);
@@ -93,6 +98,12 @@ export class NamaoChatService {
     return header.slice(7).trim();
   }
 
+  jwtToken(req: Request): string {
+    const header = this.bearerToken(req);
+    if (isJwtShape(header)) return header;
+    return cookieJwtToken(req) || '';
+  }
+
   async createSession(req: Request, guestSessionToken?: string) {
     this.assertOrigin(req);
     const ip = this.clientIp(req);
@@ -103,7 +114,7 @@ export class NamaoChatService {
       throw new HttpException('Rate limit', HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    const jwtUser = await this.userFromBearer(this.bearerToken(req));
+    const jwtUser = await this.userFromBearer(this.jwtToken(req));
     if (jwtUser) {
       await this.releaseGuest(jwtUser, guestSessionToken);
       const existing = await this.findUserSession(jwtUser.id);
@@ -363,10 +374,8 @@ export class NamaoChatService {
 
   private async resolve(req: Request): Promise<Resolved> {
     this.assertOrigin(req);
-    const token = this.bearerToken(req);
-    if (!token) throw new UnauthorizedException('Sessão inválida');
-
-    const jwtUser = await this.userFromBearer(token);
+    const header = this.bearerToken(req);
+    const jwtUser = await this.userFromBearer(this.jwtToken(req));
     if (jwtUser) {
       const session = await this.findUserSession(jwtUser.id);
       if (!session || !this.isUsable(session)) {
@@ -375,7 +384,9 @@ export class NamaoChatService {
       return { session, user: jwtUser, mode: 'auth' };
     }
 
-    const session = await this.findByToken(token);
+    if (!header) throw new UnauthorizedException('Sessão inválida');
+
+    const session = await this.findByToken(header);
     if (!session || !this.isUsable(session)) {
       throw new UnauthorizedException('Sessão expirada');
     }
@@ -625,10 +636,6 @@ function nextSlotFollowUp(
 
 function requestOrigin(req: Request): string | undefined {
   return typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
-}
-
-function isJwtShape(token: string): boolean {
-  return token.split('.').length === 3;
 }
 
 function writeSse(res: Response, event: string, data: unknown) {

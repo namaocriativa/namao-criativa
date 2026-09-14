@@ -22,10 +22,18 @@ export type StackConfig = {
     database: string;
     image: string;
   };
+  redis: {
+    name: string;
+    image: string;
+  };
   evolution: {
     name: string;
     instance: string;
     domain: string;
+    image_name: string;
+    image_tag: string;
+    ports_exposes: string;
+    health_check_path: string;
   };
   website: {
     pages_project: string;
@@ -58,6 +66,7 @@ export function loadStackConfig(): StackConfig {
     studio?: Partial<StackConfig['studio']>;
     runtime?: Partial<StackConfig['runtime']>;
     postgres?: Partial<StackConfig['postgres']>;
+    redis?: Partial<StackConfig['redis']>;
     evolution?: Partial<StackConfig['evolution']>;
   };
 
@@ -77,6 +86,10 @@ export function loadStackConfig(): StackConfig {
       database:
         process.env.POSTGRES_DB?.trim() || file.postgres?.database || 'namao',
       image: file.postgres?.image || 'postgres:16-alpine',
+    },
+    redis: {
+      name: file.redis?.name || 'namao-redis',
+      image: file.redis?.image || 'redis:7-alpine',
     },
     runtime: {
       name: file.runtime?.name || 'namao-api',
@@ -101,6 +114,16 @@ export function loadStackConfig(): StackConfig {
         'namao',
       domain:
         process.env.EVOLUTION_DOMAIN?.trim() || file.evolution?.domain || '',
+      image_name:
+        process.env.EVOLUTION_IMAGE_NAME?.trim() ||
+        file.evolution?.image_name ||
+        'evoapicloud/evolution-api',
+      image_tag:
+        process.env.EVOLUTION_IMAGE_TAG?.trim() ||
+        file.evolution?.image_tag ||
+        'v2.3.7',
+      ports_exposes: file.evolution?.ports_exposes || '8080',
+      health_check_path: file.evolution?.health_check_path || '/',
     },
     website: {
       pages_project:

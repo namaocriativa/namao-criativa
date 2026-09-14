@@ -1,3 +1,5 @@
+import { api } from "./api";
+
 type AccountPayload = {
   email?: string;
   hasPassword?: boolean;
@@ -134,7 +136,7 @@ export function initLeadAccountModal(host: HTMLElement): {
     setBusy(true);
     setStatus("Carregando acesso…");
     try {
-      const res = await fetch(profileApi(apiKind, leadId, "/account"));
+      const res = await api(profileApi(apiKind, leadId, "/account"));
       const data = (await res.json().catch(() => ({}))) as AccountPayload;
       if (!res.ok) {
         throw new Error(apiMessage(data, "Falha ao carregar acesso"));
@@ -165,7 +167,7 @@ export function initLeadAccountModal(host: HTMLElement): {
     setBusy(true);
     setStatus("Processando…");
     try {
-      const res = await fetch(
+      const res = await api(
         profileApi(apiKind, leadId, `/account/${path}`),
         { method: "POST" },
       );

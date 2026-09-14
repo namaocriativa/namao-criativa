@@ -22,7 +22,7 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     label: 'Porta da API',
     required: false,
     secret: false,
-    hint: 'Default 3000 se vazia.',
+    hint: 'No host: PORT. No Docker: PLATFORM_PORT no .env da raiz (default 4000).',
   },
   {
     key: 'JWT_SECRET',
@@ -30,7 +30,7 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     label: 'Segredo JWT',
     required: true,
     secret: true,
-    hint: 'Troque o valor de desenvolvimento em produção.',
+    hint: 'Obrigatório. Em produção não pode ser o placeholder de desenvolvimento.',
   },
   {
     key: 'REDIS_URL',
@@ -86,7 +86,7 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     label: 'Origem pública do chat',
     required: false,
     secret: false,
-    hint: 'Dev: http://localhost:3000 · Prod: https://api.namaocriativa.com.br',
+    hint: 'Dev: http://localhost:4000 · Prod: https://api.namaocriativa.com.br',
   },
   {
     key: 'LEADS_DIR',
@@ -145,6 +145,30 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     hint: 'Cadastro/login. Default: http://localhost:5174',
   },
   {
+    key: 'NAMAO_STUDIO_URL',
+    group: 'Site',
+    label: 'URL do studio',
+    required: false,
+    secret: false,
+    hint: 'CORS do studio. Default local: http://localhost:5173',
+  },
+  {
+    key: 'STUDIO_ADMIN_EMAIL',
+    group: 'Studio',
+    label: 'E-mail do admin do studio',
+    required: false,
+    secret: false,
+    hint: 'Cria o primeiro ADMIN se o e-mail ainda não existir.',
+  },
+  {
+    key: 'STUDIO_ADMIN_PASSWORD',
+    group: 'Studio',
+    label: 'Senha do admin do studio',
+    required: false,
+    secret: true,
+    hint: 'Mínimo 8 caracteres. Só usa no bootstrap.',
+  },
+  {
     key: 'NAMAO_WHATSAPP',
     group: 'Site',
     label: 'WhatsApp Namão',
@@ -190,7 +214,7 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     label: 'Meta redirect URI',
     required: false,
     secret: false,
-    hint: 'http://localhost:3000/auth/instagram/callback',
+    hint: 'http://localhost:4000/auth/instagram/callback',
   },
   {
     key: 'META_GRAPH_VERSION',

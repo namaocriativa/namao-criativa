@@ -9,6 +9,7 @@ export type AppRoute =
   | { name: "package"; id: string }
   | { name: "ui-lib" }
   | { name: "config" }
+  | { name: "users" }
   | { name: "not-found" };
 
 const APP_TITLE = "Lead Discovery Enrichment";
@@ -49,6 +50,7 @@ export function parsePath(pathname: string): AppRoute {
   }
   if (path === "/ui-lib") return { name: "ui-lib" };
   if (path === "/config") return { name: "config" };
+  if (path === "/users") return { name: "users" };
   return { name: "not-found" };
 }
 
@@ -74,6 +76,8 @@ export function hrefFor(route: AppRoute): string {
       return "/ui-lib";
     case "config":
       return "/config";
+    case "users":
+      return "/users";
     case "not-found":
       return "/404";
   }
@@ -101,6 +105,8 @@ export function tabForRoute(route: AppRoute): string {
       return "ui-lib";
     case "config":
       return "config";
+    case "users":
+      return "users";
     case "not-found":
       return "not-found";
   }
@@ -136,6 +142,8 @@ export function titleForRoute(route: AppRoute, leadName?: string): string {
       return `UI Lib · ${APP_TITLE}`;
     case "config":
       return `Config · ${APP_TITLE}`;
+    case "users":
+      return `Usuários · ${APP_TITLE}`;
     case "not-found":
       return `Não encontrado · ${APP_TITLE}`;
   }

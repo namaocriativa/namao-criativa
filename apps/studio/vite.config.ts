@@ -1,13 +1,20 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createReadStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  createReadStream,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { defineConfig, type Plugin, type ProxyOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { resolveLocalApiUrl } from '../local-api-url';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const kitSrc = path.resolve(rootDir, '../../packages/landing-kit/src');
-const api = 'http://localhost:3000';
+const api = resolveLocalApiUrl(path.resolve(rootDir, '../..'));
 
 function namaoLogoPlugin(): Plugin {
   const logoFile = path.resolve(rootDir, '../website/public/logo.png');
@@ -29,6 +36,10 @@ function namaoLogoPlugin(): Plugin {
         res.setHeader('Cache-Control', 'no-cache');
         createReadStream(logoFile).pipe(res);
       });
+    },
+    writeBundle(output) {
+      if (!output.dir || !existsSync(logoFile)) return;
+      copyFileSync(logoFile, path.join(output.dir, 'logo.png'));
     },
   };
 }
@@ -87,7 +98,28 @@ function kitRenamePlugin(): Plugin {
   };
 }
 
-/** Navegação do browser (Accept: text/html) fica no SPA; fetch/XHR segue para a API. */
+function loginPagePlugin(): Plugin {
+  const rewrite = (
+    req: { url?: string },
+    _res: unknown,
+    next: () => void,
+  ) => {
+    const [pathname, query] = (req.url || '').split('?');
+    if (pathname === '/login') {
+      req.url = query ? `/login.html?${query}` : '/login.html';
+    }
+    next();
+  };
+  return {
+    name: 'studio-login-page',
+    configureServer(server) {
+      server.middlewares.use(rewrite);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(rewrite);
+    },
+  };
+}
 function apiProxy(): ProxyOptions {
   return {
     target: api,
@@ -101,7 +133,13 @@ function apiProxy(): ProxyOptions {
 
 export default defineConfig({
   appType: 'spa',
-  plugins: [react(), tailwindcss(), namaoLogoPlugin(), kitRenamePlugin()],
+  plugins: [
+    loginPagePlugin(),
+    react(),
+    tailwindcss(),
+    namaoLogoPlugin(),
+    kitRenamePlugin(),
+  ],
   resolve: {
     alias: [
       {
@@ -136,12 +174,14 @@ export default defineConfig({
       '/config': apiProxy(),
       '/auth': apiProxy(),
       '/invites': apiProxy(),
+      '/studio': apiProxy(),
     },
   },
   build: {
     rollupOptions: {
       input: {
         main: path.join(rootDir, 'index.html'),
+        login: path.join(rootDir, 'login.html'),
         'kit-preview': path.join(rootDir, 'kit-preview.html'),
       },
     },

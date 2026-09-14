@@ -14,7 +14,7 @@
       rel="stylesheet"
     />
   </head>
-  <body>
+  <body class="is-auth-pending">
     <div class="app-shell">
     <header class="topbar">
       <div class="topbar-inner">
@@ -32,7 +32,11 @@
           <a href="/packages" data-route="packages">Pacotes</a>
           <a href="/ui-lib" data-route="ui-lib">UI Lib</a>
           <a href="/config" data-route="config">Config</a>
+          <a href="/users" data-route="users" data-admin-only hidden>Usuários</a>
         </nav>
+        <button type="button" class="topbar-logout" id="studio-logout-btn">
+          Sair
+        </button>
       </div>
     </header>
 
@@ -66,11 +70,15 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 4.5v1.8M12 17.7V19.5M4.5 12h1.8M17.7 12H19.5M6.4 6.4l1.3 1.3M16.3 16.3l1.3 1.3M17.6 6.4l-1.3 1.3M7.7 16.3l-1.3 1.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           Configurações
         </a>
+        <a href="/users" data-route="users" data-admin-only hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c.6-3 2.6-4.7 5-4.7s4.4 1.7 5 4.7M16.2 8.2a2.4 2.4 0 1 1 0 4.2M19.5 19.2c-.4-2.2-1.7-3.5-3.4-3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          Usuários
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="sidebar-card">
-          <strong>Ambiente local</strong>
-          <p>Vite em :5173 · API em :3000. Docker para Postgres, Redis e Crawl4AI.</p>
+          <strong id="studio-user-name">Studio</strong>
+          <p id="studio-user-role">Sessão autenticada via JWT.</p>
         </div>
       </div>
     </aside>
@@ -569,6 +577,48 @@
           </button>
         </div>
         <div class="status" id="config-save-status"></div>
+      </section>
+
+      <section id="tab-users" class="tab-panel">
+        <h2>Usuários do studio</h2>
+        <p class="prompt-hint">
+          Só o admin cria operadores e outros admins. Contas de clientes do
+          website não aparecem aqui.
+        </p>
+        <p class="status" id="users-status">Carregando…</p>
+        <form id="users-create-form" class="users-create app-card">
+          <h3>Novo usuário</h3>
+          <label>
+            Nome
+            <input name="name" required maxlength="120" autocomplete="name" />
+          </label>
+          <label>
+            E-mail
+            <input name="email" type="email" required autocomplete="off" />
+          </label>
+          <label>
+            Senha
+            <input
+              name="password"
+              type="password"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            />
+          </label>
+          <label>
+            Papel
+            <select name="role">
+              <option value="OPERATOR" selected>Operador</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </label>
+          <div class="actions">
+            <button type="submit">Criar</button>
+          </div>
+          <p class="status" id="users-create-status"></p>
+        </form>
+        <div id="users-list"></div>
       </section>
 
       <section id="tab-detail" class="tab-panel">

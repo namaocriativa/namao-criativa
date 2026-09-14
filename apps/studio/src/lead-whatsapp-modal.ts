@@ -1,3 +1,5 @@
+import { api } from "./api";
+
 type WhatsAppKind = "site-introduction" | "instagram-permission" | "credentials";
 
 type WhatsAppListItem = {
@@ -211,7 +213,7 @@ export function initLeadWhatsAppModal(
     setBusy(true);
     setStatus("Carregando mensagens…");
     try {
-      const res = await fetch(profileApi(apiKind, leadId, "/whatsapp"));
+      const res = await api(profileApi(apiKind, leadId, "/whatsapp"));
       const data = (await res.json().catch(() => ({}))) as {
         items?: WhatsAppListItem[];
         message?: string | string[];
@@ -237,7 +239,7 @@ export function initLeadWhatsAppModal(
     setBusy(true);
     setStatus("Carregando prévia…");
     try {
-      const res = await fetch(
+      const res = await api(
         profileApi(apiKind, leadId, `/whatsapp/${encodeURIComponent(kind)}/preview`),
       );
       const data = (await res.json().catch(() => ({}))) as WhatsAppPreview & {
@@ -259,7 +261,7 @@ export function initLeadWhatsAppModal(
     setBusy(true);
     setStatus("Enviando…");
     try {
-      const res = await fetch(
+      const res = await api(
         profileApi(apiKind, leadId, `/whatsapp/${encodeURIComponent(preview.id)}`),
         {
           method: "POST",

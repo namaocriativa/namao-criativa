@@ -1,3 +1,5 @@
+import { api } from "./api";
+
 type EmailKind = "site-introduction" | "instagram-permission" | "credentials";
 
 type EmailListItem = {
@@ -222,7 +224,7 @@ export function initLeadEmailsModal(
     setBusy(true);
     setStatus("Carregando e-mails…");
     try {
-      const res = await fetch(profileApi(apiKind, leadId, "/emails"));
+      const res = await api(profileApi(apiKind, leadId, "/emails"));
       const data = (await res.json().catch(() => ({}))) as {
         items?: EmailListItem[];
         message?: string | string[];
@@ -248,7 +250,7 @@ export function initLeadEmailsModal(
     setBusy(true);
     setStatus("Carregando prévia…");
     try {
-      const res = await fetch(
+      const res = await api(
         profileApi(apiKind, leadId, `/emails/${encodeURIComponent(kind)}/preview`),
       );
       const data = (await res.json().catch(() => ({}))) as EmailPreview & {
@@ -270,7 +272,7 @@ export function initLeadEmailsModal(
     setBusy(true);
     setStatus("Enviando…");
     try {
-      const res = await fetch(
+      const res = await api(
         profileApi(apiKind, leadId, `/emails/${encodeURIComponent(preview.id)}`),
         { method: "POST" },
       );

@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -22,9 +24,10 @@ import {
   normalizeInstagram,
 } from './instagram';
 import { JwtUser } from './jwt.strategy';
+import { isStudioRole, USER_ROLE } from './roles';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
@@ -33,6 +36,10 @@ export class AuthService {
     private readonly mail: MailService,
     private readonly config: ConfigService,
   ) {}
+
+  async onModuleInit() {
+    await this.ensureStudioAdmin();
+  }
 
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
@@ -183,6 +190,38 @@ export class AuthService {
       leadId: user.leadId,
       customerId: user.customerId,
     });
+  }
+
+  async studioLogin(dto: LoginDto) {
+    const issued = await this.login(dto);
+    if (!isStudioRole(issued.user.role)) {
+      throw new ForbiddenException('Sem permissão para o studio');
+    }
+    return issued;
+  }
+
+  async ensureStudioAdmin() {
+    const email = this.config.get<string>('STUDIO_ADMIN_EMAIL')?.trim().toLowerCase();
+    const password = this.config.get<string>('STUDIO_ADMIN_PASSWORD')?.trim();
+    if (!email || !password) return;
+    if (password.length < 8) {
+      this.logger.warn(
+        'STUDIO_ADMIN_PASSWORD precisa ter pelo menos 8 caracteres; bootstrap ignorado',
+      );
+      return;
+    }
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) return;
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.prisma.user.create({
+      data: {
+        email,
+        name: 'Admin',
+        passwordHash,
+        role: USER_ROLE.ADMIN,
+      },
+    });
+    this.logger.log(`Usuário admin do studio criado: ${email}`);
   }
 
   async me(user: JwtUser) {

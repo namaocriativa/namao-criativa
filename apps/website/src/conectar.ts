@@ -1,5 +1,5 @@
 import './chrome';
-import { api, clearSession, getToken } from './session';
+import { api, clearSession, probeLoggedIn } from './session';
 
 const userLine = document.getElementById('user-line') as HTMLElement;
 const igStatus = document.getElementById('ig-status') as HTMLElement;
@@ -7,13 +7,11 @@ const igStart = document.getElementById('ig-start') as HTMLAnchorElement;
 const igSync = document.getElementById('ig-sync') as HTMLButtonElement;
 const logoutBtn = document.getElementById('logout-btn') as HTMLButtonElement;
 
-if (!getToken()) {
-  location.href = '/login.html';
-}
-
 logoutBtn.addEventListener('click', () => {
-  clearSession();
-  location.href = '/login.html';
+  void (async () => {
+    await clearSession();
+    location.href = '/login.html';
+  })();
 });
 
 igStart.addEventListener('click', async (event) => {
@@ -63,9 +61,15 @@ async function boot() {
         'Ainda não autorizado. Use o botão para permitir a leitura do perfil via Graph API.';
     }
   } catch {
-    clearSession();
+    await clearSession();
     location.href = '/login.html';
   }
 }
 
-void boot();
+void (async () => {
+  if (!(await probeLoggedIn())) {
+    location.href = '/login.html';
+    return;
+  }
+  await boot();
+})();

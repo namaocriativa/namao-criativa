@@ -13,6 +13,7 @@ import {
   type ThemePayload,
 } from "@namao/landing-kit";
 import { listComponents } from "../ui-lib";
+import { api } from "../api";
 import { kitComponentLabel, onComponentRename } from "../ui-lib/component-names";
 import { getWizardLeadId, wizardProfileApi } from "./mount-wizard";
 import { CopywriterStep } from "./CopywriterStep";
@@ -129,7 +130,7 @@ export function SiteGenerateWizard({
       return;
     }
     let cancelled = false;
-    void fetch(wizardProfileApi(leadId))
+    void api(wizardProfileApi(leadId))
       .then((res) => (res.ok ? res.json() : null))
       .then((lead: { generateConfig?: unknown } | null) => {
         if (cancelled) return;

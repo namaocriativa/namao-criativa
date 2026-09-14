@@ -2,7 +2,9 @@ import { BadRequestException, Body, Controller, Get, Put } from '@nestjs/common'
 import { UpdateLlmSettingsDto } from './dto/update-llm-settings.dto';
 import { EnvStatusService } from './env-status.service';
 import { LlmService } from './llm.service';
+import { StudioAuth } from '../auth/studio-auth.decorator';
 
+@StudioAuth()
 @Controller('config')
 export class LlmController {
   constructor(

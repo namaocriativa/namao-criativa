@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { requireStudioSession } from "./session";
 import {
   isComponentId,
   previewPageSpec,
@@ -12,6 +13,7 @@ import {
 import "@namao/landing-kit/styles.css";
 import "@namao/landing-kit/theme.css";
 
+void requireStudioSession().then(() => {
 const params = new URLSearchParams(window.location.search);
 const rawId = params.get("id") || "hero.cinematic";
 const id: ComponentId = isComponentId(rawId) ? rawId : "hero.cinematic";
@@ -32,3 +34,4 @@ createRoot(root).render(
     <LandingPage spec={spec} />
   </ReducedMotionProvider>,
 );
+});

@@ -1,9 +1,13 @@
+# Host ports stay off 3000/5432 so this stack can run beside Basidio/Myco.
+# Inside the network, Nest still listens on 3000 and Postgres on 5432.
+# Override via repo-root .env: PLATFORM_PORT, POSTGRES_PORT, REDIS_PORT
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: namao-postgres
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     environment:
       POSTGRES_USER: namao
       POSTGRES_PASSWORD: namao
@@ -21,7 +25,7 @@ services:
     image: redis:7-alpine
     container_name: namao-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -48,12 +52,14 @@ services:
       target: development
     container_name: namao-platform
     ports:
-      - "3000:3000"
+      - "${PLATFORM_PORT:-4000}:3000"
     env_file:
       - services/platform/.env
     environment:
       NODE_ENV: development
       PORT: "3000"
+      PLATFORM_PORT: ${PLATFORM_PORT:-4000}
+      PUBLIC_CHAT_API_ORIGIN: ${PUBLIC_CHAT_API_ORIGIN:-http://localhost:${PLATFORM_PORT:-4000}}
       DATABASE_URL: postgresql://namao:namao@postgres:5432/namao
       REDIS_URL: redis://redis:6379
       CRAWL4AI_URL: http://crawl4ai:11235

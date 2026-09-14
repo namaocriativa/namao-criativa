@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Entrar · Studio</title>
+  </head>
+  <body class="auth-screen">
+    <main class="auth-card">
+      <p class="auth-kicker">Studio interno</p>
+      <h1>Entrar</h1>
+      <p class="auth-hint">Acesso só para operadores e administradores.</p>
+      <form id="login-form">
+        <label>
+          E-mail
+          <input name="email" type="email" required autocomplete="username" />
+        </label>
+        <label>
+          Senha
+          <input
+            name="password"
+            type="password"
+            required
+            minlength="8"
+            autocomplete="current-password"
+          />
+        </label>
+        <button type="submit">Entrar</button>
+      </form>
+      <p class="status" id="login-status"></p>
+    </main>
+    <script type="module" src="/src/login.ts"></script>
+  </body>
+</html>

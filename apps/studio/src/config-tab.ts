@@ -1,3 +1,5 @@
+import { api } from "./api";
+
 type LlmRole = "plan" | "code" | "vision" | "chat";
 
 type RoleConfig = {
@@ -253,7 +255,7 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
 
   async function load() {
     try {
-      const res = await fetch("/config/llm");
+      const res = await api("/config/llm");
       const data = (await res.json()) as LlmConfigPayload & { message?: string };
       if (!res.ok) {
         throw new Error(data.message || "Falha ao carregar config LLM");
@@ -297,7 +299,7 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
     saveBtn.disabled = true;
     setStatus(saveStatus, "Salvando…");
     try {
-      const res = await fetch("/config/llm", {
+      const res = await api("/config/llm", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roles: readRoles() }),

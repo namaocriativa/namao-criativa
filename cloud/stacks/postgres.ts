@@ -1,6 +1,10 @@
-import { CoolifyError, type CoolifyClient } from '../lib/coolify-client.js';
+import { type CoolifyClient } from '../lib/coolify-client.js';
 import type { StackConfig } from '../lib/config.js';
 import { log, randomSecret } from '../lib/config.js';
+import {
+  databaseExists,
+  findDatabaseByName,
+} from '../lib/coolify-database.js';
 import { resolveDestinationUuid } from '../lib/destination.js';
 import {
   buildCoolifyPostgresUrl,
@@ -9,29 +13,6 @@ import {
 import type { CloudState } from '../lib/state.js';
 
 type DatabaseCreated = { uuid?: string; internal_db_url?: string };
-type ListedDatabase = { uuid?: string; name?: string };
-
-async function findDatabaseByName(
-  client: CoolifyClient,
-  name: string,
-): Promise<string | undefined> {
-  const listed = await client.get<ListedDatabase[]>('/databases');
-  const dbs = Array.isArray(listed) ? listed : [];
-  return dbs.find((db) => db.name === name)?.uuid;
-}
-
-async function databaseExists(
-  client: CoolifyClient,
-  uuid: string,
-): Promise<boolean> {
-  try {
-    await client.get(`/databases/${uuid}`);
-    return true;
-  } catch (err) {
-    if (err instanceof CoolifyError && err.status === 404) return false;
-    throw err;
-  }
-}
 
 export function postgresCredentials(
   state: CloudState,
@@ -72,6 +53,32 @@ export function resolveRuntimeDatabaseUrl(
     password,
     uuid: state.postgres_database_uuid,
     database,
+  });
+}
+
+export function resolveEvolutionDatabaseUrl(
+  state: CloudState,
+  stack: StackConfig,
+): string {
+  const managed = managedDatabaseUrl();
+  if (managed) {
+    const joined = managed.includes('?')
+      ? `${managed}&schema=evolution_api`
+      : `${managed}?schema=evolution_api`;
+    return joined;
+  }
+  if (!state.postgres_database_uuid) {
+    throw new Error(
+      'Coolify Postgres has no uuid yet. Run apply (not plan) or set DATABASE_URL.',
+    );
+  }
+  const { user, database, password } = postgresCredentials(state, stack);
+  return buildCoolifyPostgresUrl({
+    user,
+    password,
+    uuid: state.postgres_database_uuid,
+    database,
+    schema: 'evolution_api',
   });
 }
 
@@ -187,6 +194,17 @@ export async function applyPostgres(opts: {
     throw new Error('Coolify did not return postgres database uuid');
   }
   state.postgres_database_uuid = created.uuid;
+  if (created.internal_db_url) {
+    try {
+      const parsed = new URL(created.internal_db_url);
+      if (parsed.password) {
+        state.postgres_password = decodeURIComponent(parsed.password);
+        log('postgres', 'password synced from Coolify internal_db_url');
+      }
+    } catch {
+      log('postgres', 'WARN: Coolify internal_db_url was not a valid URL');
+    }
+  }
   log('postgres', `created uuid=${created.uuid}`);
   return state;
 }

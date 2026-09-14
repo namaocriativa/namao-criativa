@@ -1,3 +1,4 @@
+import { Public } from '../auth/public.decorator';
 import {
   Body,
   Controller,
@@ -14,6 +15,7 @@ import {
 } from './dto/public-chat.dto';
 import { PublicChatService } from './public-chat.service';
 
+@Public()
 @Controller('public')
 export class PublicChatController {
   constructor(private readonly chat: PublicChatService) {}

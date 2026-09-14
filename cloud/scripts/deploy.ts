@@ -45,14 +45,16 @@ async function main() {
 
   if (
     !state.postgres_database_uuid &&
-    !state.evolution_service_uuid &&
+    !state.redis_database_uuid &&
+    !state.evolution_application_uuid &&
     !state.runtime_application_uuid
   ) {
     throw new Error('Nothing to deploy. Run apply first.');
   }
 
   await deployUuid('postgres', state.postgres_database_uuid, force);
-  await deployUuid('evolution', state.evolution_service_uuid, force);
+  await deployUuid('redis', state.redis_database_uuid, force);
+  await deployUuid('evolution', state.evolution_application_uuid, force);
   await deployUuid('runtime', state.runtime_application_uuid, force);
 }
 

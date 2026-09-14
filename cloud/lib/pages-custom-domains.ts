@@ -94,9 +94,24 @@ async function ensureCname(opts: {
     return;
   }
 
-  const listed = await client.get<DnsRecord[]>(
-    `/zones/${zone.id}/dns_records?name=${encodeURIComponent(hostname)}`,
-  );
+  let listed: DnsRecord[];
+  try {
+    listed = await client.get<DnsRecord[]>(
+      `/zones/${zone.id}/dns_records?name=${encodeURIComponent(hostname)}`,
+    );
+  } catch (err) {
+    const denied =
+      err instanceof CloudflareError &&
+      (err.status === 403 || err.status === 401);
+    if (denied) {
+      log(
+        step,
+        `DNS 403 em ${hostname}: o token lista a zona, mas não edita records. Em API Tokens → Edit, adicione Zone → DNS → Edit (não só Zone Read) e Zone Resources → Include → ${zone.name}`,
+      );
+      return;
+    }
+    throw err;
+  }
   const records = Array.isArray(listed) ? listed : [];
   const cname = records.find((record) => record.type === 'CNAME');
   if (cname) {
@@ -132,6 +147,78 @@ async function ensureCname(opts: {
     ttl: 1,
   });
   log(step, `DNS CNAME ${hostname} created → ${target}`);
+}
+
+/** A record for Coolify origins. DNS-only so Let's Encrypt HTTP-01 can reach Traefik. */
+export async function ensureAddressRecord(opts: {
+  client: CloudflareClient;
+  hostname: string;
+  ip: string;
+  proxied?: boolean;
+  step: string;
+}): Promise<void> {
+  const { client, hostname, ip, step } = opts;
+  const proxied = opts.proxied === true;
+  const zone = await findZoneForHost(client, hostname);
+  if (!zone) {
+    log(
+      step,
+      `DNS: zona de ${hostname} não está nesta conta (ou o token não lê DNS). A ${hostname} → ${ip}`,
+    );
+    return;
+  }
+
+  let listed: DnsRecord[];
+  try {
+    listed = await client.get<DnsRecord[]>(
+      `/zones/${zone.id}/dns_records?name=${encodeURIComponent(hostname)}`,
+    );
+  } catch (err) {
+    const denied =
+      err instanceof CloudflareError &&
+      (err.status === 403 || err.status === 401);
+    if (denied) {
+      log(
+        step,
+        `DNS 403 em ${hostname}: o token lista a zona, mas não edita records. Em API Tokens → Edit, adicione Zone → DNS → Edit e Zone Resources → Include → ${zone.name}`,
+      );
+      return;
+    }
+    throw err;
+  }
+
+  const records = Array.isArray(listed) ? listed : [];
+  for (const record of records.filter((item) => item.type === 'CNAME')) {
+    await client.delete(`/zones/${zone.id}/dns_records/${record.id}`);
+    log(step, `DNS removed CNAME ${hostname}`);
+  }
+
+  const address = records.find((record) => record.type === 'A');
+  if (address) {
+    const same = address.content === ip && Boolean(address.proxied) === proxied;
+    if (same) {
+      log(step, `DNS A ${hostname} already → ${ip}`);
+      return;
+    }
+    await client.put(`/zones/${zone.id}/dns_records/${address.id}`, {
+      type: 'A',
+      name: hostname,
+      content: ip,
+      proxied,
+      ttl: 1,
+    });
+    log(step, `DNS A ${hostname} updated → ${ip} (proxied=${proxied})`);
+    return;
+  }
+
+  await client.post(`/zones/${zone.id}/dns_records`, {
+    type: 'A',
+    name: hostname,
+    content: ip,
+    proxied,
+    ttl: 1,
+  });
+  log(step, `DNS A ${hostname} created → ${ip} (proxied=${proxied})`);
 }
 
 export async function attachPagesDomains(opts: {
