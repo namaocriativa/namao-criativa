@@ -55,7 +55,9 @@ jobs:
       - name: Install
         run: |
           npm install --no-audit --no-fund
-          npm install --no-save --no-audit @rollup/rollup-linux-x64-gnu
+          npm install --no-save --no-audit \
+            @rollup/rollup-linux-x64-gnu \
+            lightningcss-linux-x64-gnu
 
       - name: Build landing-kit
         run: npm run build -w @namao/landing-kit
