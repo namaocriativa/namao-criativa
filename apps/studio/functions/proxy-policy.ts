@@ -96,18 +96,16 @@ export async function fetchStudioApi(
   }
   try {
     const res = await fetch(target, init);
+    if (res.status < 500) return res;
     const payload = await res.arrayBuffer();
-    const status = studioProxyStatus(res.status);
-    const out = new Headers();
     const type = res.headers.get('content-type') || 'application/json; charset=utf-8';
-    out.set('content-type', type);
-    out.set('cache-control', 'no-store');
-    const cookies =
-      typeof res.headers.getSetCookie === 'function'
-        ? res.headers.getSetCookie()
-        : [];
-    for (const cookie of cookies) out.append('set-cookie', cookie);
-    return new Response(payload, { status, headers: out });
+    return new Response(payload, {
+      status: studioProxyStatus(res.status),
+      headers: {
+        'content-type': type,
+        'cache-control': 'no-store',
+      },
+    });
   } catch {
     return Response.json(
       { message: 'API indisponível. Tente de novo em instantes.' },
