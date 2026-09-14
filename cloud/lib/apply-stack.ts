@@ -1,13 +1,12 @@
 import { createClientFromEnv } from './coolify-client.js';
-import {
-  loadEnv,
-  loadStackConfig,
-  log,
-  requireSecret,
-  resolveDatabaseUrl,
-} from './config.js';
+import { loadEnv, loadStackConfig, log, requireSecret } from './config.js';
+import { maskDatabaseUrl } from './postgres-url.js';
 import { loadState, saveState } from './state.js';
 import { applyEvolution } from '../stacks/evolution.js';
+import {
+  applyPostgres,
+  resolveRuntimeDatabaseUrl,
+} from '../stacks/postgres.js';
 import { applyRuntime } from '../stacks/runtime.js';
 
 export async function runApply(opts: { dryRun: boolean }) {
@@ -22,9 +21,6 @@ export async function runApply(opts: { dryRun: boolean }) {
     );
   }
 
-  const databaseUrl = resolveDatabaseUrl();
-  log('apply', `PostgreSQL configured (${maskDatabaseUrl(databaseUrl)})`);
-
   state.evolution_postgres_password = requireSecret(
     'EVOLUTION_POSTGRES_PASSWORD',
     state.evolution_postgres_password,
@@ -38,6 +34,26 @@ export async function runApply(opts: { dryRun: boolean }) {
 
   log('apply', opts.dryRun ? 'dry-run (plan)' : 'applying stacks');
 
+  state = await applyPostgres({
+    client,
+    stack,
+    state,
+    dryRun: opts.dryRun,
+  });
+
+  let databaseUrl: string;
+  try {
+    databaseUrl = resolveRuntimeDatabaseUrl(state, stack);
+    log('apply', `PostgreSQL configured (${maskDatabaseUrl(databaseUrl)})`);
+  } catch (err) {
+    if (!opts.dryRun) throw err;
+    databaseUrl = 'postgresql://namao:***@pending-coolify-uuid:5432/namao';
+    log(
+      'apply',
+      'PostgreSQL would be created on apply; DATABASE_URL not resolved yet',
+    );
+  }
+
   state = await applyEvolution({
     client,
     stack,
@@ -49,6 +65,7 @@ export async function runApply(opts: { dryRun: boolean }) {
     stack,
     state,
     dryRun: opts.dryRun,
+    databaseUrl,
   });
 
   if (!opts.dryRun) {
@@ -56,25 +73,17 @@ export async function runApply(opts: { dryRun: boolean }) {
     log('apply', 'state.json written');
   }
 
-  printWireHints(state, stack.evolution.instance);
+  printWireHints(state, stack.evolution.instance, databaseUrl);
   return state;
-}
-
-function maskDatabaseUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    if (u.password) u.password = '***';
-    return u.toString();
-  } catch {
-    return '(set)';
-  }
 }
 
 function printWireHints(
   state: {
     evolution_api_key: string;
+    postgres_database_uuid?: string;
   },
   instance: string,
+  databaseUrl: string,
 ) {
   console.log('\n--- Wire into services/platform/.env ---');
   console.log(
@@ -85,7 +94,13 @@ function printWireHints(
   console.log(`EVOLUTION_INSTANCE=${instance}`);
   console.log(`PUBLIC_CHAT_API_ORIGIN=<https://api... when domain is ready>`);
   console.log('\n--- API DATABASE_URL ---');
-  console.log(
-    'namao-api uses a single PostgreSQL DATABASE_URL (Coolify Postgres or managed).\n',
-  );
+  if (state.postgres_database_uuid) {
+    console.log(
+      `namao-api uses Coolify Postgres ${state.postgres_database_uuid} (${maskDatabaseUrl(databaseUrl)}).`,
+    );
+  } else {
+    console.log(
+      `namao-api uses DATABASE_URL override (${maskDatabaseUrl(databaseUrl)}).`,
+    );
+  }
 }

@@ -9,12 +9,19 @@ export type CloudState = {
   environment_name: string;
   /** @deprecated MongoDB is Atlas — kept for old state.json cleanup */
   mongodb_service_uuid?: string;
+  destination_uuid?: string;
+  postgres_database_uuid: string;
+  postgres_user: string;
+  postgres_db: string;
+  postgres_password: string;
   evolution_service_uuid: string;
   runtime_application_uuid: string;
   evolution_postgres_password: string;
   evolution_api_key: string;
   cloudflare_pages_project?: string;
   cloudflare_pages_subdomain?: string;
+  cloudflare_studio_pages_project?: string;
+  cloudflare_studio_pages_subdomain?: string;
   updated_at: string;
 };
 
@@ -26,6 +33,10 @@ export function emptyState(): CloudState {
     project_uuid: '',
     environment_uuid: '',
     environment_name: 'production',
+    postgres_database_uuid: '',
+    postgres_user: '',
+    postgres_db: '',
+    postgres_password: '',
     evolution_service_uuid: '',
     runtime_application_uuid: '',
     evolution_postgres_password: '',

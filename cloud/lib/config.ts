@@ -16,12 +16,23 @@ export type StackConfig = {
     health_check_path: string;
     domain: string;
   };
+  postgres: {
+    name: string;
+    user: string;
+    database: string;
+    image: string;
+  };
   evolution: {
     name: string;
     instance: string;
     domain: string;
   };
   website: {
+    pages_project: string;
+    production_branch: string;
+    domain: string;
+  };
+  studio: {
     pages_project: string;
     production_branch: string;
     domain: string;
@@ -37,21 +48,6 @@ export function loadEnv(): void {
   loadDotenv({ path: join(cloudRoot(), '.env'), override: true });
 }
 
-export function resolveDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL?.trim();
-  if (!url) {
-    throw new Error(
-      'DATABASE_URL is required (PostgreSQL). Put it in the repo root .env or cloud/.env',
-    );
-  }
-  if (url.startsWith('file:')) {
-    throw new Error(
-      'DATABASE_URL must be PostgreSQL in cloud (file: SQLite is not reachable from Coolify).',
-    );
-  }
-  return url;
-}
-
 export function loadStackConfig(): StackConfig {
   const examplePath = join(cloudRoot(), 'config', 'stack.example.json');
   const localPath = join(cloudRoot(), 'config', 'stack.json');
@@ -59,7 +55,9 @@ export function loadStackConfig(): StackConfig {
   const file = JSON.parse(readFileSync(path, 'utf8')) as Partial<StackConfig> & {
     mongodb?: unknown;
     website?: Partial<StackConfig['website']>;
+    studio?: Partial<StackConfig['studio']>;
     runtime?: Partial<StackConfig['runtime']>;
+    postgres?: Partial<StackConfig['postgres']>;
     evolution?: Partial<StackConfig['evolution']>;
   };
 
@@ -72,6 +70,14 @@ export function loadStackConfig(): StackConfig {
       'production',
     server_name:
       process.env.COOLIFY_SERVER_NAME?.trim() || file.server_name || 'localhost',
+    postgres: {
+      name: file.postgres?.name || 'namao-postgres',
+      user:
+        process.env.POSTGRES_USER?.trim() || file.postgres?.user || 'namao',
+      database:
+        process.env.POSTGRES_DB?.trim() || file.postgres?.database || 'namao',
+      image: file.postgres?.image || 'postgres:16-alpine',
+    },
     runtime: {
       name: file.runtime?.name || 'namao-api',
       image_name:
@@ -106,7 +112,23 @@ export function loadStackConfig(): StackConfig {
         file.website?.production_branch ||
         'main',
       domain:
-        process.env.WEBSITE_DOMAIN?.trim() || file.website?.domain || '',
+        process.env.WEBSITE_DOMAIN?.trim() ||
+        file.website?.domain ||
+        'namaocriativa.com.br',
+    },
+    studio: {
+      pages_project:
+        process.env.CLOUDFLARE_STUDIO_PAGES_PROJECT?.trim() ||
+        file.studio?.pages_project ||
+        'namao-studio',
+      production_branch:
+        process.env.STUDIO_PRODUCTION_BRANCH?.trim() ||
+        file.studio?.production_branch ||
+        'main',
+      domain:
+        process.env.STUDIO_DOMAIN?.trim() ||
+        file.studio?.domain ||
+        'studio.namaocriativa.com.br',
     },
   };
 }

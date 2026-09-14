@@ -12,7 +12,7 @@ Monorepo para **descobrir leads** em uma região, **enriquecê-los** com dados e
 - Landings geradas em `leads/<slug>/` (independentes, fora dos workspaces)
 - Crawl4AI para enrichment quando o lead já tem website (`services/platform/crawler/` ou Docker opcional)
 
-Docker sobe Postgres, Redis, Crawl4AI e a API Nest (watch). O Vite em `apps/studio/` continua no host e faz proxy para `http://localhost:3000`.
+Docker sobe Postgres, Redis, Crawl4AI e a API Nest (watch). O Vite em `apps/studio/` continua no host e faz proxy para a API (`PLATFORM_PORT`, default `http://localhost:4000`). As portas no host (4000 e 5433) evitam conflito com stacks na 3000/5432.
 
 ## Estrutura
 
@@ -42,10 +42,24 @@ docker compose up -d --build
 npm run dev:studio
 ```
 
-- Studio (Vite em `apps/studio/`): `http://localhost:5173` — proxy `/leads`, `/config`, etc. → API na 3000
-- API (NestJS no Docker): `http://localhost:3000` — discovery, landing, chat Gemini, dashboard, com hot reload de `services/platform/src`
+- Studio (Vite em `apps/studio/`): `http://localhost:5173` — login JWT, proxy `/leads`, `/config`, `/studio`, etc. → API (`PLATFORM_PORT`, default 4000)
+- API (NestJS no Docker): `http://localhost:${PLATFORM_PORT:-4000}` — discovery, landing, chat Gemini, dashboard, com hot reload de `services/platform/src`
 
-Para rodar a API Nest no host em vez do Docker: `npm run dev` (sobe platform + studio). Não use host e Docker ao mesmo tempo na porta 3000.
+Para rodar a API Nest no host em vez do Docker: `npm run dev` (sobe platform + studio). Não use host e Docker ao mesmo tempo na mesma porta.
+
+O Compose publica a API em **4000** e o Postgres em **5433** no host (o Nest continua em 3000 *dentro* do container). No `.env` da raiz:
+
+```bash
+PLATFORM_PORT=4000
+POSTGRES_PORT=5433
+```
+
+```bash
+docker compose up -d --build
+npm run dev:studio
+```
+
+Studio e website falam com `http://localhost:4000`. API Nest no host, sem o serviço `platform` do Compose: `PORT=4000` em `services/platform/.env`.
 
 ### Variáveis de ambiente
 
@@ -53,15 +67,16 @@ Arquivo: `services/platform/.env`
 
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
-| `DATABASE_URL` | Sim | Postgres, ex.: `postgresql://namao:namao@localhost:5432/namao` |
-| `PORT` | Não | Default: `3000` |
+| `DATABASE_URL` | Sim | Postgres, ex.: `postgresql://namao:namao@localhost:5433/namao` (Docker publica 5433 no host) |
+| `PORT` | Não | Porta do Nest no **host** (sem Docker). Default: `3000` |
+| `PLATFORM_PORT` | Não | Porta no **host** com Docker (`4000:3000`). Definir no `.env` da **raiz**. Default: `4000` |
 | `REDIS_URL` | Não | Cache de discovery e rate limit. Default local: `redis://localhost:6379` |
 | `GOOGLE_PLACES_API_KEY` | Não | Se definida, discovery/enrich usam Google Places; senão, Overpass/OSM + Nominatim |
 | `CRAWL4AI_URL` | Não | API Docker do Crawl4AI, ex.: `http://localhost:11235`. Se vazia, usa o script Python local |
 | `CRAWL4AI_API_TOKEN` | Não | Bearer token se o servidor Docker exigir JWT |
 | `CRAWL4AI_PYTHON` | Não | Python do venv do crawler. Default: `services/platform/crawler/.venv/bin/python` |
 | `GEMINI_API_KEY` | Sim para gerar/chat | Google AI Studio |
-| `PUBLIC_CHAT_API_ORIGIN` | Sim em LP publicada | URL absoluta da API injetada no widget. Dev: `http://localhost:3000` |
+| `PUBLIC_CHAT_API_ORIGIN` | Sim em LP publicada | URL absoluta da API injetada no widget. Dev: `http://localhost:4000` |
 | `VERCEL_TOKEN` | Sim para publicar | Token da conta Vercel (`vercel.com/account/tokens`) |
 | `VERCEL_TEAM_ID` | Não | Team/org da Vercel, se os projetos não forem da conta pessoal |
 | `VERCEL_AUTO_DEPLOY` | Não | Default: liga sozinho quando há token. `false` publica só no botão |
@@ -69,10 +84,13 @@ Arquivo: `services/platform/.env`
 | `GA4_PROPERTY_ID` | Não | Property ID numérico do GA4 — dashboard do cliente |
 | `GA4_SERVICE_ACCOUNT_JSON` | Não | JSON da service account (Viewer na propriedade GA4) |
 | `LEADS_DIR` | Não | Pasta dos projetos Vite. Default: `<monorepo>/leads` |
-| `JWT_SECRET` | Sim em produção | Segredo JWT (login Namão / clientes) |
+| `JWT_SECRET` | Sim em produção | Segredo JWT (login Namão / clientes / studio) |
 | `NAMAO_PUBLIC_URL` | Não | URL do site Namão. Default: `http://localhost:5174` |
+| `NAMAO_STUDIO_URL` | Não | URL do studio (CORS). Default local: `http://localhost:5173` |
+| `STUDIO_ADMIN_EMAIL` | Não | Bootstrap do primeiro admin do studio |
+| `STUDIO_ADMIN_PASSWORD` | Não | Senha do bootstrap (mínimo 8 caracteres) |
 | `META_APP_ID` / `META_APP_SECRET` | Não | App Meta para OAuth Instagram Graph |
-| `META_REDIRECT_URI` | Não | Callback OAuth. Default: `http://localhost:3000/auth/instagram/callback` |
+| `META_REDIRECT_URI` | Não | Callback OAuth. Default: `http://localhost:4000/auth/instagram/callback` |
 | `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` | Não | Evolution API; sem isso o envio WhatsApp fica `not_configured` |
 
 ### Redis (cache de discovery)
@@ -195,7 +213,14 @@ Cria o lead, consulta providers, mescla dados, baixa imagens e devolve o lead co
 ```http
 POST /auth/register
 POST /auth/login
+POST /auth/studio/login
+POST /auth/studio/logout
 GET  /auth/me
+GET  /studio/users
+POST /studio/users
+PATCH /studio/users/:id
+POST /studio/users/:id/reset-password
+DELETE /studio/users/:id
 GET  /auth/instagram/start
 GET  /auth/instagram/callback
 GET  /auth/instagram/status
@@ -205,6 +230,8 @@ GET  /invites/:token
 POST /invites/:id/send-whatsapp
 POST /leads/:id/instagram/sync
 ```
+
+O studio usa cookie HttpOnly (`namao_studio_token`) em `POST /auth/studio/login` (só `ADMIN`/`OPERATOR`). Clientes do website continuam com `POST /auth/login` + Bearer. Gestão de usuários do studio é só `ADMIN`. O primeiro admin pode ser criado com `STUDIO_ADMIN_EMAIL` / `STUDIO_ADMIN_PASSWORD`.
 
 Cadastro de cliente exige `inviteToken`. O OAuth Instagram só funciona com `META_APP_ID` / `META_APP_SECRET`. `POST /invites/:id/send-whatsapp` chama a Evolution se estiver configurada; senão retorna `{ skipped: true, reason: "not_configured" }`.
 
@@ -266,7 +293,7 @@ Falhas de um provider não interrompem o enrichment.
 | `npm run crawler:setup` | Cria venv e instala Crawl4AI + Chromium |
 | `npm run cloud:bootstrap` | Resolve server/projeto no Coolify |
 | `npm run cloud:plan` | Dry-run do IaC Coolify |
-| `npm run cloud:apply` | Cria/atualiza Evolution e API |
+| `npm run cloud:apply` | Cria/atualiza Postgres, Evolution e API |
 | `npm run cloud:deploy` | Dispara deploy dos recursos no Coolify |
 
 ## API pública (chat, dashboard, convites)
@@ -296,17 +323,21 @@ Em produção, `PUBLIC_CHAT_API_ORIGIN` deve ser a URL pública da API (`https:/
 
 IaC em [`cloud/`](cloud/README.md) via API HTTP do Coolify (`https://coolify.fungalia.com.br`):
 
-- PostgreSQL (`DATABASE_URL`) — leads, chat, users, invite-requests
+- PostgreSQL (`namao-postgres` via IaC) — leads, chat, users, invite-requests
 - Evolution API (`evoapicloud/evolution-api:latest`) + Postgres + Redis
 - API (`namao-api`) como aplicação Docker image (`ghcr.io/namaocriativa/namao-api`). CD em push para `main`: [`.github/workflows/cd-runtime.yml`](.github/workflows/cd-runtime.yml)
-- Website (`apps/website`) no Cloudflare Pages (`namao-website`). CD: [`.github/workflows/cd-website.yml`](.github/workflows/cd-website.yml) — secrets e IaC em [`cloud/README.md`](cloud/README.md)
+- Website (`apps/website`) no Cloudflare Pages (`namao-website`). CD: [`.github/workflows/cd-website.yml`](.github/workflows/cd-website.yml)
+- Studio (`apps/studio`) no Cloudflare Pages (`namao-studio`), protegido por JWT. CD: [`.github/workflows/cd-studio.yml`](.github/workflows/cd-studio.yml) — secrets e IaC em [`cloud/README.md`](cloud/README.md)
 
 ```bash
 cp cloud/.env.example cloud/.env
 npm run cloud:bootstrap
 npm run cloud:apply
 npm run cloud:website
+npm run cloud:studio
 ```
+
+Ou os dois de uma vez: `npm run cloud:pages`.
 
 Detalhes e wiring de `EVOLUTION_*` / `PUBLIC_CHAT_API_ORIGIN` em [`cloud/README.md`](cloud/README.md).
 

@@ -10,6 +10,12 @@
     "health_check_path": "/health",
     "domain": ""
   },
+  "postgres": {
+    "name": "namao-postgres",
+    "user": "namao",
+    "database": "namao",
+    "image": "postgres:16-alpine"
+  },
   "evolution": {
     "name": "namao-evolution",
     "instance": "namao",
@@ -18,6 +24,11 @@
   "website": {
     "pages_project": "namao-website",
     "production_branch": "main",
-    "domain": ""
+    "domain": "namaocriativa.com.br"
+  },
+  "studio": {
+    "pages_project": "namao-studio",
+    "production_branch": "main",
+    "domain": "studio.namaocriativa.com.br"
   }
 }

@@ -43,10 +43,15 @@ async function main() {
   const state = loadState();
   const force = process.argv.includes('--force');
 
-  if (!state.evolution_service_uuid && !state.runtime_application_uuid) {
+  if (
+    !state.postgres_database_uuid &&
+    !state.evolution_service_uuid &&
+    !state.runtime_application_uuid
+  ) {
     throw new Error('Nothing to deploy. Run apply first.');
   }
 
+  await deployUuid('postgres', state.postgres_database_uuid, force);
   await deployUuid('evolution', state.evolution_service_uuid, force);
   await deployUuid('runtime', state.runtime_application_uuid, force);
 }

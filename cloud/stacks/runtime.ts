@@ -1,6 +1,6 @@
 import type { CoolifyClient } from '../lib/coolify-client.js';
 import type { StackConfig } from '../lib/config.js';
-import { log, resolveDatabaseUrl } from '../lib/config.js';
+import { log } from '../lib/config.js';
 import type { CloudState } from '../lib/state.js';
 
 type AppCreated = { uuid?: string };
@@ -43,11 +43,12 @@ async function upsertAppEnvs(
 export function buildRuntimeEnvs(opts: {
   state: CloudState;
   stack: StackConfig;
+  databaseUrl: string;
 }): Record<string, string> {
   const envs: Record<string, string> = {
     PORT: '3000',
     NODE_ENV: 'production',
-    DATABASE_URL: resolveDatabaseUrl(),
+    DATABASE_URL: opts.databaseUrl,
     JWT_SECRET:
       process.env.JWT_SECRET?.trim() || 'dev-jwt-secret-change-me',
   };
@@ -67,6 +68,14 @@ export function buildRuntimeEnvs(opts: {
     process.env.NAMAO_PUBLIC_URL?.trim() || opts.stack.runtime.domain;
   if (namao) envs.NAMAO_PUBLIC_URL = namao.replace(/\/$/, '');
 
+  const studioUrl = process.env.NAMAO_STUDIO_URL?.trim();
+  if (studioUrl) envs.NAMAO_STUDIO_URL = studioUrl.replace(/\/$/, '');
+
+  const studioEmail = process.env.STUDIO_ADMIN_EMAIL?.trim();
+  if (studioEmail) envs.STUDIO_ADMIN_EMAIL = studioEmail;
+  const studioPassword = process.env.STUDIO_ADMIN_PASSWORD?.trim();
+  if (studioPassword) envs.STUDIO_ADMIN_PASSWORD = studioPassword;
+
   return envs;
 }
 
@@ -75,10 +84,11 @@ export async function applyRuntime(opts: {
   stack: StackConfig;
   state: CloudState;
   dryRun: boolean;
+  databaseUrl: string;
 }): Promise<CloudState> {
-  const { client, stack, dryRun } = opts;
+  const { client, stack, dryRun, databaseUrl } = opts;
   const state = { ...opts.state };
-  const envs = buildRuntimeEnvs({ state, stack });
+  const envs = buildRuntimeEnvs({ state, stack, databaseUrl });
 
   if (state.runtime_application_uuid) {
     log('runtime', `exists uuid=${state.runtime_application_uuid}`);
@@ -123,6 +133,9 @@ export async function applyRuntime(opts: {
     health_check_return_code: 200,
     instant_deploy: true,
   };
+  if (state.destination_uuid) {
+    body.destination_uuid = state.destination_uuid;
+  }
   if (stack.runtime.domain.trim()) {
     body.domains = stack.runtime.domain.trim();
   }

@@ -4,6 +4,10 @@ import {
 } from '../lib/cloudflare-client.js';
 import type { StackConfig } from '../lib/config.js';
 import { log } from '../lib/config.js';
+import {
+  attachPagesDomains,
+  extraHostnames,
+} from '../lib/pages-custom-domains.js';
 import type { CloudState } from '../lib/state.js';
 
 type PagesProject = {
@@ -12,19 +16,6 @@ type PagesProject = {
   subdomain?: string;
   production_branch?: string;
 };
-
-type PagesDomain = {
-  id?: string;
-  name?: string;
-  status?: string;
-};
-
-function extraHostnames(apex: string): string[] {
-  const host = apex.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
-  if (!host) return [];
-  if (host.startsWith('www.')) return [host, host.slice(4)];
-  return [host, `www.${host}`];
-}
 
 export async function applyWebsitePages(opts: {
   client: CloudflareClient;
@@ -51,16 +42,16 @@ export async function applyWebsitePages(opts: {
   if (!existing) {
     if (dryRun) {
       log('website', `would CREATE Pages project ${name} (branch ${branch})`);
-      return state;
+    } else {
+      existing = await client.post<PagesProject>(
+        client.accountPath('/pages/projects'),
+        { name, production_branch: branch },
+      );
+      log(
+        'website',
+        `created ${name} → https://${existing.subdomain || `${name}.pages.dev`}`,
+      );
     }
-    existing = await client.post<PagesProject>(
-      client.accountPath('/pages/projects'),
-      { name, production_branch: branch },
-    );
-    log(
-      'website',
-      `created ${name} → https://${existing.subdomain || `${name}.pages.dev`}`,
-    );
   } else {
     log(
       'website',
@@ -80,37 +71,16 @@ export async function applyWebsitePages(opts: {
 
   state.cloudflare_pages_project = name;
   state.cloudflare_pages_subdomain =
-    existing.subdomain || `${name}.pages.dev`;
+    existing?.subdomain || `${name}.pages.dev`;
 
-  const hosts = extraHostnames(stack.website.domain);
-  if (!hosts.length) {
-    log('website', 'no custom domain (set WEBSITE_DOMAIN when DNS is ready)');
-    return state;
-  }
-
-  if (dryRun) {
-    log('website', `would ensure domains: ${hosts.join(', ')}`);
-    return state;
-  }
-
-  const listed = await client.get<PagesDomain[]>(`${projectPath}/domains`);
-  const have = new Set(
-    (Array.isArray(listed) ? listed : []).map((d) => d.name).filter(Boolean),
-  );
-
-  for (const host of hosts) {
-    if (have.has(host)) {
-      log('website', `domain ${host} already attached`);
-      continue;
-    }
-    try {
-      await client.post(`${projectPath}/domains`, { name: host });
-      log('website', `domain ${host} attached — point DNS to ${state.cloudflare_pages_subdomain}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      log('website', `WARN: could not attach ${host}: ${msg}`);
-    }
-  }
+  await attachPagesDomains({
+    client,
+    projectPath,
+    hostnames: extraHostnames(stack.website.domain, { includeWww: true }),
+    pagesDev: state.cloudflare_pages_subdomain,
+    step: 'website',
+    dryRun,
+  });
 
   return state;
 }

@@ -28,7 +28,11 @@
     "cloud:apply": "npm run apply -w @namao/cloud",
     "cloud:deploy": "npm run deploy -w @namao/cloud",
     "cloud:website": "npm run website -w @namao/cloud",
-    "cloud:website:plan": "npm run website:plan -w @namao/cloud"
+    "cloud:website:plan": "npm run website:plan -w @namao/cloud",
+    "cloud:studio": "npm run studio -w @namao/cloud",
+    "cloud:studio:plan": "npm run studio:plan -w @namao/cloud",
+    "cloud:pages": "npm run pages -w @namao/cloud",
+    "cloud:pages:plan": "npm run pages:plan -w @namao/cloud"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

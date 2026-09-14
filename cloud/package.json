@@ -9,9 +9,14 @@
     "plan": "tsx scripts/plan.ts",
     "apply": "tsx scripts/apply.ts",
     "deploy": "tsx scripts/deploy.ts",
+    "test": "tsx --test lib/postgres-url.spec.ts",
     "website": "tsx scripts/website.ts",
     "website:plan": "tsx scripts/website.ts --plan",
-    "website:redirects": "tsx scripts/write-website-redirects.ts"
+    "website:redirects": "tsx scripts/write-website-redirects.ts",
+    "studio": "tsx scripts/studio.ts",
+    "studio:plan": "tsx scripts/studio.ts --plan",
+    "pages": "tsx scripts/website.ts && tsx scripts/studio.ts",
+    "pages:plan": "tsx scripts/website.ts --plan && tsx scripts/studio.ts --plan"
   },
   "dependencies": {
     "dotenv": "^16.4.7"
