@@ -40,6 +40,7 @@ export async function runApply(opts: { dryRun: boolean }) {
     state,
     dryRun: opts.dryRun,
   });
+  if (!opts.dryRun) saveState(state);
 
   let databaseUrl: string;
   try {
@@ -60,6 +61,8 @@ export async function runApply(opts: { dryRun: boolean }) {
     state,
     dryRun: opts.dryRun,
   });
+  if (!opts.dryRun) saveState(state);
+
   state = await applyRuntime({
     client,
     stack,
@@ -67,7 +70,6 @@ export async function runApply(opts: { dryRun: boolean }) {
     dryRun: opts.dryRun,
     databaseUrl,
   });
-
   if (!opts.dryRun) {
     saveState(state);
     log('apply', 'state.json written');

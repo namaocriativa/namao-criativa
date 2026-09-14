@@ -34,9 +34,9 @@ async function upsertAppEnvs(
     }
   }
   if (missing.length) {
-    await client.post(`/applications/${appUuid}/envs/bulk`, {
-      data: missing,
-    });
+    for (const env of missing) {
+      await client.post(`/applications/${appUuid}/envs`, env);
+    }
   }
 }
 

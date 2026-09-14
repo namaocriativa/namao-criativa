@@ -67,6 +67,17 @@ export class CoolifyClient {
         typeof (body as { message: unknown }).message === 'string'
           ? (body as { message: string }).message
           : `Coolify ${method} ${path} → ${res.status}`;
+      if (
+        typeof body === 'object' &&
+        body &&
+        'errors' in body
+      ) {
+        throw new CoolifyError(
+          `${msg} ${JSON.stringify((body as { errors: unknown }).errors)}`,
+          res.status,
+          body,
+        );
+      }
       throw new CoolifyError(msg, res.status, body);
     }
 
