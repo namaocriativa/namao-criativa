@@ -1,5 +1,4 @@
 import {
-  BadGatewayException,
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -169,7 +168,7 @@ export class MailService {
     });
 
     if (error) {
-      throw new BadGatewayException(
+      throw new ServiceUnavailableException(
         error.message || 'Falha ao enviar e-mail',
       );
     }

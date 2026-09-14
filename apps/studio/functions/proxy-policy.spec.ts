@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   headersForStudioApiProxy,
   isHtmlNavigation,
+  studioProxyStatus,
 } from './proxy-policy';
 
 test('isHtmlNavigation ignora fetch/XHR mesmo com Accept text/html', () => {
@@ -49,4 +50,13 @@ test('headersForStudioApiProxy remove Accept-Encoding e headers hop-by-hop', () 
   assert.equal(headers.get('cf-ray'), null);
   assert.equal(headers.get('cookie'), 'namao_studio_token=abc');
   assert.equal(headers.get('origin'), 'https://studio.namaocriativa.com.br');
+});
+
+test('studioProxyStatus não deixa 502/504 vazar para a página HTML da Cloudflare', () => {
+  assert.equal(studioProxyStatus(200), 200);
+  assert.equal(studioProxyStatus(400), 400);
+  assert.equal(studioProxyStatus(401), 401);
+  assert.equal(studioProxyStatus(502), 503);
+  assert.equal(studioProxyStatus(504), 503);
+  assert.equal(studioProxyStatus(503), 503);
 });
