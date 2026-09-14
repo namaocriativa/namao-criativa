@@ -31,6 +31,73 @@ export function isSameStudioOrigin(
   }
 }
 
+/** Document navigation vs XHR/fetch. Fetch often sends Accept: text/html too. */
+export function isHtmlNavigation(request: {
+  method: string;
+  headers: { get(name: string): string | null };
+}): boolean {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return false;
+  const dest = (request.headers.get('sec-fetch-dest') || '').toLowerCase();
+  if (dest && dest !== 'document') return false;
+  const accept = request.headers.get('accept') || '';
+  return accept.includes('text/html');
+}
+
+const STRIP_API_PROXY_HEADERS = [
+  'host',
+  'connection',
+  'keep-alive',
+  'proxy-connection',
+  'transfer-encoding',
+  'te',
+  'trailer',
+  'upgrade',
+  'content-length',
+  'accept-encoding',
+  'content-encoding',
+  'cf-connecting-ip',
+  'cf-ipcountry',
+  'cf-ray',
+  'cf-visitor',
+  'cf-ew-via',
+  'cdn-loop',
+  'true-client-ip',
+];
+
+export function headersForStudioApiProxy(
+  request: { headers: Headers },
+  forwardedOrigin: string | null,
+): Headers {
+  const headers = new Headers(request.headers);
+  for (const name of STRIP_API_PROXY_HEADERS) headers.delete(name);
+  if (forwardedOrigin) headers.set('origin', forwardedOrigin);
+  return headers;
+}
+
+export async function fetchStudioApi(
+  request: Request,
+  target: URL,
+  forwardedOrigin: string | null,
+): Promise<Response> {
+  const init: RequestInit & { duplex?: 'half' } = {
+    method: request.method,
+    headers: headersForStudioApiProxy(request, forwardedOrigin),
+    redirect: 'manual',
+  };
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    init.body = request.body;
+    init.duplex = 'half';
+  }
+  try {
+    return await fetch(target, init);
+  } catch {
+    return Response.json(
+      { message: 'API indisponível. Tente de novo em instantes.' },
+      { status: 502 },
+    );
+  }
+}
+
 /**
  * Pages pretty URLs 308 `/file.html` → `/file`. Fetch the pretty path from
  * ASSETS or the 308 loops (`/login.html` → `/login` → `/login.html`).

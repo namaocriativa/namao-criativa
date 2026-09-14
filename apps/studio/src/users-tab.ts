@@ -50,11 +50,17 @@ function el<T extends HTMLElement>(id: string): T {
 }
 
 async function readError(res: Response): Promise<string> {
-  const data = (await res.json().catch(() => ({}))) as {
-    message?: string | string[];
-  };
-  const raw = data.message;
-  return Array.isArray(raw) ? raw[0] : raw || `Erro ${res.status}`;
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text) as { message?: string | string[] };
+    const raw = data.message;
+    return Array.isArray(raw) ? raw[0] : raw || `Erro ${res.status}`;
+  } catch {
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      return 'A API não respondeu. Atualize a página e tente de novo.';
+    }
+    return `Erro ${res.status}`;
+  }
 }
 
 export function initUsersTab() {

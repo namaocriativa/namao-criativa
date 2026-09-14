@@ -1,4 +1,6 @@
 import {
+  fetchStudioApi,
+  isHtmlNavigation,
   isSameStudioOrigin,
   isUnauthenticatedApiAllowed,
   originForStudioApiProxy,
@@ -93,12 +95,6 @@ export function isApiPath(pathname: string): boolean {
   );
 }
 
-export function isHtmlNavigation(request: Request): boolean {
-  if (request.method !== 'GET' && request.method !== 'HEAD') return false;
-  const accept = request.headers.get('accept') || '';
-  return accept.includes('text/html');
-}
-
 export function isPublicPath(pathname: string): boolean {
   if (pathname === '/login.html' || pathname === '/login') return true;
   if (pathname.startsWith('/assets/login')) return true;
@@ -165,30 +161,23 @@ export async function onRequest(context: {
         request.headers.get('cookie'),
         STUDIO_TOKEN_COOKIE,
       );
-      const payload = token ? await verifyStudioJwt(token, secret) : null;
+      let payload: { role?: string } | null = null;
+      try {
+        payload = token ? await verifyStudioJwt(token, secret) : null;
+      } catch {
+        payload = null;
+      }
       if (!payload) {
         return Response.json({ message: 'Não autenticado' }, { status: 401 });
       }
     }
     const target = new URL(pathname + url.search, `${apiOrigin}/`);
-    const headers = new Headers(request.headers);
-    headers.delete('host');
     const forwardedOrigin = originForStudioApiProxy(
       request.headers.get('origin'),
       env.NAMAO_STUDIO_URL,
       request.headers.get('referer'),
     );
-    if (forwardedOrigin) headers.set('origin', forwardedOrigin);
-    const init: RequestInit & { duplex?: 'half' } = {
-      method: request.method,
-      headers,
-      redirect: 'manual',
-    };
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      init.body = request.body;
-      init.duplex = 'half';
-    }
-    return fetch(target, init);
+    return fetchStudioApi(request, target, forwardedOrigin);
   }
 
   if (!secret) {
@@ -199,7 +188,12 @@ export async function onRequest(context: {
     request.headers.get('cookie'),
     STUDIO_TOKEN_COOKIE,
   );
-  const payload = token ? await verifyStudioJwt(token, secret) : null;
+  let payload: { role?: string } | null = null;
+  try {
+    payload = token ? await verifyStudioJwt(token, secret) : null;
+  } catch {
+    payload = null;
+  }
 
   if (!payload) {
     const login = new URL('/login', url.origin);
