@@ -339,7 +339,7 @@ Ordem do apply: Postgres → Redis → Evolution (Application) → API (`namao-a
 | Action não faz deploy | Path filter (API inalterada) ou secrets `COOLIFY_*` / variable `COOLIFY_BASE_URL` faltando |
 | Action website não faz deploy | Path filter (`apps/website` inalterado) ou `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` faltando |
 | Action studio não faz deploy | Path filter (`apps/studio` inalterado) ou `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` faltando |
-| Studio CD: `lightningcss.linux-x64-gnu.node` | Binário nativo Linux. `@namao/studio` declara `lightningcss-linux-x64-gnu`; o workflow também instala no Ubuntu |
+| Studio CD: `lightningcss` / `@tailwindcss/oxide` native binding | Binários Linux. `@namao/studio` declara `lightningcss-linux-x64-gnu` + `@tailwindcss/oxide-linux-x64-gnu`; o workflow instala no Ubuntu |
 | Custom domain 522 / pendente | Anexe o hostname no Pages **antes** do CNAME; zona precisa estar na mesma conta |
 | DNS: zona não listada | Token sem *Zone.DNS Edit* / *Zone.Zone Read*, ou domínio noutra conta Cloudflare |
 | Studio redireciona sempre para login | `JWT_SECRET` do Pages diferente da API, ou cookie sem `Secure` em HTTP |

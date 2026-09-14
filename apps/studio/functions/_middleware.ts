@@ -109,6 +109,13 @@ function stripSlash(url: string): string {
   return url.replace(/\/$/, '');
 }
 
+/** Public API origin. Direct Upload often omits dashboard/wrangler plaintext vars. */
+export const DEFAULT_STUDIO_API_ORIGIN = 'https://api.namaocriativa.com.br';
+
+export function resolveStudioApiOrigin(raw?: string): string {
+  return stripSlash(raw?.trim() || DEFAULT_STUDIO_API_ORIGIN);
+}
+
 function missingConfigResponse(message: string): Response {
   return Response.json({ message }, { status: 503 });
 }
@@ -126,7 +133,7 @@ export async function onRequest(context: {
   const url = new URL(request.url);
   const pathname = url.pathname;
   const secret = env.JWT_SECRET?.trim() || '';
-  const apiOrigin = stripSlash(env.STUDIO_API_ORIGIN || '');
+  const apiOrigin = resolveStudioApiOrigin(env.STUDIO_API_ORIGIN);
 
   if (pathname === '/login' || pathname === '/login.html') {
     if (env.ASSETS?.fetch) {
