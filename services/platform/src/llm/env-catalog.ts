@@ -150,7 +150,7 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     label: 'URL do studio',
     required: false,
     secret: false,
-    hint: 'CORS do studio. Default local: http://localhost:5173',
+    hint: 'CORS/cookie do studio. pages.dev do projeto entra automaticamente. Default local: http://localhost:5173',
   },
   {
     key: 'STUDIO_ADMIN_EMAIL',

@@ -26,6 +26,12 @@ import {
   normalizeInstagram,
 } from './instagram';
 import { extractJwtFromRequest } from './jwt-cookie';
+import {
+  CLIENT_ACCOUNT_SELECT,
+  JWT_TYP,
+  clientAccountToJwt,
+  staffToJwt,
+} from './identity';
 import { JwtUser } from './jwt.strategy';
 import { isStudioRole, USER_ROLE } from './roles';
 
@@ -59,7 +65,9 @@ export class AuthService implements OnModuleInit {
       ? await this.requirePendingInvite(inviteToken)
       : null;
 
-    const existing = await this.prisma.user.findUnique({ where: { email } });
+    const existing = await this.prisma.clientAccount.findUnique({
+      where: { email },
+    });
     if (existing) {
       throw new BadRequestException(
         'Este e-mail já tem conta. Use o link enviado por e-mail para entrar.',
@@ -112,23 +120,15 @@ export class AuthService implements OnModuleInit {
         }
       }
 
-      return tx.user.create({
+      return tx.clientAccount.create({
         data: {
           email,
           name,
           passwordHash,
-          role: 'CLIENT',
           leadId: invite?.customerId ? null : ownerId,
           customerId: invite?.customerId || null,
         },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          leadId: true,
-          customerId: true,
-        },
+        select: CLIENT_ACCOUNT_SELECT,
       });
     });
 
@@ -178,6 +178,21 @@ export class AuthService implements OnModuleInit {
 
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
+    const account = await this.prisma.clientAccount.findUnique({
+      where: { email },
+    });
+    if (!account) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+    const ok = await bcrypt.compare(dto.password, account.passwordHash);
+    if (!ok) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+    return this.issue(clientAccountToJwt(account));
+  }
+
+  async studioLogin(dto: LoginDto) {
+    const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       throw new UnauthorizedException('Credenciais inválidas');
@@ -186,21 +201,10 @@ export class AuthService implements OnModuleInit {
     if (!ok) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
-    return this.issue({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      leadId: user.leadId,
-      customerId: user.customerId,
-    });
-  }
-
-  async studioLogin(dto: LoginDto) {
-    const issued = await this.login(dto);
-    if (!isStudioRole(issued.user.role)) {
+    if (!isStudioRole(user.role)) {
       throw new ForbiddenException('Sem permissão para o studio');
     }
+    const issued = this.issue(staffToJwt(user));
     await this.activity.recordLogin(issued.user.id);
     return issued;
   }
@@ -227,7 +231,14 @@ export class AuthService implements OnModuleInit {
       return;
     }
     const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) return;
+    if (existing) {
+      if (!isStudioRole(existing.role)) {
+        this.logger.warn(
+          `STUDIO_ADMIN_EMAIL ${email} existe sem papel de studio; bootstrap ignorado`,
+        );
+      }
+      return;
+    }
     const passwordHash = await bcrypt.hash(password, 10);
     await this.prisma.user.create({
       data: {
@@ -322,6 +333,7 @@ export class AuthService implements OnModuleInit {
       sub: user.id,
       email: user.email,
       role: user.role,
+      typ: user.typ || (isStudioRole(user.role) ? JWT_TYP.STAFF : JWT_TYP.CLIENT),
     });
     return { accessToken, user };
   }

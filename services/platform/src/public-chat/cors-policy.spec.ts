@@ -73,6 +73,15 @@ describe('cors-policy', () => {
       expect(
         isPreviewOrigin('https://studio.namaocriativa.com.br', 'production'),
       ).toBe(true);
+      expect(
+        isPreviewOrigin('https://namao-studio.pages.dev', 'production'),
+      ).toBe(true);
+      expect(
+        isPreviewOrigin('https://abc.namao-studio.pages.dev', 'production'),
+      ).toBe(true);
+      expect(isPreviewOrigin('https://evil.pages.dev', 'production')).toBe(
+        false,
+      );
     } finally {
       if (prevPublic === undefined) delete process.env.NAMAO_PUBLIC_URL;
       else process.env.NAMAO_PUBLIC_URL = prevPublic;

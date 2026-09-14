@@ -8,7 +8,7 @@ import { LeadWhatsAppService } from './lead-whatsapp.service';
 describe('LeadWhatsAppService', () => {
   const prisma = {
     lead: { findUnique: jest.fn() },
-    user: { findFirst: jest.fn() },
+    clientAccount: { findFirst: jest.fn() },
   };
   const config = { get: jest.fn() };
   const evolution = {
@@ -39,7 +39,7 @@ describe('LeadWhatsAppService', () => {
     phone: '11999999999',
     whatsapp: '+5511999999999',
     publishedOrigin: 'https://firma.vercel.app',
-    users: [],
+    clientAccounts: [],
     instagramConnections: [],
   };
 
@@ -48,7 +48,7 @@ describe('LeadWhatsAppService', () => {
     config.get.mockReturnValue('http://localhost:5174');
     evolution.configured.mockReturnValue(true);
     prisma.lead.findUnique.mockResolvedValue({ ...lead });
-    prisma.user.findFirst.mockResolvedValue({ id: 'user-1' });
+    prisma.clientAccount.findFirst.mockResolvedValue({ id: 'user-1' });
     owners.kindOf.mockResolvedValue('lead');
   });
 
@@ -105,7 +105,7 @@ describe('LeadWhatsAppService', () => {
   it('preview de acesso mascara a senha', async () => {
     prisma.lead.findUnique.mockResolvedValue({
       ...lead,
-      users: [{ email: 'ana@loja.com' }],
+      clientAccounts: [{ email: 'ana@loja.com' }],
     });
     const preview = await service.preview('lead-1', 'credentials');
     expect(preview.text).toContain('••••••••');
@@ -180,7 +180,7 @@ describe('LeadWhatsAppService', () => {
   it('propaga falha da Evolution como erro HTTP', async () => {
     prisma.lead.findUnique.mockResolvedValue({
       ...lead,
-      users: [{ email: 'ana@loja.com' }],
+      clientAccounts: [{ email: 'ana@loja.com' }],
     });
     evolution.sendText.mockResolvedValue({
       skipped: false,
@@ -196,7 +196,7 @@ describe('LeadWhatsAppService', () => {
   it('envia credenciais com senha real no lugar da máscara', async () => {
     prisma.lead.findUnique.mockResolvedValue({
       ...lead,
-      users: [{ email: 'ana@loja.com' }],
+      clientAccounts: [{ email: 'ana@loja.com' }],
     });
     accounts.resetPassword.mockResolvedValue({
       email: 'ana@loja.com',

@@ -59,6 +59,11 @@ export function buildRuntimeEnvs(opts: {
   const studioPassword = process.env.STUDIO_ADMIN_PASSWORD?.trim();
   if (studioPassword) envs.STUDIO_ADMIN_PASSWORD = studioPassword;
 
+  const resendKey = process.env.RESEND_API_KEY?.trim();
+  if (resendKey) envs.RESEND_API_KEY = resendKey;
+  const resendFrom = process.env.RESEND_FROM?.trim();
+  if (resendFrom) envs.RESEND_FROM = resendFrom;
+
   return envs;
 }
 

@@ -61,12 +61,51 @@ describe('StudioUsersService', () => {
     );
   });
 
-  it('rejeita e-mail já cadastrado', async () => {
-    prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+  it('rejeita e-mail que já tem acesso ao studio', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'u1',
+      email: 'ana@namao.local',
+      name: 'Ana',
+      role: USER_ROLE.OPERATOR,
+      passwordHash: 'hash',
+    });
     await expect(
       service.create({ email: 'ana@namao.local' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toThrow(/já tem acesso ao studio/);
     expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('cria OPERATOR mesmo se o e-mail já existir no portal', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue({
+      ...created,
+      email: 'miguellsz553@gmail.com',
+      name: 'Miguellsz553',
+    });
+    const result = await service.create({ email: 'miguellsz553@gmail.com' });
+    expect(result.role).toBe(USER_ROLE.OPERATOR);
+    expect(result).not.toHaveProperty('password');
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          email: 'miguellsz553@gmail.com',
+          name: 'Miguellsz553',
+          role: USER_ROLE.OPERATOR,
+        }),
+      }),
+    );
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(mail.sendStudioWelcome).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'miguellsz553@gmail.com',
+        email: 'miguellsz553@gmail.com',
+        kind: 'welcome',
+        loginUrl: 'http://localhost:5173/login',
+      }),
+    );
+    const password = mail.sendStudioWelcome.mock.calls[0][0].password as string;
+    expect(password.length).toBeGreaterThanOrEqual(8);
   });
 
   it('cria OPERATOR, gera senha e envia convite', async () => {
@@ -132,13 +171,8 @@ describe('StudioUsersService', () => {
     );
   });
 
-  it('não encontra CLIENT', async () => {
-    prisma.user.findUnique.mockResolvedValue({
-      id: 'c1',
-      email: 'cli@loja.com',
-      name: 'Cli',
-      role: USER_ROLE.CLIENT,
-    });
+  it('não encontra conta que não é staff', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
     await expect(service.resetPassword('c1')).rejects.toBeInstanceOf(
       NotFoundException,
     );

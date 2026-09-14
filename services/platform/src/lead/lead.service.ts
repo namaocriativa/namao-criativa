@@ -13,7 +13,7 @@ import {
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
-import { STUDIO_CREATOR_SELECT } from '../owner/owner.util';
+import { STUDIO_CREATOR_SELECT, withPortalUsers } from '../owner/owner.util';
 
 export type LeadUploadFile = {
   buffer?: Buffer;
@@ -71,8 +71,8 @@ export class LeadService {
         },
         createdBy: { select: STUDIO_CREATOR_SELECT },
         studioShares: { select: { userId: true } },
-        users: {
-          select: { id: true, email: true, name: true, role: true, createdAt: true },
+        clientAccounts: {
+          select: { id: true, email: true, name: true, createdAt: true },
         },
         invites: {
           orderBy: { createdAt: 'desc' },
@@ -102,9 +102,9 @@ export class LeadService {
     }
 
     if (actor) {
-      return this.access.present(actor, lead);
+      return withPortalUsers(this.access.present(actor, lead));
     }
-    return lead;
+    return withPortalUsers(lead);
   }
 
   async deleteById(id: string) {

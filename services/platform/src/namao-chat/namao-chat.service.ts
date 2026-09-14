@@ -12,6 +12,10 @@ import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { AuthService } from '../auth/auth.service';
+import {
+  CLIENT_ACCOUNT_SELECT,
+  clientAccountToJwt,
+} from '../auth/identity';
 import { cookieJwtToken } from '../auth/jwt-cookie';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { namaoWhatsAppUrl } from '../mail/site-introduction-email';
@@ -50,7 +54,7 @@ type ChatRow = {
   id: string;
   leadId: string | null;
   customerId: string | null;
-  userId: string | null;
+  clientAccountId: string | null;
   channel: string;
   tokenHash: string;
   expiresAt: Date;
@@ -135,7 +139,7 @@ export class NamaoChatService {
     const existingToken = this.bearerToken(req);
     if (existingToken && !isJwtShape(existingToken)) {
       const existing = await this.findByToken(existingToken);
-      if (existing && this.isUsable(existing) && !existing.userId) {
+      if (existing && this.isUsable(existing) && !existing.clientAccountId) {
         return this.sessionPayload(existing, null, existingToken);
       }
     }
@@ -339,14 +343,14 @@ export class NamaoChatService {
       this.logger.warn(`namao chat register: ${message}`);
       return `Não consegui criar a conta agora: ${message} Se você já tem acesso, entre em /login.html.`;
     }
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.clientAccount.findUnique({
       where: { email: slots.email },
       select: { id: true, leadId: true, customerId: true },
     });
     await this.prisma.chatSession.update({
       where: { id: session.id },
       data: {
-        userId: user?.id || null,
+        clientAccountId: user?.id || null,
         leadId: user?.leadId || session.leadId,
         customerId: user?.customerId || session.customerId,
         metadata: {
@@ -407,7 +411,7 @@ export class NamaoChatService {
     await this.prisma.chatSession.create({
       data: {
         id: sessionId,
-        userId: user?.id || null,
+        clientAccountId: user?.id || null,
         leadId: user?.leadId || null,
         customerId: user?.customerId || null,
         channel: CHAT_CHANNEL_NAMAO,
@@ -441,12 +445,12 @@ export class NamaoChatService {
     if (!guestToken) return;
     const guest = await this.findByToken(guestToken);
     if (!guest || guest.channel !== CHAT_CHANNEL_NAMAO) return;
-    if (guest.userId && guest.userId !== user.id) return;
+    if (guest.clientAccountId && guest.clientAccountId !== user.id) return;
     await this.prisma.chatSession.update({
       where: { id: guest.id },
       data: {
         status: 'claimed',
-        userId: user.id,
+        clientAccountId: user.id,
         leadId: user.leadId,
         customerId: user.customerId,
         metadata: {
@@ -461,7 +465,7 @@ export class NamaoChatService {
   private async findUserSession(userId: string) {
     const sessions = await this.prisma.chatSession.findMany({
       where: {
-        userId,
+        clientAccountId: userId,
         channel: CHAT_CHANNEL_NAMAO,
         status: 'active',
       },
@@ -555,17 +559,11 @@ export class NamaoChatService {
       const payload = this.jwt.verify<{ sub?: string }>(token);
       const id = String(payload?.sub || '').trim();
       if (!id) return null;
-      return this.prisma.user.findUnique({
+      const account = await this.prisma.clientAccount.findUnique({
         where: { id },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          leadId: true,
-          customerId: true,
-        },
+        select: CLIENT_ACCOUNT_SELECT,
       });
+      return account ? clientAccountToJwt(account) : null;
     } catch {
       return null;
     }
@@ -603,7 +601,7 @@ function sessionKind(session: ChatRow): 'guest' | 'auth' {
   if (meta.kind === 'auth' || meta.kind === 'guest') return meta.kind;
   const slots = parseSlots(meta.slots);
   if (slots.name || slots.email || slots.instagram) return 'guest';
-  return session.userId ? 'auth' : 'guest';
+  return session.clientAccountId ? 'auth' : 'guest';
 }
 
 function isGuestSignupTranscript(

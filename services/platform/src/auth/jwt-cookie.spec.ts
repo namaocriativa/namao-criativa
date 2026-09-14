@@ -65,12 +65,25 @@ describe('cookie-origin', () => {
   };
 
   it('lista origens do studio', () => {
+    expect(allowedOriginsForCookie('studio-cookie', studioEnv)).toEqual(
+      expect.arrayContaining([
+        'https://studio.namaocriativa.com.br',
+        'https://namao-studio.pages.dev',
+        'http://localhost:5173',
+      ]),
+    );
+  });
+
+  it('aceita lista de origens no NAMAO_STUDIO_URL', () => {
     expect(
-      allowedOriginsForCookie('studio-cookie', studioEnv),
+      allowedOriginsForCookie('studio-cookie', {
+        studioUrl:
+          'https://studio.namaocriativa.com.br, https://studio.example.dev',
+      }),
     ).toEqual(
       expect.arrayContaining([
         'https://studio.namaocriativa.com.br',
-        'http://localhost:5173',
+        'https://studio.example.dev',
       ]),
     );
   });
@@ -166,6 +179,78 @@ describe('cookie-origin', () => {
         studioEnv,
       ),
     ).not.toThrow();
+  });
+
+  it('em produção aceita o pages.dev do studio e rejeita o do website', () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      expect(() =>
+        assertCookieOrigin(
+          {
+            method: 'GET',
+            headers: { origin: 'https://namao-studio.pages.dev' },
+          },
+          'studio-cookie',
+          studioEnv,
+        ),
+      ).not.toThrow();
+      expect(() =>
+        assertCookieOrigin(
+          {
+            method: 'GET',
+            headers: {
+              origin: 'https://preview.namao-studio.pages.dev',
+            },
+          },
+          'studio-cookie',
+          studioEnv,
+        ),
+      ).not.toThrow();
+      expect(() =>
+        assertCookieOrigin(
+          {
+            method: 'GET',
+            headers: { origin: 'https://namao-website.pages.dev' },
+          },
+          'studio-cookie',
+          studioEnv,
+        ),
+      ).toThrow(ForbiddenException);
+      expect(() =>
+        assertCookieOrigin(
+          {
+            method: 'GET',
+            headers: { origin: 'https://evil.pages.dev' },
+          },
+          'studio-cookie',
+          studioEnv,
+        ),
+      ).toThrow(ForbiddenException);
+    } finally {
+      if (prev === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prev;
+    }
+  });
+
+  it('aceita o domínio canônico do studio mesmo sem NAMAO_STUDIO_URL', () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      expect(() =>
+        assertCookieOrigin(
+          {
+            method: 'GET',
+            headers: { origin: 'https://studio.namaocriativa.com.br' },
+          },
+          'studio-cookie',
+          { studioUrl: null, publicUrl: 'https://namaocriativa.com.br' },
+        ),
+      ).not.toThrow();
+    } finally {
+      if (prev === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prev;
+    }
   });
 
   it('lê origin do Referer quando Origin falta', () => {

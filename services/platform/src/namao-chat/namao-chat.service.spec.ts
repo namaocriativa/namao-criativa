@@ -48,7 +48,7 @@ function prismaMock() {
     chatEvent: {
       create: jest.fn().mockResolvedValue({}),
     },
-    user: {
+    clientAccount: {
       findUnique: jest.fn(),
     },
   };
@@ -59,7 +59,7 @@ function guestSession(overrides: Record<string, unknown> = {}) {
     id: 'sess_g',
     leadId: null,
     customerId: null,
-    userId: null,
+    clientAccountId: null,
     channel: 'namao',
     tokenHash: 'hash',
     expiresAt: new Date(Date.now() + 86_400_000),
@@ -142,7 +142,7 @@ describe('NamaoChatService', () => {
     expect(prisma.chatSession.create).toHaveBeenCalled();
     const data = prisma.chatSession.create.mock.calls[0][0].data;
     expect(data.channel).toBe('namao');
-    expect(data.userId).toBeNull();
+    expect(data.clientAccountId).toBeNull();
     expect(prisma.chatMessage.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -217,7 +217,7 @@ describe('NamaoChatService', () => {
         },
       }),
     );
-    prisma.user.findUnique.mockResolvedValue({
+    prisma.clientAccount.findUnique.mockResolvedValue({
       id: 'u1',
       leadId: 'lead1',
       customerId: null,
@@ -270,7 +270,7 @@ describe('NamaoChatService', () => {
         },
       }),
     );
-    prisma.user.findUnique.mockResolvedValue({
+    prisma.clientAccount.findUnique.mockResolvedValue({
       id: 'u1',
       leadId: 'lead1',
       customerId: null,
@@ -331,7 +331,7 @@ describe('NamaoChatService', () => {
     const prisma = prismaMock();
     const leftover = guestSession({
       id: 'sess_g',
-      userId: 'u1',
+      clientAccountId: 'u1',
       metadata: {
         slots: { name: 'Carla Mendes' },
         registered: true,
@@ -341,7 +341,7 @@ describe('NamaoChatService', () => {
     prisma.chatSession.findUniqueOrThrow.mockResolvedValue(
       guestSession({
         id: 'sess_auth',
-        userId: 'u1',
+        clientAccountId: 'u1',
         metadata: { kind: 'auth', registered: true, slots: {} },
       }),
     );
@@ -353,7 +353,7 @@ describe('NamaoChatService', () => {
         createdAt: new Date(),
       },
     ]);
-    prisma.user.findUnique.mockResolvedValue({
+    prisma.clientAccount.findUnique.mockResolvedValue({
       id: 'u1',
       email: 'carla@loja.com',
       name: 'Carla Mendes',
@@ -385,7 +385,7 @@ describe('NamaoChatService', () => {
     const prisma = prismaMock();
     const polluted = guestSession({
       id: 'sess_auth',
-      userId: 'u1',
+      clientAccountId: 'u1',
       metadata: { kind: 'auth', registered: true, slots: {} },
     });
     prisma.chatSession.findMany.mockResolvedValue([polluted]);
@@ -415,11 +415,11 @@ describe('NamaoChatService', () => {
     prisma.chatSession.findUniqueOrThrow.mockResolvedValue(
       guestSession({
         id: 'sess_new',
-        userId: 'u1',
+        clientAccountId: 'u1',
         metadata: { kind: 'auth', registered: true, slots: {} },
       }),
     );
-    prisma.user.findUnique.mockResolvedValue({
+    prisma.clientAccount.findUnique.mockResolvedValue({
       id: 'u1',
       email: 'carla@loja.com',
       name: 'Carla Mendes',
@@ -452,7 +452,7 @@ describe('NamaoChatService', () => {
     prisma.chatSession.findUniqueOrThrow.mockResolvedValue(
       guestSession({
         id: 'sess_cookie',
-        userId: 'u1',
+        clientAccountId: 'u1',
         metadata: { kind: 'auth', registered: true, slots: {} },
       }),
     );
@@ -464,7 +464,7 @@ describe('NamaoChatService', () => {
         createdAt: new Date(),
       },
     ]);
-    prisma.user.findUnique.mockResolvedValue({
+    prisma.clientAccount.findUnique.mockResolvedValue({
       id: 'u1',
       email: 'carla@loja.com',
       name: 'Carla Mendes',
@@ -483,6 +483,6 @@ describe('NamaoChatService', () => {
       },
     } as never);
     expect(result.mode).toBe('auth');
-    expect(prisma.user.findUnique).toHaveBeenCalled();
+    expect(prisma.clientAccount.findUnique).toHaveBeenCalled();
   });
 });

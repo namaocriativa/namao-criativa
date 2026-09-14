@@ -113,7 +113,7 @@ export class ConvertToCustomerService {
         where: { leadId },
         data: reassign,
       });
-      await tx.user.updateMany({
+      await tx.clientAccount.updateMany({
         where: { leadId },
         data: reassign,
       });

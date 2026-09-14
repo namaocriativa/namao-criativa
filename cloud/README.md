@@ -251,6 +251,8 @@ npx wrangler pages deploy apps/studio/dist --project-name=namao-studio
 | `STUDIO_ADMIN_PASSWORD` | não | Senha do bootstrap (mín. 8) |
 | `GA4_PROPERTY_ID` | não | dashboard de estatísticas do cliente |
 | `GA4_SERVICE_ACCOUNT_JSON` | não | service account com Viewer na propriedade GA4 |
+| `RESEND_API_KEY` | não | convites do studio e e-mails de acesso |
+| `RESEND_FROM` | não | remetente verificado no Resend |
 
 Health check Coolify: `GET /health` na porta `3000`.
 

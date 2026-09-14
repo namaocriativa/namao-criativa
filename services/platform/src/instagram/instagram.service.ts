@@ -76,7 +76,9 @@ export class InstagramService {
       return fail('invalid_state');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.clientAccount.findUnique({
+      where: { id: userId },
+    });
     const ownerId = user ? jwtOwnerId(user) : null;
     if (!user || !ownerId) {
       return fail('user_without_lead');
@@ -97,7 +99,7 @@ export class InstagramService {
         await this.prisma.instagramConnection.update({
           where: { id: existing.id },
           data: {
-            userId: user.id,
+            clientAccountId: user.id,
             igUserId: account.igUserId,
             username: account.username,
             accessToken: tokens.accessToken,
@@ -107,7 +109,7 @@ export class InstagramService {
       } else {
         await this.prisma.instagramConnection.create({
           data: {
-            userId: user.id,
+            clientAccountId: user.id,
             ...ownerCreateData(kind, ownerId),
             igUserId: account.igUserId,
             username: account.username,
@@ -128,7 +130,7 @@ export class InstagramService {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: 'CLIENT',
         leadId: user.leadId,
         customerId: user.customerId,
       });

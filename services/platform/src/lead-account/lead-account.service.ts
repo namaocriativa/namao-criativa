@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { USER_ROLE } from '../auth/roles';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnerLookup } from '../owner/owner-lookup.service';
@@ -32,6 +33,14 @@ export type LeadAccountUser = {
   customerId: string | null;
 };
 
+const CLIENT_ACCOUNT_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  leadId: true,
+  customerId: true,
+} as const;
+
 @Injectable()
 export class LeadAccountService {
   constructor(
@@ -42,39 +51,25 @@ export class LeadAccountService {
   ) {}
 
   async ensureForLead(lead: LeadAccountSeed): Promise<LeadAccountUser> {
-    const existing = await this.prisma.user.findFirst({
-      where: { ...ownerWhere(lead.id), role: 'CLIENT' },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        leadId: true,
-        customerId: true,
-      },
+    const existing = await this.prisma.clientAccount.findFirst({
+      where: ownerWhere(lead.id),
+      select: CLIENT_ACCOUNT_SELECT,
     });
-    if (existing) return existing;
+    if (existing) return this.toLeadAccount(existing);
 
     const kind = await this.owners.requireKind(lead.id);
     const email = await this.resolveLoginEmail(lead);
     const passwordHash = await bcrypt.hash(generatePassword(), 10);
-    return this.prisma.user.create({
+    const created = await this.prisma.clientAccount.create({
       data: {
         email,
         name: lead.name.trim() || 'Cliente',
         passwordHash,
-        role: 'CLIENT',
         ...ownerCreateData(kind, lead.id),
       },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        leadId: true,
-        customerId: true,
-      },
+      select: CLIENT_ACCOUNT_SELECT,
     });
+    return this.toLeadAccount(created);
   }
 
   async getAccount(leadId: string) {
@@ -92,7 +87,7 @@ export class LeadAccountService {
     const lead = await this.requireLead(leadId);
     const user = await this.ensureForLead(lead);
     const password = generatePassword();
-    await this.prisma.user.update({
+    await this.prisma.clientAccount.update({
       where: { id: user.id },
       data: { passwordHash: await bcrypt.hash(password, 10) },
     });
@@ -108,7 +103,7 @@ export class LeadAccountService {
       );
     }
     const password = generatePassword();
-    await this.prisma.user.update({
+    await this.prisma.clientAccount.update({
       where: { id: user.id },
       data: { passwordHash: await bcrypt.hash(password, 10) },
     });
@@ -147,10 +142,20 @@ export class LeadAccountService {
   }
 
   private async emailAvailable(email: string): Promise<boolean> {
-    const taken = await this.prisma.user.findUnique({
+    const taken = await this.prisma.clientAccount.findUnique({
       where: { email },
       select: { id: true },
     });
     return !taken;
+  }
+
+  private toLeadAccount(account: {
+    id: string;
+    email: string;
+    name: string;
+    leadId: string | null;
+    customerId: string | null;
+  }): LeadAccountUser {
+    return { ...account, role: USER_ROLE.CLIENT };
   }
 }

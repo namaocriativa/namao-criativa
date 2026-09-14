@@ -1,6 +1,7 @@
 import {
   isSameStudioOrigin,
   isUnauthenticatedApiAllowed,
+  originForStudioApiProxy,
   pagesPrettyPath,
   safeNextPath,
 } from './proxy-policy';
@@ -127,6 +128,7 @@ export async function onRequest(context: {
   env: {
     JWT_SECRET?: string;
     STUDIO_API_ORIGIN?: string;
+    NAMAO_STUDIO_URL?: string;
     ASSETS?: { fetch: (request: Request) => Promise<Response> };
   };
 }): Promise<Response> {
@@ -171,6 +173,12 @@ export async function onRequest(context: {
     const target = new URL(pathname + url.search, `${apiOrigin}/`);
     const headers = new Headers(request.headers);
     headers.delete('host');
+    const forwardedOrigin = originForStudioApiProxy(
+      request.headers.get('origin'),
+      env.NAMAO_STUDIO_URL,
+      request.headers.get('referer'),
+    );
+    if (forwardedOrigin) headers.set('origin', forwardedOrigin);
     const init: RequestInit & { duplex?: 'half' } = {
       method: request.method,
       headers,

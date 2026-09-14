@@ -12,6 +12,51 @@ const CLIENT_LOOPBACK = [
   'http://127.0.0.1:5174',
 ];
 
+/** Cloudflare Pages project for the studio (custom domain + *.pages.dev). */
+export const STUDIO_PAGES_PROJECT = 'namao-studio';
+/** Cloudflare Pages project for the public website. */
+export const CLIENT_PAGES_PROJECT = 'namao-website';
+export const DEFAULT_STUDIO_ORIGIN = 'https://studio.namaocriativa.com.br';
+
+export function parseOriginList(value?: string | null): string[] {
+  if (!value) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of value.split(/[\s,]+/)) {
+    const normalized = normalizeOrigin(part.trim());
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+export function primaryOrigin(value?: string | null, fallback = ''): string {
+  return parseOriginList(value)[0] || fallback;
+}
+
+export function pagesProjectOrigin(project: string): string {
+  return `https://${project}.pages.dev`;
+}
+
+export function isPagesProjectOrigin(origin: string, project: string): boolean {
+  try {
+    const url = new URL(normalizeOrigin(origin));
+    if (url.protocol !== 'https:') return false;
+    const host = url.hostname.toLowerCase();
+    const apex = `${project.toLowerCase()}.pages.dev`;
+    return host === apex || host.endsWith(`.${apex}`);
+  } catch {
+    return false;
+  }
+}
+
+export function pagesProjectForCookie(
+  source: Exclude<JwtRequestSource, 'bearer'>,
+): string {
+  return source === 'studio-cookie' ? STUDIO_PAGES_PROJECT : CLIENT_PAGES_PROJECT;
+}
+
 export function isLoopbackOrigin(origin: string): boolean {
   try {
     const url = new URL(normalizeOrigin(origin));
@@ -93,11 +138,15 @@ export function allowedOriginsForCookie(
       ? env.studioUrl || process.env.NAMAO_STUDIO_URL
       : env.publicUrl || process.env.NAMAO_PUBLIC_URL;
   const extra = source === 'studio-cookie' ? STUDIO_LOOPBACK : CLIENT_LOOPBACK;
-  return withWwwAliases(
-    [configured, ...extra]
-      .map((item) => (item ? normalizeOrigin(item) : ''))
-      .filter(Boolean),
-  );
+  const firstParty =
+    source === 'studio-cookie'
+      ? [DEFAULT_STUDIO_ORIGIN, pagesProjectOrigin(STUDIO_PAGES_PROJECT)]
+      : [pagesProjectOrigin(CLIENT_PAGES_PROJECT)];
+  return withWwwAliases([
+    ...parseOriginList(configured),
+    ...firstParty,
+    ...extra,
+  ]);
 }
 
 export function assertCookieOrigin(
@@ -115,6 +164,7 @@ export function assertCookieOrigin(
   }
   const allowed = allowedOriginsForCookie(source, env);
   if (allowed.includes(origin)) return;
+  if (isPagesProjectOrigin(origin, pagesProjectForCookie(source))) return;
   if (allowDevLoopbackOrigins() && isLoopbackOrigin(origin)) return;
   throw new ForbiddenException('Origem não permitida para este cookie');
 }

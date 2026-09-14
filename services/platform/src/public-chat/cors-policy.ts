@@ -1,4 +1,12 @@
-import { withWwwAliases } from '../auth/cookie-origin';
+import {
+  CLIENT_PAGES_PROJECT,
+  DEFAULT_STUDIO_ORIGIN,
+  STUDIO_PAGES_PROJECT,
+  isPagesProjectOrigin,
+  pagesProjectOrigin,
+  parseOriginList,
+  withWwwAliases,
+} from '../auth/cookie-origin';
 
 export const PREVIEW_ORIGINS = [
   'http://localhost:5173',
@@ -30,8 +38,11 @@ export function staticCorsOrigins(
   nodeEnv: string | undefined = process.env.NODE_ENV,
 ): string[] {
   const configured = withWwwAliases([
-    process.env.NAMAO_PUBLIC_URL?.replace(/\/$/, '') || '',
-    process.env.NAMAO_STUDIO_URL?.replace(/\/$/, '') || '',
+    ...parseOriginList(process.env.NAMAO_PUBLIC_URL),
+    ...parseOriginList(process.env.NAMAO_STUDIO_URL),
+    DEFAULT_STUDIO_ORIGIN,
+    pagesProjectOrigin(STUDIO_PAGES_PROJECT),
+    pagesProjectOrigin(CLIENT_PAGES_PROJECT),
   ]);
   if (!allowLoopbackCors(nodeEnv)) return configured.filter(Boolean);
   return [...PREVIEW_ORIGINS, ...configured].filter(Boolean);
@@ -44,6 +55,12 @@ export function isPreviewOrigin(
   if (!origin) return true;
   const normalized = origin.replace(/\/$/, '');
   if (staticCorsOrigins(nodeEnv).includes(normalized)) return true;
+  if (
+    isPagesProjectOrigin(normalized, STUDIO_PAGES_PROJECT) ||
+    isPagesProjectOrigin(normalized, CLIENT_PAGES_PROJECT)
+  ) {
+    return true;
+  }
   if (!allowLoopbackCors(nodeEnv)) return false;
   return isLoopbackHttpOrigin(normalized);
 }

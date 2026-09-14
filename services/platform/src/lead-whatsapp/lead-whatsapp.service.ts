@@ -67,8 +67,8 @@ export class LeadWhatsAppService {
     const igConnected = lead.instagramConnections.length > 0;
     const siteUrl = lead.publishedOrigin?.trim() || null;
     const evolutionReady = this.evolution.configured();
-    const client = await this.prisma.user.findFirst({
-      where: { ...ownerWhere(lead.id), role: 'CLIENT' },
+    const client = await this.prisma.clientAccount.findFirst({
+      where: ownerWhere(lead.id),
       select: { id: true },
     });
 
@@ -105,7 +105,7 @@ export class LeadWhatsAppService {
     const lead = await this.requireLead(leadId);
     const to = this.phoneOf(lead) || '—';
     const evolutionReady = this.evolution.configured();
-    const hasAccount = lead.users.length > 0;
+    const hasAccount = lead.clientAccounts.length > 0;
 
     if (messageKind === 'site-introduction') {
       const siteUrl = lead.publishedOrigin?.trim() || null;
@@ -164,7 +164,7 @@ export class LeadWhatsAppService {
       };
     }
 
-    const loginEmail = lead.users[0]?.email || '—';
+    const loginEmail = lead.clientAccounts[0]?.email || '—';
     const notices = [
       this.phoneNotice(lead),
       this.evolutionNotice(evolutionReady),
@@ -246,7 +246,7 @@ export class LeadWhatsAppService {
     kind: LeadWhatsAppKind,
     phone: string,
   ) {
-    const hasAccount = lead.users.length > 0;
+    const hasAccount = lead.clientAccounts.length > 0;
     const previewRegisterUrl = this.previewRegisterUrl();
 
     if (kind === 'site-introduction') {
@@ -287,8 +287,8 @@ export class LeadWhatsAppService {
       };
     }
 
-    const client = await this.prisma.user.findFirst({
-      where: { ...ownerWhere(lead.id), role: 'CLIENT' },
+    const client = await this.prisma.clientAccount.findFirst({
+      where: ownerWhere(lead.id),
       select: { id: true },
     });
     if (!client) {
@@ -389,8 +389,7 @@ export class LeadWhatsAppService {
       phone: true,
       whatsapp: true,
       publishedOrigin: true,
-      users: {
-        where: { role: 'CLIENT' },
+      clientAccounts: {
         select: { email: true },
         take: 1,
       },

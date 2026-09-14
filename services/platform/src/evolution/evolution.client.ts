@@ -13,18 +13,32 @@ export class EvolutionClient {
 
   constructor(private readonly config: ConfigService) {}
 
+  mockEnabled(): boolean {
+    const nodeEnv =
+      this.config.get<string>('NODE_ENV')?.trim() || process.env.NODE_ENV;
+    if (nodeEnv === 'production') return false;
+    const flag = this.config.get<string>('EVOLUTION_MOCK')?.trim().toLowerCase();
+    return flag === '1' || flag === 'true';
+  }
+
   configured(): boolean {
-    return Boolean(
-      this.config.get<string>('EVOLUTION_API_URL')?.trim() &&
-        this.config.get<string>('EVOLUTION_API_KEY')?.trim() &&
-        this.config.get<string>('EVOLUTION_INSTANCE')?.trim(),
-    );
+    return this.mockEnabled() || this.hasRealConfig();
   }
 
   async sendText(opts: {
     phone: string;
     text: string;
   }): Promise<EvolutionSendResult> {
+    if (this.mockEnabled()) {
+      const number = opts.phone.replace(/\D/g, '');
+      this.logger.log(`[evolution-mock] to=${number} text=${opts.text}`);
+      return {
+        skipped: false,
+        ok: true,
+        data: { mock: true, number, text: opts.text },
+      };
+    }
+
     const base = this.config.get<string>('EVOLUTION_API_URL')?.replace(/\/$/, '');
     const key = this.config.get<string>('EVOLUTION_API_KEY')?.trim();
     const instance = this.config.get<string>('EVOLUTION_INSTANCE')?.trim();
@@ -55,5 +69,13 @@ export class EvolutionClient {
       this.logger.warn(`Evolution sendText skipped/failed: ${message}`);
       return { skipped: false, ok: false, error: message };
     }
+  }
+
+  private hasRealConfig(): boolean {
+    return Boolean(
+      this.config.get<string>('EVOLUTION_API_URL')?.trim() &&
+        this.config.get<string>('EVOLUTION_API_KEY')?.trim() &&
+        this.config.get<string>('EVOLUTION_INSTANCE')?.trim(),
+    );
   }
 }

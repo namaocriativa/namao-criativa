@@ -47,7 +47,7 @@ model Lead {
   createdBy User? @relation("LeadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   images  LeadImage[]
   sources LeadSource[]
-  users   User[]
+  clientAccounts ClientAccount[]
   invites Invite[]
   instagramConnections InstagramConnection[]
   landingJobs LandingJob[]
@@ -102,7 +102,7 @@ model Customer {
   createdBy User? @relation("CustomerCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   images  LeadImage[]
   sources LeadSource[]
-  users   User[]
+  clientAccounts ClientAccount[]
   invites Invite[]
   instagramConnections InstagramConnection[]
   landingJobs LandingJob[]
@@ -135,30 +135,30 @@ model LeadActivity {
 }
 
 model ChatSession {
-  id           String   @id
-  leadId       String?
-  customerId   String?
-  userId       String?
-  channel      String   @default("landing")
-  tokenHash    String   @unique
-  expiresAt    DateTime
-  ipHash       String
-  origin       String?
-  status       String   @default("active")
-  messageCount Int      @default(0)
-  metadata     Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id
+  leadId          String?
+  customerId      String?
+  clientAccountId String?
+  channel         String   @default("landing")
+  tokenHash       String   @unique
+  expiresAt       DateTime
+  ipHash          String
+  origin          String?
+  status          String   @default("active")
+  messageCount    Int      @default(0)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  lead     Lead?         @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  customer Customer?     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  messages ChatMessage[]
-  events   ChatEvent[]
+  lead          Lead?          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  clientAccount ClientAccount? @relation(fields: [clientAccountId], references: [id], onDelete: SetNull)
+  messages      ChatMessage[]
+  events        ChatEvent[]
 
   @@index([leadId])
   @@index([customerId])
-  @@index([userId, channel])
+  @@index([clientAccountId, channel])
   @@index([channel])
   @@index([expiresAt])
 }
@@ -240,25 +240,36 @@ model LandingGeneration {
   @@index([category])
 }
 
+/// Staff do Studio (`ADMIN` | `OPERATOR`). Login do portal é `ClientAccount`.
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
   name         String
-  role         String   @default("CLIENT")
+  role         String   @default("OPERATOR")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  studioActivities StudioUserActivity[]
+  createdLeads     Lead[]               @relation("LeadCreatedBy")
+  createdCustomers Customer[]           @relation("CustomerCreatedBy")
+  studioLeadShares StudioLeadShare[]
+}
+
+model ClientAccount {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
   leadId       String?
   customerId   String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lead                 Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer             Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
   instagramConnections InstagramConnection[]
-  chatSessions ChatSession[]
-  studioActivities StudioUserActivity[]
-  createdLeads Lead[] @relation("LeadCreatedBy")
-  createdCustomers Customer[] @relation("CustomerCreatedBy")
-  studioLeadShares StudioLeadShare[]
+  chatSessions         ChatSession[]
 
   @@index([leadId])
   @@index([customerId])
@@ -317,25 +328,25 @@ model Invite {
 }
 
 model InstagramConnection {
-  id             String    @id @default(cuid())
-  userId         String
-  leadId         String?
-  customerId     String?
-  igUserId       String
-  username       String?
-  accessToken    String
-  tokenExpiresAt DateTime?
-  scopes         String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  clientAccountId String
+  leadId          String?
+  customerId      String?
+  igUserId        String
+  username        String?
+  accessToken     String
+  tokenExpiresAt  DateTime?
+  scopes          String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  clientAccount ClientAccount @relation(fields: [clientAccountId], references: [id], onDelete: Cascade)
+  lead          Lead?         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer      Customer?     @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([leadId])
   @@unique([customerId])
-  @@index([userId])
+  @@index([clientAccountId])
 }
 
 model LeadSource {

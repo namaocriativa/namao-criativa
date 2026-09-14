@@ -129,7 +129,7 @@ export class LeadMailService {
     if (emailKind === 'instagram-permission') {
       const to = this.instagramRecipient(lead);
       const igConnected = lead.instagramConnections.length > 0;
-      const hasAccount = lead.users.length > 0;
+      const hasAccount = lead.clientAccounts.length > 0;
       const actionUrl = hasAccount
         ? `${this.publicBaseUrl()}/conectar.html`
         : `${this.publicBaseUrl()}/register.html?invite=preview`;
@@ -234,13 +234,15 @@ export class LeadMailService {
       name: string;
       email: string | null;
       publishedOrigin: string | null;
-      users: Array<{ email: string }>;
+      clientAccounts: Array<{ email: string }>;
     },
     logoUrl: string,
   ) {
     const to = this.instagramRecipient(lead);
     const siteUrl = lead.publishedOrigin?.trim() || null;
-    const hasAccount = lead.users.some((user) => isSendableEmail(user.email));
+    const hasAccount = lead.clientAccounts.some((user) =>
+      isSendableEmail(user.email),
+    );
     const registerUrl = hasAccount
       ? publicLoginUrl(this.config.get('NAMAO_PUBLIC_URL'))
       : `${this.publicBaseUrl()}/register.html?invite=preview`;
@@ -300,10 +302,11 @@ export class LeadMailService {
 
   private instagramRecipient(lead: {
     email: string | null;
-    users: Array<{ email: string }>;
+    clientAccounts: Array<{ email: string }>;
   }): string | null {
     const to =
-      normalizeEmail(lead.email) || normalizeEmail(lead.users[0]?.email);
+      normalizeEmail(lead.email) ||
+      normalizeEmail(lead.clientAccounts[0]?.email);
     return to && isSendableEmail(to) ? to : null;
   }
 
@@ -311,8 +314,8 @@ export class LeadMailService {
     id: string;
     email: string | null;
   }) {
-    const user = await this.prisma.user.findFirst({
-      where: { ...ownerWhere(lead.id), role: 'CLIENT' },
+    const user = await this.prisma.clientAccount.findFirst({
+      where: ownerWhere(lead.id),
       select: { email: true },
     });
     const email = normalizeEmail(user?.email) || normalizeEmail(lead.email);
@@ -328,8 +331,7 @@ export class LeadMailService {
       name: true,
       email: true,
       publishedOrigin: true,
-      users: {
-        where: { role: 'CLIENT' },
+      clientAccounts: {
         select: { email: true },
         take: 1,
       },

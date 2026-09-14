@@ -4,7 +4,7 @@ import { LeadMailService } from './lead-mail.service';
 describe('LeadMailService', () => {
   const prisma = {
     lead: { findUnique: jest.fn() },
-    user: { findFirst: jest.fn() },
+    clientAccount: { findFirst: jest.fn() },
   };
   const config = { get: jest.fn() };
   const invites = {
@@ -37,13 +37,13 @@ describe('LeadMailService', () => {
       loginUrl: 'http://localhost:5174/login.html',
     });
     invites.namaoWhatsApp.mockReturnValue('+5519997306695');
-    prisma.user.findFirst.mockResolvedValue({ email: 'ana@loja.com' });
+    prisma.clientAccount.findFirst.mockResolvedValue({ email: 'ana@loja.com' });
     prisma.lead.findUnique.mockResolvedValue({
       id: 'lead-1',
       name: 'Firma',
       email: 'contato@firma.com',
       publishedOrigin: 'https://firma.vercel.app',
-      users: [],
+      clientAccounts: [],
       instagramConnections: [],
     });
     owners.kindOf.mockResolvedValue('lead');
@@ -68,7 +68,7 @@ describe('LeadMailService', () => {
       name: 'Firma',
       email: 'contato@firma.com',
       publishedOrigin: 'https://firma.vercel.app',
-      users: [],
+      clientAccounts: [],
       instagramConnections: [{ username: 'firma.lab' }],
     });
     const result = await service.list('lead-1');
@@ -91,7 +91,7 @@ describe('LeadMailService', () => {
       name: 'Firma',
       email: 'contato@firma.com',
       publishedOrigin: null,
-      users: [],
+      clientAccounts: [],
       instagramConnections: [],
     });
     const result = await service.list('lead-1');
@@ -117,7 +117,7 @@ describe('LeadMailService', () => {
       name: 'Firma',
       email: 'contato@firma.com',
       publishedOrigin: null,
-      users: [],
+      clientAccounts: [],
       instagramConnections: [],
     });
     const preview = await service.preview('lead-1', 'site-introduction');
@@ -139,7 +139,7 @@ describe('LeadMailService', () => {
       id: 'lead-1',
       name: 'Firma',
       email: null,
-      users: [],
+      clientAccounts: [],
       instagramConnections: [],
     });
     const preview = await service.preview('lead-1', 'instagram-permission');

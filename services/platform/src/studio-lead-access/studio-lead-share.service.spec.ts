@@ -44,7 +44,7 @@ describe('StudioLeadShareService', () => {
     expect(prisma.studioLeadShare.create).not.toHaveBeenCalled();
   });
 
-  it('POST recusa CLIENT e o próprio usuário', async () => {
+  it('POST recusa o próprio usuário e quem não é staff', async () => {
     access.assertCanManageShares.mockResolvedValue({
       kind: 'lead',
       id: 'lead-1',
@@ -55,10 +55,7 @@ describe('StudioLeadShareService', () => {
       service.add(actor('op-1'), 'lead-1', 'op-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    prisma.user.findUnique.mockResolvedValue({
-      id: 'client-1',
-      role: USER_ROLE.CLIENT,
-    });
+    prisma.user.findUnique.mockResolvedValue(null);
     await expect(
       service.add(actor('op-1'), 'lead-1', 'client-1'),
     ).rejects.toBeInstanceOf(BadRequestException);

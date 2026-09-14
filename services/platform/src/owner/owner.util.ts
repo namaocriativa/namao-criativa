@@ -48,12 +48,11 @@ export const PROFILE_DETAIL_INCLUDE = {
   studioShares: {
     select: { userId: true },
   },
-  users: {
+  clientAccounts: {
     select: {
       id: true,
       email: true,
       name: true,
-      role: true,
       createdAt: true,
     },
   },
@@ -93,6 +92,23 @@ export const PROFILE_LIST_INCLUDE = {
     select: { userId: true },
   },
 };
+
+export function withPortalUsers<
+  T extends {
+    clientAccounts?: ReadonlyArray<{
+      id: string;
+      email: string;
+      name: string;
+      createdAt?: Date | string;
+    }>;
+  },
+>(row: T) {
+  const accounts = row.clientAccounts || [];
+  return {
+    ...row,
+    users: accounts.map((account) => ({ ...account, role: 'CLIENT' as const })),
+  };
+}
 
 export const PROFILE_SCALAR_SELECT = {
   id: true,

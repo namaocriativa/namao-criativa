@@ -68,6 +68,9 @@ leads/*/.scaffold-ok
 .venv
 services/platform/crawler/.venv
 
+# Dev local sem Docker (Postgres/Redis isolados)
+.local/
+
 # temp directory
 .temp
 .tmp

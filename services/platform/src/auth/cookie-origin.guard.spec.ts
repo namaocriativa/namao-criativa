@@ -59,4 +59,24 @@ describe('CookieOriginGuard', () => {
       ),
     ).toThrow(/Origem não permitida/);
   });
+
+  it('em rota protegida aceita cookie do studio vindo do pages.dev', () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    config.get.mockImplementation((key: string) =>
+      key === 'NAMAO_STUDIO_URL'
+        ? 'https://studio.namaocriativa.com.br'
+        : 'https://namaocriativa.com.br',
+    );
+    expect(
+      guard.canActivate(
+        mockContext({
+          method: 'GET',
+          headers: {
+            origin: 'https://namao-studio.pages.dev',
+            cookie: 'namao_studio_token=studio-token',
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
 });

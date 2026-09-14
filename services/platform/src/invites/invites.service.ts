@@ -171,8 +171,7 @@ export class InvitesService {
       email: true,
       phone: true,
       whatsapp: true,
-      users: {
-        where: { role: 'CLIENT' },
+      clientAccounts: {
         select: { email: true },
         take: 1,
       },
@@ -189,7 +188,7 @@ export class InvitesService {
 
     const to =
       normalizeEmail(lead.email) ||
-      normalizeEmail(lead.users[0]?.email) ||
+      normalizeEmail(lead.clientAccounts[0]?.email) ||
       null;
     if (!to || !isSendableEmail(to)) {
       throw new BadRequestException(
@@ -197,7 +196,7 @@ export class InvitesService {
       );
     }
 
-    const hasAccount = lead.users.length > 0;
+    const hasAccount = lead.clientAccounts.length > 0;
     let inviteId: string | null = null;
     let actionUrl: string;
 
@@ -244,8 +243,7 @@ export class InvitesService {
       phone: true,
       whatsapp: true,
       publishedOrigin: true,
-      users: {
-        where: { role: 'CLIENT' },
+      clientAccounts: {
         select: { email: true },
         take: 1,
       },
@@ -253,7 +251,7 @@ export class InvitesService {
 
     const to =
       normalizeEmail(lead.email) ||
-      normalizeEmail(lead.users[0]?.email) ||
+      normalizeEmail(lead.clientAccounts[0]?.email) ||
       null;
     if (!to || !isSendableEmail(to)) {
       throw new BadRequestException(
@@ -268,7 +266,9 @@ export class InvitesService {
       );
     }
 
-    const hasAccount = lead.users.some((user) => isSendableEmail(user.email));
+    const hasAccount = lead.clientAccounts.some((user) =>
+      isSendableEmail(user.email),
+    );
     let inviteId: string | null = null;
     let registerUrl: string;
 

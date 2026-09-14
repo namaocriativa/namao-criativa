@@ -3,7 +3,7 @@ import { LeadAccountService } from './lead-account.service';
 
 describe('LeadAccountService', () => {
   const prisma = {
-    user: {
+    clientAccount: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
@@ -43,13 +43,13 @@ describe('LeadAccountService', () => {
     });
   });
 
-  it('não recria senha se o lead já tem CLIENT', async () => {
-    prisma.user.findFirst.mockResolvedValue({
+  it('não recria senha se o lead já tem login no portal', async () => {
+    prisma.clientAccount.findFirst.mockResolvedValue({
       id: 'u1',
       email: 'ana@loja.com',
       name: 'Ana',
-      role: 'CLIENT',
       leadId: 'lead-1',
+      customerId: null,
     });
 
     const user = await service.ensureForLead({
@@ -59,18 +59,19 @@ describe('LeadAccountService', () => {
     });
 
     expect(user.email).toBe('ana@loja.com');
-    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(user.role).toBe('CLIENT');
+    expect(prisma.clientAccount.create).not.toHaveBeenCalled();
   });
 
-  it('cria user com e-mail do lead', async () => {
-    prisma.user.findFirst.mockResolvedValue(null);
-    prisma.user.findUnique.mockResolvedValue(null);
-    prisma.user.create.mockResolvedValue({
+  it('cria ClientAccount com e-mail do lead', async () => {
+    prisma.clientAccount.findFirst.mockResolvedValue(null);
+    prisma.clientAccount.findUnique.mockResolvedValue(null);
+    prisma.clientAccount.create.mockResolvedValue({
       id: 'u2',
       email: 'ana@loja.com',
       name: 'Firma',
-      role: 'CLIENT',
       leadId: 'lead-1',
+      customerId: null,
     });
 
     await service.ensureForLead({
@@ -79,15 +80,17 @@ describe('LeadAccountService', () => {
       email: 'ana@loja.com',
     });
 
-    expect(prisma.user.create).toHaveBeenCalledWith(
+    expect(prisma.clientAccount.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           email: 'ana@loja.com',
-          role: 'CLIENT',
           leadId: 'lead-1',
           customerId: null,
         }),
       }),
+    );
+    expect(prisma.clientAccount.create.mock.calls[0][0].data).not.toHaveProperty(
+      'role',
     );
   });
 
@@ -104,12 +107,12 @@ describe('LeadAccountService', () => {
       name: 'Firma',
       email: null,
     });
-    prisma.user.findFirst.mockResolvedValue({
+    prisma.clientAccount.findFirst.mockResolvedValue({
       id: 'u1',
       email: 'lead+abc@clientes.namao.local',
       name: 'Firma',
-      role: 'CLIENT',
       leadId: 'lead-1',
+      customerId: null,
     });
 
     await expect(service.sendPassword('lead-1')).rejects.toBeInstanceOf(

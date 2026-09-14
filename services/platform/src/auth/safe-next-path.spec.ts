@@ -32,6 +32,50 @@ function isSameStudioOrigin(
   }
 }
 
+const DEFAULT_CANONICAL_STUDIO_ORIGIN =
+  'https://studio.namaocriativa.com.br';
+
+function isStudioPagesDevHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === 'namao-studio.pages.dev' ||
+    host.endsWith('.namao-studio.pages.dev')
+  );
+}
+
+function originFromReferer(refererHeader?: string | null): string | null {
+  if (!refererHeader?.trim()) return null;
+  try {
+    return new URL(refererHeader.trim()).origin;
+  } catch {
+    return null;
+  }
+}
+
+function canonicalStudioOrigin(canonicalStudioUrl?: string | null): string {
+  const first = (canonicalStudioUrl || DEFAULT_CANONICAL_STUDIO_ORIGIN)
+    .split(/[\s,]+/)
+    .map((item) => item.trim().replace(/\/$/, ''))
+    .find(Boolean);
+  return first || DEFAULT_CANONICAL_STUDIO_ORIGIN;
+}
+
+function originForStudioApiProxy(
+  originHeader: string | null,
+  canonicalStudioUrl?: string | null,
+  refererHeader?: string | null,
+): string | null {
+  const raw = originHeader?.trim() || originFromReferer(refererHeader);
+  if (!raw) return originHeader;
+  try {
+    const origin = new URL(raw).origin;
+    if (!isStudioPagesDevHost(new URL(origin).hostname)) return origin;
+    return new URL(canonicalStudioOrigin(canonicalStudioUrl)).origin;
+  } catch {
+    return originHeader;
+  }
+}
+
 describe('studio proxy policy', () => {
   it('aceita path relativo', () => {
     expect(safeNextPath('/leads')).toBe('/leads');
@@ -76,5 +120,33 @@ describe('studio proxy policy', () => {
         null,
       ),
     ).toBe(true);
+  });
+
+  it('reescreve pages.dev para a origem canônica do studio', () => {
+    expect(
+      originForStudioApiProxy('https://namao-studio.pages.dev', null),
+    ).toBe('https://studio.namaocriativa.com.br');
+    expect(
+      originForStudioApiProxy(
+        'https://preview.namao-studio.pages.dev',
+        'https://studio.example.com',
+      ),
+    ).toBe('https://studio.example.com');
+    expect(
+      originForStudioApiProxy(
+        null,
+        null,
+        'https://namao-studio.pages.dev/config/llm',
+      ),
+    ).toBe('https://studio.namaocriativa.com.br');
+    expect(
+      originForStudioApiProxy(
+        'https://studio.namaocriativa.com.br',
+        null,
+      ),
+    ).toBe('https://studio.namaocriativa.com.br');
+    expect(originForStudioApiProxy('https://evil.pages.dev', null)).toBe(
+      'https://evil.pages.dev',
+    );
   });
 });

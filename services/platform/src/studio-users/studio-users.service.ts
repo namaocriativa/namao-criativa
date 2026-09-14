@@ -8,6 +8,7 @@ import * as bcrypt from 'bcryptjs';
 import { generatePassword } from '../lead-account/lead-account.util';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { primaryOrigin } from '../auth/cookie-origin';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { isStudioRole, USER_ROLE } from '../auth/roles';
 import { MailService } from '../mail/mail.service';
@@ -54,9 +55,12 @@ export class StudioUsersService {
 
   async create(dto: CreateStudioUserDto) {
     const email = dto.email.trim().toLowerCase();
-    const existing = await this.prisma.user.findUnique({ where: { email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, role: true },
+    });
     if (existing) {
-      throw new BadRequestException('Este e-mail já tem conta');
+      throw new BadRequestException('Este e-mail já tem acesso ao studio');
     }
     const name = nameFromEmail(email);
     const password = generatePassword();
@@ -161,9 +165,10 @@ export class StudioUsersService {
   }
 
   private studioLoginUrl() {
-    const origin = (
-      this.config.get<string>('NAMAO_STUDIO_URL') || 'http://localhost:5173'
-    ).replace(/\/$/, '');
+    const origin = primaryOrigin(
+      this.config.get<string>('NAMAO_STUDIO_URL'),
+      'http://localhost:5173',
+    );
     return `${origin}/login`;
   }
 

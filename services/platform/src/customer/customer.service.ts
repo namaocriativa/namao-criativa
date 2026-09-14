@@ -12,7 +12,7 @@ import {
   StorageService,
   UPLOAD_MIME_TYPES,
 } from '../storage/storage.service';
-import { PROFILE_DETAIL_INCLUDE, PROFILE_LIST_INCLUDE } from '../owner/owner.util';
+import { PROFILE_DETAIL_INCLUDE, PROFILE_LIST_INCLUDE, withPortalUsers } from '../owner/owner.util';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 
@@ -48,9 +48,9 @@ export class CustomerService {
       throw new NotFoundException(`Customer ${id} not found`);
     }
     if (actor) {
-      return this.access.present(actor, customer);
+      return withPortalUsers(this.access.present(actor, customer));
     }
-    return customer;
+    return withPortalUsers(customer);
   }
 
   async deleteById(id: string) {

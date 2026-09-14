@@ -7,7 +7,7 @@ describe('ConvertToCustomerService', () => {
     customer: { create: jest.fn() },
     leadImage: { updateMany: jest.fn() },
     leadSource: { updateMany: jest.fn() },
-    user: { updateMany: jest.fn() },
+    clientAccount: { updateMany: jest.fn() },
     invite: { updateMany: jest.fn() },
     instagramConnection: { updateMany: jest.fn() },
     landingJob: { updateMany: jest.fn() },
@@ -112,10 +112,10 @@ describe('ConvertToCustomerService', () => {
       where: { leadId: 'lead-1' },
       data: { customerId: 'lead-1', leadId: null },
     });
-    expect(tx.user.updateMany).toHaveBeenCalledWith({
-      where: { leadId: 'lead-1' },
-      data: { customerId: 'lead-1', leadId: null },
-    });
+    expect(tx.clientAccount.updateMany).toHaveBeenCalledWith({
+        where: { leadId: 'lead-1' },
+        data: { customerId: 'lead-1', leadId: null },
+      });
     expect(tx.lead.delete).toHaveBeenCalledWith({ where: { id: 'lead-1' } });
     expect(tx.leadActivity.create).toHaveBeenCalledWith({
       data: expect.objectContaining({

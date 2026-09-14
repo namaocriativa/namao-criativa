@@ -40,3 +40,48 @@ export function pagesPrettyPath(htmlPath: string): string {
   const without = htmlPath.slice(0, -'.html'.length);
   return without === '/index' ? '/' : without;
 }
+
+export const DEFAULT_CANONICAL_STUDIO_ORIGIN =
+  'https://studio.namaocriativa.com.br';
+
+export function isStudioPagesDevHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === 'namao-studio.pages.dev' ||
+    host.endsWith('.namao-studio.pages.dev')
+  );
+}
+
+function originFromReferer(refererHeader?: string | null): string | null {
+  if (!refererHeader?.trim()) return null;
+  try {
+    return new URL(refererHeader.trim()).origin;
+  } catch {
+    return null;
+  }
+}
+
+function canonicalStudioOrigin(canonicalStudioUrl?: string | null): string {
+  const first = (canonicalStudioUrl || DEFAULT_CANONICAL_STUDIO_ORIGIN)
+    .split(/[\s,]+/)
+    .map((item) => item.trim().replace(/\/$/, ''))
+    .find(Boolean);
+  return first || DEFAULT_CANONICAL_STUDIO_ORIGIN;
+}
+
+/** Maps the Pages default host to the canonical studio origin for the API cookie check. */
+export function originForStudioApiProxy(
+  originHeader: string | null,
+  canonicalStudioUrl?: string | null,
+  refererHeader?: string | null,
+): string | null {
+  const raw = originHeader?.trim() || originFromReferer(refererHeader);
+  if (!raw) return originHeader;
+  try {
+    const origin = new URL(raw).origin;
+    if (!isStudioPagesDevHost(new URL(origin).hostname)) return origin;
+    return new URL(canonicalStudioOrigin(canonicalStudioUrl)).origin;
+  } catch {
+    return originHeader;
+  }
+}

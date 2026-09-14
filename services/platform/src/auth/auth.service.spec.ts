@@ -20,6 +20,10 @@ describe('AuthService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
     },
+    clientAccount: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+    },
     instagramConnection: {
       findFirst: jest.fn(),
     },
@@ -68,7 +72,9 @@ describe('AuthService', () => {
     );
     prisma.invite.findUnique.mockResolvedValue(pendingInvite);
     prisma.user.findUnique.mockResolvedValue(null);
-    prisma.user.create.mockResolvedValue(createdUser);
+    prisma.user.create.mockResolvedValue({});
+    prisma.clientAccount.findUnique.mockResolvedValue(null);
+    prisma.clientAccount.create.mockResolvedValue(createdUser);
     prisma.lead.create.mockResolvedValue({ id: 'lead-new' });
     prisma.lead.update.mockResolvedValue({});
     prisma.lead.findUnique.mockResolvedValue(null);
@@ -123,11 +129,12 @@ describe('AuthService', () => {
       where: { id: 'inv-1' },
       data: { status: 'ACCEPTED' },
     });
-    expect(prisma.user.create).toHaveBeenCalledWith(
+    expect(prisma.clientAccount.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ leadId: 'lead-1', customerId: null }),
       }),
     );
+    expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.lead.update).not.toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ fromPublicSignup: true }),
@@ -225,14 +232,39 @@ describe('AuthService', () => {
     expect(result.instagram).toEqual({ connected: false });
   });
 
-  it('studioLogin rejeita CLIENT', async () => {
-    prisma.user.findUnique.mockResolvedValue({
+  it('login autentica ClientAccount e assina typ client', async () => {
+    const hash = await require('bcryptjs').hash('password1', 4);
+    prisma.clientAccount.findUnique.mockResolvedValue({
+      ...createdUser,
+      passwordHash: hash,
+    });
+    const result = await service.login({
+      email: 'ana@loja.com',
+      password: 'password1',
+    });
+    expect(result.user.role).toBe('CLIENT');
+    expect(result.user.typ).toBe('client');
+    expect(result.accessToken).toBe('token');
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 'u1',
+        role: 'CLIENT',
+        typ: 'client',
+      }),
+    );
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('studioLogin rejeita e-mail que só existe no portal', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.clientAccount.findUnique.mockResolvedValue({
       ...createdUser,
       passwordHash: await require('bcryptjs').hash('password1', 4),
     });
     await expect(
       service.studioLogin({ email: 'ana@loja.com', password: 'password1' }),
-    ).rejects.toMatchObject({ status: 403 });
+    ).rejects.toMatchObject({ status: 401 });
+    expect(prisma.clientAccount.findUnique).not.toHaveBeenCalled();
   });
 
   it('studioLogin aceita ADMIN', async () => {
@@ -251,7 +283,15 @@ describe('AuthService', () => {
       password: 'password1',
     });
     expect(result.user.role).toBe('ADMIN');
+    expect(result.user.typ).toBe('staff');
     expect(result.accessToken).toBe('token');
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 'a1',
+        role: 'ADMIN',
+        typ: 'staff',
+      }),
+    );
     expect(activity.recordLogin).toHaveBeenCalledWith('a1');
   });
 

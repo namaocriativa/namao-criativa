@@ -12,7 +12,7 @@ Monorepo para **descobrir leads** em uma região, **enriquecê-los** com dados e
 - Landings geradas em `leads/<slug>/` (independentes, fora dos workspaces)
 - Crawl4AI para enrichment quando o lead já tem website (`services/platform/crawler/` ou Docker opcional)
 
-Docker sobe Postgres, Redis, Crawl4AI e a API Nest (watch). O Vite em `apps/studio/` continua no host e faz proxy para a API (`PLATFORM_PORT`, default `http://localhost:4000`). As portas no host (4000 e 5433) evitam conflito com stacks na 3000/5432.
+O caminho recomendado no host é `npm run dev:local` (Postgres, Redis, API, studio e website, sem Docker). Alternativa: Docker sobe Postgres, Redis, Crawl4AI e a API Nest (watch), e o Vite do studio continua no host. As portas (4000 e 5433) evitam conflito com stacks na 3000/5432.
 
 ## Estrutura
 
@@ -35,6 +35,27 @@ docker-compose.yml     # Postgres + Redis + Crawl4AI + API Nest (watch)
 
 ## Setup
 
+### Dev local sem Docker (recomendado)
+
+Postgres e Redis sobem como processos nativos (Homebrew), isolados em `.local/` nas portas **5433** e **6379** — a 5432 do host fica livre. A API, o studio e o website rodam com hot reload. Evolution **não** sobe: o script exporta `EVOLUTION_MOCK=1` e o envio de WhatsApp é fake.
+
+```bash
+brew install postgresql@16 redis
+npm install
+cp services/platform/.env.example services/platform/.env   # se ainda não tiver
+npm run dev:local
+```
+
+- API (Nest watch): `http://localhost:4000`
+- Studio (Vite): `http://localhost:5173`
+- Website (Vite): `http://localhost:5174`
+
+Não misture `npm run dev:local` com `docker compose up` nas mesmas portas (4000, 5433, 6379).
+
+`npm run dev` continua disponível (só platform + studio no host; Postgres/Redis você sobe à parte).
+
+### Docker
+
 ```bash
 npm install
 cp services/platform/.env.example services/platform/.env
@@ -45,18 +66,11 @@ npm run dev:studio
 - Studio (Vite em `apps/studio/`): `http://localhost:5173` — login JWT, proxy `/leads`, `/config`, `/studio`, etc. → API (`PLATFORM_PORT`, default 4000)
 - API (NestJS no Docker): `http://localhost:${PLATFORM_PORT:-4000}` — discovery, landing, chat Gemini, dashboard, com hot reload de `services/platform/src`
 
-Para rodar a API Nest no host em vez do Docker: `npm run dev` (sobe platform + studio). Não use host e Docker ao mesmo tempo na mesma porta.
-
 O Compose publica a API em **4000** e o Postgres em **5433** no host (o Nest continua em 3000 *dentro* do container). No `.env` da raiz:
 
 ```bash
 PLATFORM_PORT=4000
 POSTGRES_PORT=5433
-```
-
-```bash
-docker compose up -d --build
-npm run dev:studio
 ```
 
 Studio e website falam com `http://localhost:4000`. API Nest no host, sem o serviço `platform` do Compose: `PORT=4000` em `services/platform/.env`.
@@ -92,10 +106,11 @@ Arquivo: `services/platform/.env`
 | `META_APP_ID` / `META_APP_SECRET` | Não | App Meta para OAuth Instagram Graph |
 | `META_REDIRECT_URI` | Não | Callback OAuth. Default: `http://localhost:4000/auth/instagram/callback` |
 | `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` | Não | Evolution API; sem isso o envio WhatsApp fica `not_configured` |
+| `EVOLUTION_MOCK` | Não | `1` no `dev:local`: WhatsApp fake. Ignorado em produção. Não precisa Evolution local |
 
 ### Redis (cache de discovery)
 
-Sobe o Redis (já incluso em `docker compose up`). Se a API Nest estiver no host:
+`npm run dev:local` já sobe um Redis nativo em `127.0.0.1:6379` (dados em `.local/redis`). No Docker, o Redis já entra em `docker compose up`. Se a API Nest estiver no host sem o `dev:local`:
 
 ```bash
 docker compose up -d redis
@@ -284,6 +299,7 @@ Falhas de um provider não interrompem o enrichment.
 
 | Script | Descrição |
 |--------|-----------|
+| `npm run dev:local` | Postgres + Redis + kit + API + studio + website (sem Docker, hot reload) |
 | `npm run dev` | Sobe platform + studio |
 | `npm run dev:platform` | Só a API |
 | `npm run dev:studio` | Só o studio Vite |
