@@ -56,7 +56,7 @@ test('studioProxyStatus não deixa 502/504 vazar para a página HTML da Cloudfla
   assert.equal(studioProxyStatus(200), 200);
   assert.equal(studioProxyStatus(400), 400);
   assert.equal(studioProxyStatus(401), 401);
-  assert.equal(studioProxyStatus(502), 503);
-  assert.equal(studioProxyStatus(504), 503);
-  assert.equal(studioProxyStatus(503), 503);
+  assert.equal(studioProxyStatus(502), 400);
+  assert.equal(studioProxyStatus(504), 400);
+  assert.equal(studioProxyStatus(503), 400);
 });

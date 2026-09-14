@@ -75,8 +75,9 @@ export function headersForStudioApiProxy(
 }
 
 export function studioProxyStatus(status: number): number {
-  // Custom domains replace Worker 502/504 with Cloudflare HTML error pages.
-  return status === 502 || status === 504 ? 503 : status;
+  // Custom-domain Pages replaces 502/503/504 with an HTML/text error page.
+  if (status === 502 || status === 503 || status === 504) return 400;
+  return status;
 }
 
 export async function fetchStudioApi(
@@ -95,16 +96,20 @@ export async function fetchStudioApi(
   }
   try {
     const res = await fetch(target, init);
+    const payload = await res.arrayBuffer();
     const status = studioProxyStatus(res.status);
-    return new Response(res.body, {
+    const type = res.headers.get('content-type') || 'application/json; charset=utf-8';
+    return new Response(payload, {
       status,
-      statusText: status === res.status ? res.statusText : 'Service Unavailable',
-      headers: res.headers,
+      headers: {
+        'content-type': type,
+        'cache-control': 'no-store',
+      },
     });
   } catch {
     return Response.json(
       { message: 'API indisponível. Tente de novo em instantes.' },
-      { status: 503 },
+      { status: 400 },
     );
   }
 }
