@@ -17,6 +17,11 @@ import {
   siteIntroductionEmailHtml,
   siteIntroductionEmailText,
 } from './site-introduction-email';
+import {
+  studioWelcomeEmailHtml,
+  studioWelcomeEmailText,
+  type StudioWelcomeKind,
+} from './studio-welcome-email';
 import { publicLogoUrl } from '../lead-account/lead-account.util';
 
 @Injectable()
@@ -45,6 +50,39 @@ export class MailService {
         email: params.email,
         password: params.password,
         loginUrl: params.loginUrl,
+      }),
+    });
+  }
+
+  async sendStudioWelcome(params: {
+    to: string;
+    name: string;
+    email: string;
+    password: string;
+    loginUrl: string;
+    kind?: StudioWelcomeKind;
+  }) {
+    const kind = params.kind || 'welcome';
+    await this.send({
+      to: params.to,
+      subject:
+        kind === 'reset'
+          ? 'Nova senha do studio — Namão Criativa'
+          : 'Seu acesso ao studio — Namão Criativa',
+      html: studioWelcomeEmailHtml({
+        name: params.name,
+        email: params.email,
+        password: params.password,
+        loginUrl: params.loginUrl,
+        logoUrl: this.logoUrl(),
+        kind,
+      }),
+      text: studioWelcomeEmailText({
+        name: params.name,
+        email: params.email,
+        password: params.password,
+        loginUrl: params.loginUrl,
+        kind,
       }),
     });
   }

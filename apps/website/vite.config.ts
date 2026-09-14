@@ -2,6 +2,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { resolveLocalApiUrl } from '../local-api-url';
+import { viteInput } from './seo/pages';
+import { namaoSeoPlugin } from './seo/plugin';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const api = resolveLocalApiUrl(path.resolve(rootDir, '../..'));
@@ -9,6 +11,7 @@ const api = resolveLocalApiUrl(path.resolve(rootDir, '../..'));
 export default defineConfig({
   root: '.',
   publicDir: 'public',
+  plugins: [namaoSeoPlugin()],
   server: {
     port: 5174,
     proxy: {
@@ -24,15 +27,12 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: {
-        main: 'index.html',
-        register: 'register.html',
-        login: 'login.html',
-        conectar: 'conectar.html',
-        dashboard: 'dashboard.html',
-        termos: 'termos.html',
-        privacidade: 'privacidade.html',
-      },
+      input: Object.fromEntries(
+        Object.entries(viteInput()).map(([name, file]) => [
+          name,
+          path.resolve(rootDir, file),
+        ]),
+      ),
     },
   },
 });

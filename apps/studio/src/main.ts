@@ -7,6 +7,7 @@ import { initUsersTab } from "./users-tab";
 import {
   logoutStudio,
   requireStudioSession,
+  isStudioAdmin,
   type StudioUser,
 } from "./session";
 import {
@@ -29,6 +30,7 @@ import {
 import { entityKindOf, profileApi, type EntityKind } from "./profile-api";
 import { initLeadGallery } from "./lead-gallery";
 import { initLeadAccountModal } from "./lead-account-modal";
+import { initLeadShareModal } from "./lead-share-modal";
 import { initLeadEditModal } from "./lead-edit-modal";
 import { initLeadEmailsModal } from "./lead-emails-modal";
 import { initLeadWhatsAppModal } from "./lead-whatsapp-modal";
@@ -222,13 +224,13 @@ function applyRoute(route: AppRoute) {
     }
   }
   packagesTab.onRoute(route);
-  if (route.name === "users") {
+  if (route.name === "users" || route.name === "user") {
     if (currentUser?.role !== "ADMIN") {
       showTab("not-found");
       document.title = titleForRoute({ name: "not-found" });
       return;
     }
-    usersTab.reload();
+    usersTab.onRoute(route);
   }
 }
 
@@ -242,6 +244,7 @@ const leadGallery = initLeadGallery(el<HTMLElement>("lead-gallery-root"), {
   },
 });
 const leadAccount = initLeadAccountModal(el<HTMLElement>("lead-account-root"));
+const leadShare = initLeadShareModal(el<HTMLElement>("lead-share-root"));
 const leadEmails = initLeadEmailsModal(el<HTMLElement>("lead-emails-root"), {
   onSent: () => {
     if (currentLead) void loadLeadHistory(currentLead);
@@ -258,6 +261,18 @@ const leadEdit = initLeadEditModal(el<HTMLElement>("lead-edit-root"), {
     void loadSavedLeads();
   },
 });
+
+function studioAccessTagsHtml(lead: Lead): string {
+  if (isStudioAdmin()) {
+    const label =
+      lead.createdBy?.name || lead.createdBy?.email || "Sem responsável";
+    return `<span class="lead-tag lead-tag-creator">${escapeHtml(label)}</span>`;
+  }
+  if (lead.sharedWithMe) {
+    return `<span class="lead-tag lead-tag-shared">Compartilhado</span>`;
+  }
+  return "";
+}
 
 function formatDate(value: string | Date | null | undefined) {
   if (!value) return "";
@@ -652,6 +667,11 @@ function renderLeadContext(lead: Lead) {
     ${lead.id ? `<button type="button" data-context-action="whatsapp">Wpp Msgs</button>` : ""}
     ${lead.id ? `<button type="button" data-context-action="export">Exportar dados</button>` : ""}
     ${
+      lead.id && lead.canManageShares
+        ? `<button type="button" data-context-action="share">Compartilhar</button>`
+        : ""
+    }
+    ${
       lead.id && !isCustomer
         ? `<button type="button" data-context-action="convert-customer">Transformar em Customer</button>`
         : ""
@@ -673,6 +693,11 @@ function renderLeadContext(lead: Lead) {
   leadContextActions
     .querySelector("[data-context-action='export']")
     ?.addEventListener("click", () => exportLeadJson(lead));
+  leadContextActions
+    .querySelector("[data-context-action='share']")
+    ?.addEventListener("click", () => {
+      if (lead.id) leadShare.open(lead.id, kind);
+    });
   leadContextActions
     .querySelector("[data-context-action='convert-customer']")
     ?.addEventListener("click", () => {
@@ -806,8 +831,8 @@ function renderLead(lead: Lead) {
           ${lead.website ? `<span>${linkOrText(lead.website)}</span>` : ""}
         </p>
         ${
-          tags.length
-            ? `<div class="lead-tags lead-hero-tags">${tags
+          tags.length || studioAccessTagsHtml(lead)
+            ? `<div class="lead-tags lead-hero-tags">${studioAccessTagsHtml(lead)}${tags
                 .map((tag) => `<span class="lead-tag">${escapeHtml(tag)}</span>`)
                 .join("")}</div>`
             : ""
@@ -1170,6 +1195,7 @@ function renderSavedLeadsList() {
       <strong>${escapeHtml(lead.name || "Sem nome")}</strong>
       ${landingBadgeHtml(lead.landingStatus, lead.publishedOrigin)}
       ${lead.fromPublicSignup ? `<span class="landing-badge origin-badge">cadastro</span>` : ""}
+      ${studioAccessTagsHtml(lead)}
       <div class="meta">
         ${category ? `<span class="lead-category-tag">${escapeHtml(category)}</span> · ` : ""}
         ${place ? escapeHtml(place) + " · " : ""}
@@ -1270,6 +1296,7 @@ function renderSavedCustomersList() {
     li.innerHTML = `
       <strong>${escapeHtml(lead.name || "Sem nome")}</strong>
       ${landingBadgeHtml(lead.landingStatus, lead.publishedOrigin)}
+      ${studioAccessTagsHtml(lead)}
       <div class="meta">
         ${category ? `<span class="lead-category-tag">${escapeHtml(category)}</span> · ` : ""}
         ${place ? escapeHtml(place) + " · " : ""}

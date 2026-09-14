@@ -28,7 +28,8 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  register(@Body() dto: RegisterDto) {
+  async register(@Req() req: Request, @Body() dto: RegisterDto) {
+    await this.assertAuthRateLimit(req);
     return this.authService.register(dto);
   }
 
@@ -39,12 +40,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Body() dto: LoginDto,
   ) {
-    if (await this.rateLimit.tooMany(this.clientIp(req))) {
-      throw new HttpException(
-        'Muitas tentativas. Tente de novo em alguns minutos.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
+    await this.assertAuthRateLimit(req);
     const { accessToken, user } = await this.authService.login(dto);
     res.cookie(CLIENT_TOKEN_COOKIE, accessToken, authCookieOptions(req));
     return { user };
@@ -64,12 +60,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Body() dto: LoginDto,
   ) {
-    if (await this.rateLimit.tooMany(this.clientIp(req))) {
-      throw new HttpException(
-        'Muitas tentativas. Tente de novo em alguns minutos.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
+    await this.assertAuthRateLimit(req);
     const { accessToken, user } = await this.authService.studioLogin(dto);
     res.cookie(STUDIO_TOKEN_COOKIE, accessToken, authCookieOptions(req));
     return { user };
@@ -77,7 +68,11 @@ export class AuthController {
 
   @Public()
   @Post('studio/logout')
-  studioLogout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async studioLogout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.authService.recordStudioLogout(req);
     res.clearCookie(STUDIO_TOKEN_COOKIE, authCookieOptions(req));
     return { ok: true as const };
   }
@@ -85,6 +80,15 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: JwtUser) {
     return this.authService.me(user);
+  }
+
+  private async assertAuthRateLimit(req: Request) {
+    if (await this.rateLimit.tooMany(this.clientIp(req))) {
+      throw new HttpException(
+        'Muitas tentativas. Tente de novo em alguns minutos.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 
   private clientIp(req: Request): string {

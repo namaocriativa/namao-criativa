@@ -15,6 +15,7 @@ describe('ConvertToCustomerService', () => {
     chatSession: { updateMany: jest.fn() },
     chatEvent: { updateMany: jest.fn() },
     leadActivity: { updateMany: jest.fn(), create: jest.fn() },
+    studioLeadShare: { updateMany: jest.fn() },
   };
 
   const prisma = {
@@ -81,6 +82,7 @@ describe('ConvertToCustomerService', () => {
       vercelProjectId: 'prj',
       vercelDeploymentId: 'dpl',
       fromPublicSignup: true,
+      createdByUserId: 'op-1',
       createdAt: new Date('2026-01-01'),
       updatedAt: new Date('2026-01-03'),
     });
@@ -99,7 +101,12 @@ describe('ConvertToCustomerService', () => {
         landingSlug: 'firma',
         publicSiteId: 'site-1',
         fromPublicSignup: true,
+        createdByUserId: 'op-1',
       }),
+    });
+    expect(tx.studioLeadShare.updateMany).toHaveBeenCalledWith({
+      where: { leadId: 'lead-1' },
+      data: { customerId: 'lead-1', leadId: null },
     });
     expect(tx.leadImage.updateMany).toHaveBeenCalledWith({
       where: { leadId: 'lead-1' },

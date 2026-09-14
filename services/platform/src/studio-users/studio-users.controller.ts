@@ -25,6 +25,16 @@ export class StudioUsersController {
     return this.users.list();
   }
 
+  @Get(':id/activity')
+  activity(@Param('id') id: string) {
+    return this.users.listActivity(id);
+  }
+
+  @Get(':id')
+  get(@Param('id') id: string) {
+    return this.users.get(id);
+  }
+
   @Post()
   create(@Body() dto: CreateStudioUserDto) {
     return this.users.create(dto);

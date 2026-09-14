@@ -582,43 +582,62 @@
       <section id="tab-users" class="tab-panel">
         <h2>Usuários do studio</h2>
         <p class="prompt-hint">
-          Só o admin cria operadores e outros admins. Contas de clientes do
+          Só o admin convida operadores. A senha é gerada e enviada por e-mail.
+          Papel Admin se define depois na ficha da pessoa. Contas de clientes do
           website não aparecem aqui.
         </p>
         <p class="status" id="users-status">Carregando…</p>
         <form id="users-create-form" class="users-create app-card">
           <h3>Novo usuário</h3>
           <label>
-            Nome
-            <input name="name" required maxlength="120" autocomplete="name" />
-          </label>
-          <label>
             E-mail
             <input name="email" type="email" required autocomplete="off" />
           </label>
-          <label>
-            Senha
-            <input
-              name="password"
-              type="password"
-              required
-              minlength="8"
-              autocomplete="new-password"
-            />
-          </label>
-          <label>
-            Papel
-            <select name="role">
-              <option value="OPERATOR" selected>Operador</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-          </label>
           <div class="actions">
-            <button type="submit">Criar</button>
+            <button type="submit">Enviar por e-mail</button>
           </div>
           <p class="status" id="users-create-status"></p>
         </form>
         <div id="users-list"></div>
+      </section>
+
+      <section id="tab-user-detail" class="tab-panel">
+        <p>
+          <a href="/users" class="back-link" id="user-back-btn">
+            ← Voltar aos usuários
+          </a>
+        </p>
+        <div class="packages-header">
+          <div>
+            <h2 id="user-detail-heading">Usuário</h2>
+            <p class="prompt-hint" id="user-detail-meta"></p>
+          </div>
+          <div class="actions">
+            <button type="button" class="secondary" id="user-reset-btn">
+              Resetar senha
+            </button>
+            <button type="button" class="danger" id="user-delete-btn">
+              Remover
+            </button>
+          </div>
+        </div>
+        <div class="status" id="user-detail-status"></div>
+        <div class="app-card users-detail-card">
+          <label>
+            Papel
+            <select id="user-role-select">
+              <option value="OPERATOR">Operador</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </label>
+        </div>
+        <div class="app-card users-activity-card">
+          <h3>Histórico de ações</h3>
+          <p class="prompt-hint" id="user-activity-hint">
+            As ações no studio passam a aparecer aqui a partir desta versão.
+          </p>
+          <ol class="context-history" id="user-activity-list"></ol>
+        </div>
       </section>
 
       <section id="tab-detail" class="tab-panel">
@@ -744,6 +763,7 @@
     <div id="site-wizard-root"></div>
     <div id="lead-gallery-root"></div>
     <div id="lead-account-root"></div>
+    <div id="lead-share-root"></div>
     <div id="lead-edit-root"></div>
     <div id="lead-emails-root"></div>
     <div id="lead-whatsapp-root"></div>

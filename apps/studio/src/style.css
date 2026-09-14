@@ -813,6 +813,18 @@ button.outline:hover {
   font-weight: 600;
 }
 
+.lead-tag-creator {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #3730a3;
+}
+
+.lead-tag-shared {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+  color: #6d28d9;
+}
+
 .lead-tag-source {
   background: #eef3f8;
   border-color: #c5d0db;
@@ -3497,6 +3509,69 @@ select {
   }
 }
 
+.lead-share-modal .site-wizard-modal__dialog {
+  width: 100%;
+  height: auto;
+  max-height: var(--app-vh);
+}
+
+@media (min-width: 860px) {
+  .lead-share-modal .site-wizard-modal__dialog {
+    width: min(480px, calc(100vw - 1.5rem));
+    max-height: calc(var(--app-vh) - 1.5rem);
+  }
+}
+
+.lead-share-hint {
+  margin: 0 0 0.85rem;
+  color: var(--wz-muted);
+  font-size: 0.88rem;
+}
+
+.lead-share-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.lead-share-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.lead-share-list .meta {
+  margin: 0.15rem 0 0;
+}
+
+.lead-share-empty {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.lead-share-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.lead-share-form label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.lead-share-form span {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--wz-muted);
+}
+
 .lead-account-modal .site-wizard-modal__dialog {
   width: 100%;
   height: auto;
@@ -3830,6 +3905,16 @@ body.is-auth-pending .app-shell {
   gap: 0.85rem;
 }
 
+.users-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.users-card:hover {
+  border-color: #c7d2fe;
+}
+
 .users-card-head {
   display: flex;
   justify-content: space-between;
@@ -3843,16 +3928,32 @@ body.is-auth-pending .app-shell {
 }
 
 .users-email {
-  margin: 0.35rem 0 0.75rem;
+  margin: 0.35rem 0 0;
   color: var(--muted);
   font-size: 0.88rem;
 }
 
-.users-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: end;
+.users-detail-card,
+.users-activity-card {
+  margin-top: 1rem;
+  max-width: 640px;
+}
+
+.users-detail-card label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  max-width: 240px;
+}
+
+.users-activity-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.users-activity-card .context-history {
+  margin-top: 0.85rem;
 }
 
 body.auth-screen {

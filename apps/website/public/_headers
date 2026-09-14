@@ -6,3 +6,27 @@
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+/login
+  X-Robots-Tag: noindex, nofollow
+
+/login.html
+  X-Robots-Tag: noindex, nofollow
+
+/register
+  X-Robots-Tag: noindex, nofollow
+
+/register.html
+  X-Robots-Tag: noindex, nofollow
+
+/dashboard
+  X-Robots-Tag: noindex, nofollow
+
+/dashboard.html
+  X-Robots-Tag: noindex, nofollow
+
+/conectar
+  X-Robots-Tag: noindex, nofollow
+
+/conectar.html
+  X-Robots-Tag: noindex, nofollow

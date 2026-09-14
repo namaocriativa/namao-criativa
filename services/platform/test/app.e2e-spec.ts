@@ -89,12 +89,7 @@ describe('Discovery Lead Enrichment (e2e)', () => {
 
   it('GET /health retorna status', async () => {
     const res = await request(app.getHttpServer()).get('/health').expect(200);
-    expect(res.body).toEqual(
-      expect.objectContaining({
-        status: 'ok',
-        geminiConfigured: expect.any(Boolean),
-      }),
-    );
+    expect(res.body).toEqual({ status: 'ok' });
   });
 
   it('POST /public/chat/session retorna 404 para site desconhecido', () => {

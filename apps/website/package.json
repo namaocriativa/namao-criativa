@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "npx tsx --test functions/*.spec.ts seo/*.spec.ts",
+    "assets:seo": "python3 scripts/optimize-seo-assets.py"
   },
   "devDependencies": {
     "@types/three": "^0.185.4",

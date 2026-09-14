@@ -1,3 +1,4 @@
+import type { Request } from 'express';
 import {
   BadRequestException,
   ForbiddenException,
@@ -16,6 +17,7 @@ import {
 import { MailService } from '../mail/mail.service';
 import { namaoWhatsAppUrl } from '../mail/site-introduction-email';
 import { PrismaService } from '../prisma/prisma.service';
+import { StudioActivityService } from '../studio-activity/studio-activity.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import {
@@ -23,6 +25,7 @@ import {
   instagramProfileUrl,
   normalizeInstagram,
 } from './instagram';
+import { extractJwtFromRequest } from './jwt-cookie';
 import { JwtUser } from './jwt.strategy';
 import { isStudioRole, USER_ROLE } from './roles';
 
@@ -35,6 +38,7 @@ export class AuthService implements OnModuleInit {
     private readonly jwt: JwtService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly activity: StudioActivityService,
   ) {}
 
   async onModuleInit() {
@@ -197,7 +201,19 @@ export class AuthService implements OnModuleInit {
     if (!isStudioRole(issued.user.role)) {
       throw new ForbiddenException('Sem permissão para o studio');
     }
+    await this.activity.recordLogin(issued.user.id);
     return issued;
+  }
+
+  async recordStudioLogout(req: Request) {
+    try {
+      const token = extractJwtFromRequest(req);
+      if (!token) return;
+      const payload = this.jwt.verify<{ sub?: string }>(token);
+      if (payload?.sub) await this.activity.recordLogout(payload.sub);
+    } catch {
+      // cookie ausente ou JWT inválido: logout ainda limpa o cookie
+    }
   }
 
   async ensureStudioAdmin() {

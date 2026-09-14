@@ -17,8 +17,11 @@ describe('StudioUsersService', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    studioUserActivity: {
+      findMany: jest.fn(),
+    },
   };
-  const mail = { sendCredentials: jest.fn().mockResolvedValue(undefined) };
+  const mail = { sendStudioWelcome: jest.fn().mockResolvedValue(undefined) };
   const config = { get: jest.fn().mockReturnValue('http://localhost:5173') };
   const service = new StudioUsersService(
     prisma as never,
@@ -33,9 +36,19 @@ describe('StudioUsersService', () => {
     leadId: null,
     customerId: null,
   };
+  const created = {
+    id: 'op-1',
+    email: 'ana@namao.local',
+    name: 'Ana',
+    role: USER_ROLE.OPERATOR,
+    createdAt: new Date('2026-09-14T12:00:00.000Z'),
+    updatedAt: new Date('2026-09-14T12:00:00.000Z'),
+  };
 
   beforeEach(() => {
     jest.resetAllMocks();
+    config.get.mockReturnValue('http://localhost:5173');
+    mail.sendStudioWelcome.mockResolvedValue(undefined);
   });
 
   it('lista só ADMIN e OPERATOR', async () => {
@@ -51,13 +64,47 @@ describe('StudioUsersService', () => {
   it('rejeita e-mail já cadastrado', async () => {
     prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
     await expect(
-      service.create({
-        name: 'Ana',
-        email: 'ana@namao.local',
-        password: 'password1',
-        role: USER_ROLE.OPERATOR,
-      }),
+      service.create({ email: 'ana@namao.local' }),
     ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('cria OPERATOR, gera senha e envia convite', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue(created);
+    const result = await service.create({ email: 'ana@namao.local' });
+    expect(result).toEqual(created);
+    expect(result).not.toHaveProperty('password');
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          email: 'ana@namao.local',
+          name: 'Ana',
+          role: USER_ROLE.OPERATOR,
+        }),
+      }),
+    );
+    expect(mail.sendStudioWelcome).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'ana@namao.local',
+        email: 'ana@namao.local',
+        kind: 'welcome',
+        loginUrl: 'http://localhost:5173/login',
+      }),
+    );
+    const password = mail.sendStudioWelcome.mock.calls[0][0].password as string;
+    expect(password.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('apaga o usuário se o e-mail falhar', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue(created);
+    prisma.user.delete.mockResolvedValue({});
+    mail.sendStudioWelcome.mockRejectedValue(new Error('resend down'));
+    await expect(
+      service.create({ email: 'ana@namao.local' }),
+    ).rejects.toThrow('resend down');
+    expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: created.id } });
   });
 
   it('não remove a própria conta', async () => {
@@ -108,12 +155,31 @@ describe('StudioUsersService', () => {
     const result = await service.resetPassword('op-1');
     expect(result).toEqual({ ok: true });
     expect(result).not.toHaveProperty('password');
-    expect(mail.sendCredentials).toHaveBeenCalledWith(
+    expect(mail.sendStudioWelcome).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'op@namao.local',
         email: 'op@namao.local',
+        kind: 'reset',
         loginUrl: 'http://localhost:5173/login',
       }),
     );
+  });
+
+  it('inclui conta criada no histórico', async () => {
+    prisma.user.findUnique.mockResolvedValue(created);
+    prisma.studioUserActivity.findMany.mockResolvedValue([
+      {
+        id: 'act-1',
+        title: 'Entrou no studio',
+        summary: 'Login no studio',
+        kind: 'auth.login',
+        createdAt: new Date('2026-09-14T13:00:00.000Z'),
+      },
+    ]);
+    const { items } = await service.listActivity('op-1');
+    expect(items.map((item) => item.kind)).toEqual([
+      'auth.login',
+      'account.created',
+    ]);
   });
 });

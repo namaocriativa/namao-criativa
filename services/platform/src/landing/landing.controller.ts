@@ -21,11 +21,17 @@ import { RateGenerationDto } from './dto/rate-generation.dto';
 import { LandingJobEvent } from './landing-jobs.service';
 import { LandingService } from './landing.service';
 import { StudioAuth } from '../auth/studio-auth.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { JwtUser } from '../auth/jwt.strategy';
+import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 
 @StudioAuth()
 @Controller('landing')
 export class LandingController {
-  constructor(private readonly landingService: LandingService) {}
+  constructor(
+    private readonly landingService: LandingService,
+    private readonly access: StudioLeadAccessService,
+  ) {}
 
   @Get('status')
   status() {
@@ -38,22 +44,29 @@ export class LandingController {
   }
 
   @Post('scaffold')
-  scaffold(@Body() dto: LeadIdDto) {
+  async scaffold(@Body() dto: LeadIdDto, @CurrentUser() user: JwtUser) {
+    await this.access.assertCanAccess(user, dto.leadId);
     return this.landingService.scaffold(dto.leadId);
   }
 
   @Post('prompt')
-  prompt(@Body() dto: LeadIdDto) {
+  async prompt(@Body() dto: LeadIdDto, @CurrentUser() user: JwtUser) {
+    await this.access.assertCanAccess(user, dto.leadId);
     return this.landingService.prompt(dto.leadId);
   }
 
   @Post('publish')
-  publish(@Body() dto: LeadIdDto) {
+  async publish(@Body() dto: LeadIdDto, @CurrentUser() user: JwtUser) {
+    await this.access.assertCanAccess(user, dto.leadId);
     return this.landingService.publish(dto.leadId);
   }
 
   @Post('generate')
-  generate(@Body() dto: GenerateLandingDto) {
+  async generate(
+    @Body() dto: GenerateLandingDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    await this.access.assertCanAccess(user, dto.leadId);
     return this.landingService.startGenerate(dto);
   }
 
@@ -61,37 +74,55 @@ export class LandingController {
   rateGeneration(
     @Param('id') id: string,
     @Body() dto: RateGenerationDto,
+    @CurrentUser() user: JwtUser,
   ) {
-    return this.landingService.rateGeneration(id, dto.rating);
+    return this.landingService.rateGeneration(id, dto.rating, user);
   }
 
   @Get('generations')
-  listGenerations() {
-    return this.landingService.listGenerations();
+  listGenerations(@CurrentUser() user: JwtUser) {
+    return this.landingService.listGenerations(user);
   }
 
   @Get('jobs/:jobId')
-  getJob(@Param('jobId') jobId: string) {
-    return this.landingService.getJobPublic(jobId);
+  async getJob(@Param('jobId') jobId: string, @CurrentUser() user: JwtUser) {
+    const job = await this.landingService.getJobPublic(jobId);
+    await this.access.assertCanAccess(user, job.leadId);
+    return job;
   }
 
   @Post('jobs/:jobId/cancel')
-  cancel(@Param('jobId') jobId: string) {
+  async cancel(@Param('jobId') jobId: string, @CurrentUser() user: JwtUser) {
+    const job = await this.landingService.getJobPublic(jobId);
+    await this.access.assertCanAccess(user, job.leadId);
     return this.landingService.cancelJob(jobId);
   }
 
   @Post('local/:leadId')
-  startLocal(@Param('leadId') leadId: string) {
+  async startLocal(
+    @Param('leadId') leadId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    await this.access.assertCanAccess(user, leadId);
     return this.landingService.startLocal(leadId);
   }
 
   @Delete('site/:leadId')
-  deleteSite(@Param('leadId') leadId: string) {
+  async deleteSite(
+    @Param('leadId') leadId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    await this.access.assertCanAccess(user, leadId);
     return this.landingService.deleteSite(leadId);
   }
 
   @Get('preview/:leadId')
-  async previewRoot(@Param('leadId') leadId: string, @Res() res: Response) {
+  async previewRoot(
+    @Param('leadId') leadId: string,
+    @CurrentUser() user: JwtUser,
+    @Res() res: Response,
+  ) {
+    await this.access.assertCanAccess(user, leadId);
     return this.sendPreviewFile(leadId, 'index.html', res);
   }
 
@@ -99,10 +130,12 @@ export class LandingController {
   async previewSplat(
     @Param('leadId') leadId: string,
     @Param('splat') splat: string | string[],
+    @CurrentUser() user: JwtUser,
     @Res() res: Response,
     @Next() next: NextFunction,
   ) {
     try {
+      await this.access.assertCanAccess(user, leadId);
       const relative = Array.isArray(splat)
         ? splat.join('/')
         : String(splat || 'index.html');
@@ -113,13 +146,17 @@ export class LandingController {
   }
 
   @Sse('jobs/:jobId/events')
-  events(@Param('jobId') jobId: string): Observable<MessageEvent> {
+  events(
+    @Param('jobId') jobId: string,
+    @CurrentUser() user: JwtUser,
+  ): Observable<MessageEvent> {
     return new Observable<MessageEvent>((subscriber) => {
       let cleanup = () => undefined;
 
       void (async () => {
         try {
           const job = await this.landingService.getJob(jobId);
+          await this.access.assertCanAccess(user, job.leadId);
 
           for (const past of job.log) {
             subscriber.next({ data: past });

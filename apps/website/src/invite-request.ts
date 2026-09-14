@@ -9,15 +9,25 @@ function initInviteRequest() {
   if (!dialog || !openBtn || !form || !statusEl) return;
 
   const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+  const title = document.getElementById('invite-dialog-title');
+  const lede = dialog.querySelector('.lede');
 
   const setDialogCursor = (open: boolean) => {
     document.body.classList.toggle('dialog-open', open);
   };
 
-  const open = () => {
+  const resetUi = () => {
+    form.hidden = false;
+    if (lede instanceof HTMLElement) lede.hidden = false;
+    if (title) title.textContent = 'Criar conta';
     statusEl.textContent = '';
     statusEl.classList.remove('error');
     if (submitBtn) submitBtn.disabled = false;
+  };
+
+  const open = () => {
+    resetUi();
+    form.reset();
     dialog.showModal();
     setDialogCursor(true);
   };
@@ -46,7 +56,9 @@ function initInviteRequest() {
         email: String(fd.get('email') || ''),
         instagram: String(fd.get('instagram') || ''),
       });
-      form.reset();
+      form.hidden = true;
+      if (lede instanceof HTMLElement) lede.hidden = true;
+      if (title) title.textContent = 'Conta criada';
       statusEl.textContent = created.mailed ? SIGNUP_SUCCESS : SIGNUP_MAIL_FAILED;
     } catch (error) {
       statusEl.textContent =

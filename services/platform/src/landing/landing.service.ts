@@ -7,6 +7,7 @@ import {
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerIdOf } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateLandingDto } from './dto/generate-landing.dto';
 import { normalizeGenerateConfig } from './generate-config';
@@ -20,6 +21,9 @@ import { buildCursorLandingPrompt, stableLandingSlug } from './prompt.builder';
 import { ScaffoldService } from './scaffold.service';
 import { PRESET_SECTIONS } from './section-catalog';
 import { VercelService } from './vercel.service';
+import type { JwtUser } from '../auth/jwt.strategy';
+import { isStudioAdmin } from '../auth/roles';
+import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 
 @Injectable()
 export class LandingService {
@@ -34,6 +38,7 @@ export class LandingService {
     private readonly pipelineService: LandingPipelineService,
     private readonly localService: LandingLocalService,
     private readonly vercelService: VercelService,
+    private readonly access: StudioLeadAccessService,
   ) {}
 
   async status() {
@@ -212,17 +217,31 @@ export class LandingService {
     });
   }
 
-  async rateGeneration(id: string, rating: number) {
+  async rateGeneration(id: string, rating: number, user: JwtUser) {
     const row = await this.prisma.landingGeneration.findUnique({ where: { id } });
     if (!row) throw new NotFoundException(`Generation ${id} não encontrada`);
+    const profileId = ownerIdOf(row);
+    if (!profileId) {
+      throw new NotFoundException(`Generation ${id} não encontrada`);
+    }
+    await this.access.assertCanAccess(user, profileId);
     return this.prisma.landingGeneration.update({
       where: { id },
       data: { humanRating: rating },
     });
   }
 
-  async listGenerations() {
+  async listGenerations(user: JwtUser) {
+    const where = isStudioAdmin(user.role)
+      ? undefined
+      : {
+          OR: [
+            { lead: this.access.visibleWhere(user) },
+            { customer: this.access.visibleWhere(user) },
+          ],
+        };
     return this.prisma.landingGeneration.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       take: 100,
       select: {

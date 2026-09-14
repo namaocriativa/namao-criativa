@@ -30,3 +30,13 @@ export function isSameStudioOrigin(
     return false;
   }
 }
+
+/**
+ * Pages pretty URLs 308 `/file.html` → `/file`. Fetch the pretty path from
+ * ASSETS or the 308 loops (`/login.html` → `/login` → `/login.html`).
+ */
+export function pagesPrettyPath(htmlPath: string): string {
+  if (!htmlPath.endsWith('.html')) return htmlPath;
+  const without = htmlPath.slice(0, -'.html'.length);
+  return without === '/index' ? '/' : without;
+}

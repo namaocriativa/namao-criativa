@@ -59,12 +59,16 @@ export function readStoredSession(): StoredChatSession | null {
 }
 
 export function writeStoredSession(session: StoredChatSession) {
-  const payload = JSON.stringify(session);
-  sessionStorage.setItem(CHAT_SESSION_KEY, payload);
-  if (loggedIn) {
-    localStorage.setItem(CHAT_SESSION_KEY, payload);
-  } else {
-    localStorage.removeItem(CHAT_SESSION_KEY);
+  try {
+    const payload = JSON.stringify(session);
+    sessionStorage.setItem(CHAT_SESSION_KEY, payload);
+    if (session.sessionToken) {
+      localStorage.setItem(CHAT_SESSION_KEY, payload);
+    } else {
+      localStorage.removeItem(CHAT_SESSION_KEY);
+    }
+  } catch {
+    /* ignore quota / private mode */
   }
 }
 
@@ -91,14 +95,16 @@ async function readError(res: Response): Promise<string> {
 
 export async function createChatSession(): Promise<ChatSessionPayload> {
   const stored = readStoredSession();
-  if (!loggedIn) {
-    clearChatSession();
-  }
+  const guestToken = !loggedIn ? stored?.sessionToken || null : null;
   const res = await fetch('/namao-chat/session', {
     method: 'POST',
     credentials: 'include',
-    headers: headers(),
-    body: JSON.stringify({}),
+    headers: headers(guestToken),
+    body: JSON.stringify(
+      loggedIn && stored?.sessionToken
+        ? { guestSessionToken: stored.sessionToken }
+        : {},
+    ),
   });
   if (!res.ok) throw new Error(await readError(res));
   const payload = (await res.json()) as ChatSessionPayload;

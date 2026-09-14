@@ -1,5 +1,6 @@
 import './chrome';
 import './invite-request';
+import { initHeroMedia, whenIdleReady } from './hero-media';
 import { mountWebsiteChat } from './chat/mount';
 
 async function bootScenes() {
@@ -24,5 +25,8 @@ async function bootScenes() {
   }
 }
 
-void bootScenes();
+initHeroMedia();
+whenIdleReady(() => {
+  void bootScenes();
+});
 mountWebsiteChat();

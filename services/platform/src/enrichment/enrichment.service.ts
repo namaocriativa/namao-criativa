@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { LeadAccountService } from '../lead-account/lead-account.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -20,6 +20,9 @@ import {
   websiteDedupeKey,
 } from './lead-dedupe';
 import { LeadMergerService } from './lead-merger.service';
+import type { JwtUser } from '../auth/jwt.strategy';
+import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
+import { STUDIO_CREATOR_SELECT } from '../owner/owner.util';
 
 @Injectable()
 export class EnrichmentService {
@@ -33,9 +36,10 @@ export class EnrichmentService {
     private readonly accounts: LeadAccountService,
     @Inject(LEAD_PROVIDERS)
     private readonly providers: LeadProvider[],
+    private readonly access: StudioLeadAccessService,
   ) {}
 
-  async enrich(dto: EnrichmentDto) {
+  async enrich(dto: EnrichmentDto, actor: JwtUser) {
     const initial: EnrichmentInput = {
       name: dto.name.trim(),
       city: dto.city?.trim(),
@@ -57,6 +61,9 @@ export class EnrichmentService {
 
     const existing = await this.findDuplicateLead(initial);
     if (existing) {
+      if (!(await this.access.hasAccess(actor, existing.id))) {
+        throw new ConflictException('Este lead já existe');
+      }
       this.logger.log(
         `Dedupe: reutilizando lead ${existing.id} para "${initial.name}"`,
       );
@@ -118,6 +125,7 @@ export class EnrichmentService {
         rating: initial.rating ?? null,
         reviewCount: initial.reviewCount ?? null,
         country: 'BR',
+        createdByUserId: actor.id,
       },
     });
 
@@ -129,7 +137,8 @@ export class EnrichmentService {
    * place. Existing values are kept as the baseline, so providers only fill in
    * whatever is still missing.
    */
-  async reenrich(id: string) {
+  async reenrich(id: string, actor: JwtUser) {
+    await this.access.assertCanAccess(actor, id);
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) {
       throw new NotFoundException(`Lead ${id} not found`);
@@ -316,6 +325,8 @@ export class EnrichmentService {
       include: {
         images: true,
         sources: true,
+        createdBy: { select: STUDIO_CREATOR_SELECT },
+        studioShares: { select: { userId: true } },
       },
     });
 

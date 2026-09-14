@@ -11,6 +11,9 @@ import {
   UPLOAD_MIME_TYPES,
 } from '../storage/storage.service';
 import { UpdateLeadDto } from './dto/update-lead.dto';
+import type { JwtUser } from '../auth/jwt.strategy';
+import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
+import { STUDIO_CREATOR_SELECT } from '../owner/owner.util';
 
 export type LeadUploadFile = {
   buffer?: Buffer;
@@ -34,10 +37,12 @@ export class LeadService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly access: StudioLeadAccessService,
   ) {}
 
-  async findAll() {
-    return this.prisma.lead.findMany({
+  async findAll(actor: JwtUser) {
+    const leads = await this.prisma.lead.findMany({
+      where: this.access.visibleWhere(actor),
       orderBy: { updatedAt: 'desc' },
       include: {
         _count: {
@@ -46,12 +51,15 @@ export class LeadService {
             sources: true,
           },
         },
+        createdBy: { select: STUDIO_CREATOR_SELECT },
+        studioShares: { select: { userId: true } },
       },
       omit: { generateConfig: true },
     });
+    return leads.map((lead) => this.access.present(actor, lead));
   }
 
-  async findById(id: string) {
+  async findById(id: string, actor?: JwtUser) {
     const lead = await this.prisma.lead.findUnique({
       where: { id },
       include: {
@@ -61,6 +69,8 @@ export class LeadService {
         sources: {
           orderBy: { createdAt: 'asc' },
         },
+        createdBy: { select: STUDIO_CREATOR_SELECT },
+        studioShares: { select: { userId: true } },
         users: {
           select: { id: true, email: true, name: true, role: true, createdAt: true },
         },
@@ -91,6 +101,9 @@ export class LeadService {
       throw new NotFoundException(`Lead ${id} not found`);
     }
 
+    if (actor) {
+      return this.access.present(actor, lead);
+    }
     return lead;
   }
 
@@ -110,7 +123,7 @@ export class LeadService {
     return { id: existing.id, name: existing.name, deleted: true };
   }
 
-  async update(id: string, dto: UpdateLeadDto) {
+  async update(id: string, dto: UpdateLeadDto, actor?: JwtUser) {
     await this.findById(id);
 
     const data: Prisma.LeadUpdateInput = {};
@@ -125,10 +138,10 @@ export class LeadService {
       await this.prisma.lead.update({ where: { id }, data });
     }
 
-    return this.findById(id);
+    return this.findById(id, actor);
   }
 
-  async addImages(leadId: string, files: LeadUploadFile[]) {
+  async addImages(leadId: string, files: LeadUploadFile[], actor?: JwtUser) {
     await this.findById(leadId);
     if (!files.length) {
       throw new BadRequestException('Envie ao menos uma imagem');
@@ -170,7 +183,7 @@ export class LeadService {
       });
     }
 
-    return this.findById(leadId);
+    return this.findById(leadId, actor);
   }
 
   async addVideo(
@@ -237,7 +250,7 @@ export class LeadService {
     };
   }
 
-  async deleteImage(leadId: string, imageId: string) {
+  async deleteImage(leadId: string, imageId: string, actor?: JwtUser) {
     const image = await this.prisma.leadImage.findFirst({
       where: { id: imageId, leadId },
     });
@@ -247,7 +260,7 @@ export class LeadService {
 
     await this.storageService.removeImageFile(image.localPath);
     await this.prisma.leadImage.delete({ where: { id: image.id } });
-    return this.findById(leadId);
+    return this.findById(leadId, actor);
   }
 
   private async readUploadBuffer(file: LeadUploadFile): Promise<Buffer> {

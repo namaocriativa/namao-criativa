@@ -3,21 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Criar conta — Namão Criativa</title>
-    <link rel="icon" type="image/png" href="/logo-icon.png" />
-    <link rel="apple-touch-icon" href="/logo-icon.png" />
-    <meta name="theme-color" content="#050505" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Figtree:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <!--seo-->
   </head>
   <body class="auth-body">
     <header class="site-nav">
       <a class="nav-brand" href="/">
-        <img src="/logo-icon.png" alt="" width="40" height="40" decoding="async" />
+        <img src="/logo-mark.png" alt="Namão Criativa" width="40" height="40" decoding="async" />
         <span>Namão</span>
       </a>
       <nav><a href="/login.html">Entrar</a></nav>
@@ -31,15 +22,15 @@
         <label>E-mail <input name="email" type="email" required autocomplete="email" maxlength="254" /></label>
         <label>Instagram do negócio <input name="instagram" required autocomplete="username" placeholder="@seu.negocio" maxlength="80" /></label>
         <p class="form-note">Enviamos a senha e o link de acesso para este e-mail.</p>
-        <label class="legal-accept">
-          <input type="checkbox" name="acceptedTerms" required />
+        <div class="legal-accept">
+          <input type="checkbox" id="register-accepted-terms" name="acceptedTerms" required />
           <span>
-            Li e aceito os
+            <label for="register-accepted-terms">Li e aceito os</label>
             <a href="/termos.html" target="_blank" rel="noopener noreferrer">Termos de uso</a>
             e a
             <a href="/privacidade.html" target="_blank" rel="noopener noreferrer">Política de privacidade</a>.
           </span>
-        </label>
+        </div>
         <button type="submit" id="register-btn">Criar conta</button>
       </form>
       <p class="status" id="register-status"></p>

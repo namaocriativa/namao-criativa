@@ -10,6 +10,7 @@ export type AppRoute =
   | { name: "ui-lib" }
   | { name: "config" }
   | { name: "users" }
+  | { name: "user"; id: string }
   | { name: "not-found" };
 
 const APP_TITLE = "Lead Discovery Enrichment";
@@ -51,6 +52,14 @@ export function parsePath(pathname: string): AppRoute {
   if (path === "/ui-lib") return { name: "ui-lib" };
   if (path === "/config") return { name: "config" };
   if (path === "/users") return { name: "users" };
+  const user = path.match(/^\/users\/([^/]+)$/);
+  if (user?.[1]) {
+    try {
+      return { name: "user", id: decodeURIComponent(user[1]) };
+    } catch {
+      return { name: "not-found" };
+    }
+  }
   return { name: "not-found" };
 }
 
@@ -78,6 +87,8 @@ export function hrefFor(route: AppRoute): string {
       return "/config";
     case "users":
       return "/users";
+    case "user":
+      return `/users/${encodeURIComponent(route.id)}`;
     case "not-found":
       return "/404";
   }
@@ -107,6 +118,8 @@ export function tabForRoute(route: AppRoute): string {
       return "config";
     case "users":
       return "users";
+    case "user":
+      return "user-detail";
     case "not-found":
       return "not-found";
   }
@@ -117,6 +130,7 @@ export function navRouteFor(route: AppRoute): string | null {
   if (route.name === "lead") return "leads";
   if (route.name === "customer") return "customers";
   if (route.name === "package") return "packages";
+  if (route.name === "user") return "users";
   return route.name;
 }
 
@@ -144,6 +158,8 @@ export function titleForRoute(route: AppRoute, leadName?: string): string {
       return `Config · ${APP_TITLE}`;
     case "users":
       return `Usuários · ${APP_TITLE}`;
+    case "user":
+      return `${leadName || "Usuário"} · ${APP_TITLE}`;
     case "not-found":
       return `Não encontrado · ${APP_TITLE}`;
   }
@@ -158,6 +174,7 @@ function sameRoute(a: AppRoute, b: AppRoute): boolean {
   if (a.name === "lead" && b.name === "lead") return a.id === b.id;
   if (a.name === "customer" && b.name === "customer") return a.id === b.id;
   if (a.name === "package" && b.name === "package") return a.id === b.id;
+  if (a.name === "user" && b.name === "user") return a.id === b.id;
   return true;
 }
 

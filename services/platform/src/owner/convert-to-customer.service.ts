@@ -36,6 +36,7 @@ const LEAD_COPY_FIELDS = [
   'vercelProjectId',
   'vercelDeploymentId',
   'fromPublicSignup',
+  'createdByUserId',
   'createdAt',
 ] as const;
 
@@ -94,6 +95,7 @@ export class ConvertToCustomerService {
         vercelProjectId: existing.vercelProjectId,
         vercelDeploymentId: existing.vercelDeploymentId,
         fromPublicSignup: existing.fromPublicSignup,
+        createdByUserId: existing.createdByUserId,
         createdAt: existing.createdAt,
         updatedAt: existing.updatedAt,
         convertedAt: new Date(),
@@ -140,6 +142,10 @@ export class ConvertToCustomerService {
         data: reassign,
       });
       await tx.leadActivity.updateMany({
+        where: { leadId },
+        data: reassign,
+      });
+      await tx.studioLeadShare.updateMany({
         where: { leadId },
         data: reassign,
       });

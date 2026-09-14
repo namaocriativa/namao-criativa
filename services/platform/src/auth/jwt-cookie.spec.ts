@@ -141,6 +141,33 @@ describe('cookie-origin', () => {
     ).not.toThrow();
   });
 
+  it('aceita www do website em POST com cookie do cliente', () => {
+    expect(() =>
+      assertCookieOrigin(
+        {
+          method: 'POST',
+          headers: { origin: 'https://www.namaocriativa.com.br' },
+        },
+        'client-cookie',
+        studioEnv,
+      ),
+    ).not.toThrow();
+  });
+
+  it('em desenvolvimento aceita localhost em qualquer porta', () => {
+    expect(process.env.NODE_ENV).not.toBe('production');
+    expect(() =>
+      assertCookieOrigin(
+        {
+          method: 'POST',
+          headers: { origin: 'http://localhost:5175' },
+        },
+        'studio-cookie',
+        studioEnv,
+      ),
+    ).not.toThrow();
+  });
+
   it('lê origin do Referer quando Origin falta', () => {
     expect(
       requestOrigin({

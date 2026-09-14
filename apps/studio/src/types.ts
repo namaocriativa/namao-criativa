@@ -57,6 +57,9 @@ export interface Lead {
   publishedOrigin?: string | null;
   vercelProjectId?: string | null;
   fromPublicSignup?: boolean;
+  createdBy?: { id: string; name: string; email: string } | null;
+  sharedWithMe?: boolean;
+  canManageShares?: boolean;
   source?: string;
   discoverySources?: string[];
   generateConfig?: {

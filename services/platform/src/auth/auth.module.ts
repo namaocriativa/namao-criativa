@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { MailModule } from '../mail/mail.module';
+import { StudioActivityModule } from '../studio-activity/studio-activity.module';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -16,6 +17,7 @@ import { RolesGuard } from './roles.guard';
 @Module({
   imports: [
     MailModule,
+    StudioActivityModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

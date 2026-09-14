@@ -1,14 +1,21 @@
 .namao-chat {
+  --namao-chat-keyboard: 0px;
   position: fixed;
   z-index: 90;
   right: 20px;
-  bottom: 20px;
+  bottom: calc(20px + var(--namao-chat-keyboard));
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
   font-family: var(--font-body, "Figtree", sans-serif);
   color: #1c1c1c;
+}
+
+.namao-chat__dock {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
 }
 
 .namao-chat__launcher {
@@ -22,16 +29,26 @@
   text-align: left;
 }
 
-.namao-chat__teaser {
+.namao-chat__teaser-wrap {
   position: relative;
   max-width: 230px;
+}
+
+.namao-chat__teaser {
+  position: relative;
+  display: block;
+  width: 100%;
   background: #fff;
   color: #2a2a2a;
+  border: 0;
   border-radius: 18px;
-  padding: 12px 16px;
+  padding: 12px 28px 12px 16px;
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+  font: inherit;
   font-size: 14px;
   line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
 }
 
 .namao-chat__teaser::after {
@@ -44,6 +61,22 @@
   background: #fff;
   transform: rotate(45deg);
   box-shadow: 4px 4px 10px rgb(0 0 0 / 0.06);
+}
+
+.namao-chat__teaser-dismiss {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.06);
+  color: #444;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .namao-chat__avatar {
@@ -90,7 +123,7 @@
 
 .namao-chat__panel {
   width: min(360px, calc(100vw - 32px));
-  height: min(520px, calc(100vh - 120px));
+  height: min(520px, calc(100dvh - 120px - var(--namao-chat-keyboard)));
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -100,16 +133,20 @@
 }
 
 .namao-chat__panel[hidden],
+.namao-chat__dock[hidden],
 .namao-chat__launcher[hidden],
 .namao-chat__chips[hidden],
 .namao-chat__whatsapp[hidden],
-.namao-chat__error[hidden] {
+.namao-chat__error[hidden],
+.namao-chat__terms[hidden],
+.namao-chat__terms-ok[hidden],
+.namao-chat__retry[hidden] {
   display: none !important;
 }
 
 .namao-chat--auth .namao-chat__panel {
   width: min(400px, calc(100vw - 32px));
-  height: min(580px, calc(100vh - 100px));
+  height: min(580px, calc(100dvh - 100px - var(--namao-chat-keyboard)));
   border-radius: 8px 8px 16px 16px;
 }
 
@@ -214,14 +251,68 @@
   border-radius: 14px 4px 14px 14px;
 }
 
+.namao-chat__loading {
+  color: #666;
+}
+
 .namao-chat__typing {
-  letter-spacing: 0.2em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 1.15em;
+  letter-spacing: 0;
+}
+
+.namao-chat__typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+  animation: namao-chat-dot 1s ease-in-out infinite;
+}
+
+.namao-chat__typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.namao-chat__typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes namao-chat-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
 }
 
 .namao-chat__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   color: #b42318;
   padding: 0 16px;
+}
+
+.namao-chat__retry {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .namao-chat__chips {
@@ -239,6 +330,11 @@
   padding: 7px 12px;
   font-size: 12px;
   cursor: pointer;
+}
+
+.namao-chat__chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .namao-chat__footer {
@@ -279,10 +375,28 @@
   accent-color: #111;
 }
 
+.namao-chat__terms label {
+  display: inline;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
 .namao-chat__terms a {
   color: #111;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.namao-chat__terms-ok {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #0f766e;
+  padding: 0 4px;
+}
+
+.namao-chat--auth .namao-chat__terms-ok {
+  color: #444;
 }
 
 .namao-chat__form {
@@ -312,6 +426,10 @@
   color: #1c1c1c;
 }
 
+.namao-chat__form input:disabled {
+  opacity: 0.55;
+}
+
 .namao-chat__send {
   width: 36px;
   height: 36px;
@@ -336,12 +454,36 @@
 
 @media (max-width: 520px) {
   .namao-chat {
-    right: 12px;
-    bottom: 12px;
+    right: 8px;
+    left: 8px;
+    bottom: calc(8px + var(--namao-chat-keyboard));
+    align-items: stretch;
+  }
+
+  .namao-chat__dock {
+    align-self: flex-end;
+  }
+
+  .namao-chat__teaser-wrap {
+    max-width: min(180px, calc(100vw - 92px));
   }
 
   .namao-chat__teaser {
-    max-width: 180px;
     font-size: 13px;
+  }
+
+  .namao-chat__panel,
+  .namao-chat--auth .namao-chat__panel {
+    width: 100%;
+    height: calc(100dvh - 16px - var(--namao-chat-keyboard));
+    max-height: calc(100dvh - 16px - var(--namao-chat-keyboard));
+    border-radius: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .namao-chat__typing span {
+    animation: none;
+    opacity: 0.7;
   }
 }

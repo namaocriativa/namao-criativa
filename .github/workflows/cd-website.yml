@@ -58,7 +58,12 @@ jobs:
       - name: Write API proxy redirects
         run: npm run website:redirects -w @namao/cloud
 
+      - name: Test website SEO
+        run: npm test -w @namao/website
+
       - name: Build
+        env:
+          VITE_WEBSITE_GTM_ID: ${{ vars.WEBSITE_GTM_CONTAINER_ID }}
         run: npm run build -w @namao/website
 
       - id: cf

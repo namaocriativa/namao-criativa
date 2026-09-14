@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { getStudioUser } from "./session";
+import { hrefFor, navigate, titleForRoute, type AppRoute } from "./router";
 
 type StudioUserRow = {
   id: string;
@@ -7,6 +8,14 @@ type StudioUserRow = {
   name: string;
   role: string;
   createdAt: string;
+};
+
+type ActivityItem = {
+  id: string;
+  title: string;
+  summary: string | null;
+  kind: string;
+  at: string;
 };
 
 function escapeHtml(value: unknown): string {
@@ -23,6 +32,15 @@ function errorMessage(error: unknown, fallback: string): string {
 
 function roleLabel(role: string): string {
   return role === "ADMIN" ? "Admin" : "Operador";
+}
+
+function formatDate(value: string | Date | null | undefined) {
+  if (!value) return "";
+  try {
+    return new Date(value).toLocaleString("pt-BR");
+  } catch {
+    return String(value);
+  }
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -44,137 +62,212 @@ export function initUsersTab() {
   const statusEl = el<HTMLElement>("users-status");
   const form = el<HTMLFormElement>("users-create-form");
   const createStatus = el<HTMLElement>("users-create-status");
+  const heading = el<HTMLElement>("user-detail-heading");
+  const meta = el<HTMLElement>("user-detail-meta");
+  const detailStatus = el<HTMLElement>("user-detail-status");
+  const roleSelect = el<HTMLSelectElement>("user-role-select");
+  const resetBtn = el<HTMLButtonElement>("user-reset-btn");
+  const deleteBtn = el<HTMLButtonElement>("user-delete-btn");
+  const activityList = el<HTMLElement>("user-activity-list");
+  const activityHint = el<HTMLElement>("user-activity-hint");
 
-  async function reload() {
-    statusEl.textContent = "Carregando…";
-    statusEl.classList.remove("error");
+  let current: StudioUserRow | null = null;
+  let loadSeq = 0;
+
+  function setListStatus(message: string, isError = false) {
+    statusEl.textContent = message;
+    statusEl.classList.toggle("error", isError);
+  }
+
+  function setCreateStatus(message: string, isError = false) {
+    createStatus.textContent = message;
+    createStatus.classList.toggle("error", isError);
+  }
+
+  function setDetailStatus(message: string, isError = false) {
+    detailStatus.textContent = message;
+    detailStatus.classList.toggle("error", isError);
+  }
+
+  function renderList(rows: StudioUserRow[]) {
+    if (!rows.length) {
+      listEl.innerHTML = `<p class="empty-detail">Nenhum usuário do studio.</p>`;
+      return;
+    }
+    listEl.innerHTML = `<ul class="users-grid">${rows
+      .map((user) => {
+        const href = hrefFor({ name: "user", id: user.id });
+        return `<li>
+          <a class="app-card users-card" href="${escapeHtml(href)}">
+            <div class="users-card-head">
+              <strong>${escapeHtml(user.name)}</strong>
+              <span class="users-role">${escapeHtml(roleLabel(user.role))}</span>
+            </div>
+            <p class="users-email">${escapeHtml(user.email)}</p>
+          </a>
+        </li>`;
+      })
+      .join("")}</ul>`;
+  }
+
+  function renderActivity(items: ActivityItem[]) {
+    const recorded = items.filter((item) => item.kind !== "account.created");
+    activityHint.hidden = recorded.length > 0;
+    activityList.innerHTML = items.length
+      ? items
+          .map(
+            (item) =>
+              `<li><strong>${escapeHtml(item.title)}</strong>${
+                item.summary
+                  ? `<p class="meta">${escapeHtml(item.summary)}</p>`
+                  : ""
+              }${
+                item.at
+                  ? `<p class="meta">${escapeHtml(formatDate(item.at))}</p>`
+                  : ""
+              }</li>`,
+          )
+          .join("")
+      : `<li><strong>Sem histórico</strong></li>`;
+  }
+
+  function fillDetail(user: StudioUserRow) {
+    current = user;
+    const me = getStudioUser();
+    const self = user.id === me?.id;
+    heading.textContent = user.name || user.email;
+    meta.textContent = `${user.email} · ${roleLabel(user.role)} · desde ${formatDate(user.createdAt)}`;
+    roleSelect.value = user.role === "ADMIN" ? "ADMIN" : "OPERATOR";
+    roleSelect.disabled = self;
+    deleteBtn.disabled = self;
+    document.title = titleForRoute({ name: "user", id: user.id }, user.name);
+  }
+
+  async function reloadList() {
+    setListStatus("Carregando…");
     try {
       const res = await api("/studio/users");
       if (!res.ok) throw new Error(await readError(res));
       const rows = (await res.json()) as StudioUserRow[];
-      const me = getStudioUser();
-      if (!rows.length) {
-        listEl.innerHTML = `<p class="empty-detail">Nenhum usuário do studio.</p>`;
-      } else {
-        listEl.innerHTML = `<ul class="users-grid">${rows
-          .map((user) => {
-            const self = user.id === me?.id;
-            return `<li class="app-card users-card" data-id="${escapeHtml(user.id)}">
-              <div class="users-card-head">
-                <strong>${escapeHtml(user.name)}</strong>
-                <span class="users-role">${escapeHtml(roleLabel(user.role))}</span>
-              </div>
-              <p class="users-email">${escapeHtml(user.email)}</p>
-              <div class="users-card-actions">
-                <label>
-                  Papel
-                  <select data-role-select ${self ? "disabled" : ""}>
-                    <option value="OPERATOR" ${user.role === "OPERATOR" ? "selected" : ""}>Operador</option>
-                    <option value="ADMIN" ${user.role === "ADMIN" ? "selected" : ""}>Admin</option>
-                  </select>
-                </label>
-                <button type="button" class="secondary" data-reset>Resetar senha</button>
-                <button type="button" class="danger" data-remove ${self ? "disabled" : ""}>Remover</button>
-              </div>
-            </li>`;
-          })
-          .join("")}</ul>`;
-      }
-      statusEl.textContent = `${rows.length} usuário(s)`;
+      renderList(rows);
+      setListStatus(`${rows.length} usuário(s)`);
     } catch (error) {
-      statusEl.textContent = errorMessage(error, "Falha ao listar usuários");
-      statusEl.classList.add("error");
+      setListStatus(errorMessage(error, "Falha ao listar usuários"), true);
+    }
+  }
+
+  async function loadDetail(id: string) {
+    const seq = ++loadSeq;
+    current = null;
+    heading.textContent = "Usuário";
+    meta.textContent = "";
+    setDetailStatus("Carregando…");
+    activityList.innerHTML = `<li><strong>Carregando histórico…</strong></li>`;
+    activityHint.hidden = true;
+    try {
+      const [userRes, activityRes] = await Promise.all([
+        api(`/studio/users/${encodeURIComponent(id)}`),
+        api(`/studio/users/${encodeURIComponent(id)}/activity`),
+      ]);
+      if (seq !== loadSeq) return;
+      if (!userRes.ok) throw new Error(await readError(userRes));
+      const user = (await userRes.json()) as StudioUserRow;
+      if (seq !== loadSeq) return;
+      fillDetail(user);
+      setDetailStatus("");
+      if (!activityRes.ok) {
+        renderActivity([]);
+        setDetailStatus(await readError(activityRes), true);
+        return;
+      }
+      const data = (await activityRes.json()) as { items?: ActivityItem[] };
+      if (seq !== loadSeq) return;
+      renderActivity(Array.isArray(data.items) ? data.items : []);
+    } catch (error) {
+      if (seq !== loadSeq) return;
+      setDetailStatus(errorMessage(error, "Falha ao abrir usuário"), true);
+      activityList.innerHTML = `<li><strong>Sem histórico</strong></li>`;
     }
   }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const fd = new FormData(form);
-    createStatus.textContent = "Criando…";
-    createStatus.classList.remove("error");
+    setCreateStatus("Enviando convite…");
     try {
       const res = await api("/studio/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: String(fd.get("name") || "").trim(),
           email: String(fd.get("email") || "").trim(),
-          password: String(fd.get("password") || ""),
-          role: String(fd.get("role") || "OPERATOR"),
         }),
       });
       if (!res.ok) throw new Error(await readError(res));
       form.reset();
-      createStatus.textContent = "Usuário criado.";
-      await reload();
+      setCreateStatus("Convite enviado por e-mail.");
+      await reloadList();
     } catch (error) {
-      createStatus.textContent = errorMessage(error, "Falha ao criar");
-      createStatus.classList.add("error");
+      setCreateStatus(errorMessage(error, "Falha ao enviar convite"), true);
     }
   });
 
-  listEl.addEventListener("change", async (event) => {
-    const select = (event.target as HTMLElement | null)?.closest(
-      "select[data-role-select]",
-    ) as HTMLSelectElement | null;
-    if (!select) return;
-    const card = select.closest<HTMLElement>("[data-id]");
-    const id = card?.dataset.id;
-    if (!id) return;
-    statusEl.textContent = "Atualizando papel…";
+  roleSelect.addEventListener("change", async () => {
+    if (!current) return;
+    setDetailStatus("Atualizando papel…");
     try {
-      const res = await api(`/studio/users/${encodeURIComponent(id)}`, {
+      const res = await api(`/studio/users/${encodeURIComponent(current.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: select.value }),
+        body: JSON.stringify({ role: roleSelect.value }),
       });
       if (!res.ok) throw new Error(await readError(res));
-      await reload();
+      const user = (await res.json()) as StudioUserRow;
+      fillDetail(user);
+      setDetailStatus("Papel atualizado.");
+      await loadDetail(user.id);
     } catch (error) {
-      statusEl.textContent = errorMessage(error, "Falha ao atualizar");
-      statusEl.classList.add("error");
-      await reload();
+      setDetailStatus(errorMessage(error, "Falha ao atualizar"), true);
+      if (current) roleSelect.value = current.role === "ADMIN" ? "ADMIN" : "OPERATOR";
     }
   });
 
-  listEl.addEventListener("click", async (event) => {
-    const target = (event.target as HTMLElement | null)?.closest("button");
-    if (!target) return;
-    const card = target.closest<HTMLElement>("[data-id]");
-    const id = card?.dataset.id;
-    if (!id) return;
-    if (target.matches("[data-reset]")) {
-      statusEl.textContent = "Resetando senha…";
-      try {
-        const res = await api(
-          `/studio/users/${encodeURIComponent(id)}/reset-password`,
-          { method: "POST" },
-        );
-        if (!res.ok) throw new Error(await readError(res));
-        await res.json().catch(() => ({}));
-        statusEl.textContent = "Nova senha enviada por e-mail.";
-        statusEl.classList.remove("error");
-      } catch (error) {
-        statusEl.textContent = errorMessage(error, "Falha ao resetar senha");
-        statusEl.classList.add("error");
-      }
-      return;
-    }
-    if (target.matches("[data-remove]")) {
-      if (!confirm("Remover este usuário do studio?")) return;
-      statusEl.textContent = "Removendo…";
-      try {
-        const res = await api(`/studio/users/${encodeURIComponent(id)}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) throw new Error(await readError(res));
-        await reload();
-      } catch (error) {
-        statusEl.textContent = errorMessage(error, "Falha ao remover");
-        statusEl.classList.add("error");
-      }
+  resetBtn.addEventListener("click", async () => {
+    if (!current) return;
+    setDetailStatus("Resetando senha…");
+    try {
+      const res = await api(
+        `/studio/users/${encodeURIComponent(current.id)}/reset-password`,
+        { method: "POST" },
+      );
+      if (!res.ok) throw new Error(await readError(res));
+      setDetailStatus("Nova senha enviada por e-mail.");
+      await loadDetail(current.id);
+    } catch (error) {
+      setDetailStatus(errorMessage(error, "Falha ao resetar senha"), true);
     }
   });
 
-  return { reload };
+  deleteBtn.addEventListener("click", async () => {
+    if (!current) return;
+    if (!confirm("Remover este usuário do studio?")) return;
+    setDetailStatus("Removendo…");
+    try {
+      const res = await api(`/studio/users/${encodeURIComponent(current.id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(await readError(res));
+      current = null;
+      navigate({ name: "users" });
+    } catch (error) {
+      setDetailStatus(errorMessage(error, "Falha ao remover"), true);
+    }
+  });
+
+  return {
+    reload: reloadList,
+    onRoute(route: AppRoute) {
+      if (route.name === "users") void reloadList();
+      if (route.name === "user") void loadDetail(route.id);
+    },
+  };
 }

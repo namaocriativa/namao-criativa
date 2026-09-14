@@ -27,7 +27,10 @@ describe('LeadService images', () => {
     removeLeadDir: jest.fn(),
   };
 
-  const service = new LeadService(prisma as never, storage as never);
+  const service = new LeadService(prisma as never, storage as never, {
+    present: (_user: unknown, record: unknown) => record,
+    visibleWhere: () => ({}),
+  } as never);
 
   beforeEach(() => {
     jest.resetAllMocks();

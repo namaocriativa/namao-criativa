@@ -29,12 +29,24 @@ export function jwtOwnerId(user: {
   return user.customerId || user.leadId || null;
 }
 
+export const STUDIO_CREATOR_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+} as const;
+
 export const PROFILE_DETAIL_INCLUDE = {
   images: {
     orderBy: { createdAt: 'asc' as const },
   },
   sources: {
     orderBy: { createdAt: 'asc' as const },
+  },
+  createdBy: {
+    select: STUDIO_CREATOR_SELECT,
+  },
+  studioShares: {
+    select: { userId: true },
   },
   users: {
     select: {
@@ -73,6 +85,12 @@ export const PROFILE_LIST_INCLUDE = {
       images: true,
       sources: true,
     },
+  },
+  createdBy: {
+    select: STUDIO_CREATOR_SELECT,
+  },
+  studioShares: {
+    select: { userId: true },
   },
 };
 

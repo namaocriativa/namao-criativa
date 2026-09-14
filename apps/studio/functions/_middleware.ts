@@ -1,6 +1,7 @@
 import {
   isSameStudioOrigin,
   isUnauthenticatedApiAllowed,
+  pagesPrettyPath,
   safeNextPath,
 } from './proxy-policy';
 
@@ -136,11 +137,6 @@ export async function onRequest(context: {
   const apiOrigin = resolveStudioApiOrigin(env.STUDIO_API_ORIGIN);
 
   if (pathname === '/login' || pathname === '/login.html') {
-    if (env.ASSETS?.fetch) {
-      return env.ASSETS.fetch(
-        new Request(new URL('/login.html', url.origin), request),
-      );
-    }
     return next();
   }
 
@@ -207,9 +203,14 @@ export async function onRequest(context: {
     return next();
   }
 
-  const indexUrl = new URL('/index.html', url.origin);
   if (env.ASSETS?.fetch) {
-    return env.ASSETS.fetch(new Request(indexUrl, request));
+    return env.ASSETS.fetch(
+      new Request(new URL(pagesPrettyPath('/index.html'), url.origin), {
+        method: request.method === 'HEAD' ? 'HEAD' : 'GET',
+        headers: request.headers,
+        redirect: 'manual',
+      }),
+    );
   }
   return next();
 }

@@ -5,6 +5,7 @@ import { SIGNUP_SUCCESS } from './signup';
 
 const form = document.getElementById('login-form') as HTMLFormElement;
 const statusEl = document.getElementById('login-status') as HTMLElement;
+const submitBtn = document.getElementById('login-btn') as HTMLButtonElement;
 const emailInput = form.querySelector<HTMLInputElement>('input[name="email"]');
 const params = new URLSearchParams(location.search);
 
@@ -22,6 +23,7 @@ form.addEventListener('submit', async (event) => {
   const fd = new FormData(form);
   statusEl.textContent = 'Entrando…';
   statusEl.classList.remove('error');
+  submitBtn.disabled = true;
   try {
     await api('/auth/login', {
       method: 'POST',
@@ -36,5 +38,6 @@ form.addEventListener('submit', async (event) => {
     statusEl.textContent =
       error instanceof Error ? error.message : 'Falha no login';
     statusEl.classList.add('error');
+    submitBtn.disabled = false;
   }
 });

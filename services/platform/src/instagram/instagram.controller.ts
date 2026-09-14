@@ -13,10 +13,14 @@ import { Public } from '../auth/public.decorator';
 import { StudioAuth } from '../auth/studio-auth.decorator';
 import { jwtOwnerId } from '../owner/owner.util';
 import { InstagramService } from './instagram.service';
+import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 
 @Controller()
 export class InstagramController {
-  constructor(private readonly instagram: InstagramService) {}
+  constructor(
+    private readonly instagram: InstagramService,
+    private readonly access: StudioLeadAccessService,
+  ) {}
 
   @Get('auth/instagram/start')
   async start(@CurrentUser() user: JwtUser) {
@@ -50,7 +54,8 @@ export class InstagramController {
 
   @Post('leads/:id/instagram/sync')
   @StudioAuth()
-  syncLead(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+  async syncLead(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    await this.access.assertCanAccess(user, id);
     return this.instagram.syncLead(id, user);
   }
 }

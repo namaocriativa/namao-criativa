@@ -28,11 +28,16 @@ describe('AuthService', () => {
   const jwt = { sign: jest.fn().mockReturnValue('token') };
   const mail = { sendCredentials: jest.fn() };
   const config = { get: jest.fn().mockReturnValue('http://localhost:5174') };
+  const activity = {
+    recordLogin: jest.fn().mockResolvedValue(undefined),
+    recordLogout: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new AuthService(
     prisma as never,
     jwt as never,
     mail as never,
     config as never,
+    activity as never,
   );
 
   const pendingInvite = {
@@ -71,6 +76,8 @@ describe('AuthService', () => {
     prisma.instagramConnection.findFirst.mockResolvedValue(null);
     prisma.invite.update.mockResolvedValue({});
     mail.sendCredentials.mockResolvedValue(undefined);
+    activity.recordLogin.mockResolvedValue(undefined);
+    activity.recordLogout.mockResolvedValue(undefined);
   });
 
   it('cria lead, gera senha e envia o acesso por e-mail', async () => {
@@ -245,6 +252,7 @@ describe('AuthService', () => {
     });
     expect(result.user.role).toBe('ADMIN');
     expect(result.accessToken).toBe('token');
+    expect(activity.recordLogin).toHaveBeenCalledWith('a1');
   });
 
   it('ensureStudioAdmin cria o primeiro admin', async () => {

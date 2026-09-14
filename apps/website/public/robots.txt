@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /login.html
+Disallow: /register
+Disallow: /register.html
+Disallow: /dashboard
+Disallow: /dashboard.html
+Disallow: /conectar
+Disallow: /conectar.html
+
+Sitemap: https://namaocriativa.com.br/sitemap.xml

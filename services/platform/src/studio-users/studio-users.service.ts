@@ -13,6 +13,7 @@ import { isStudioRole, USER_ROLE } from '../auth/roles';
 import { MailService } from '../mail/mail.service';
 import { CreateStudioUserDto } from './dto/create-studio-user.dto';
 import { UpdateStudioUserDto } from './dto/update-studio-user.dto';
+import { nameFromEmail } from './studio-users.util';
 
 const STUDIO_USER_SELECT = {
   id: true,
@@ -22,6 +23,14 @@ const STUDIO_USER_SELECT = {
   createdAt: true,
   updatedAt: true,
 } as const;
+
+export type StudioUserActivityItem = {
+  id: string;
+  title: string;
+  summary: string | null;
+  kind: string;
+  at: string;
+};
 
 @Injectable()
 export class StudioUsersService {
@@ -39,29 +48,42 @@ export class StudioUsersService {
     });
   }
 
+  get(id: string) {
+    return this.requireStudioUser(id);
+  }
+
   async create(dto: CreateStudioUserDto) {
     const email = dto.email.trim().toLowerCase();
-    const name = dto.name.trim();
-    if (!name) {
-      throw new BadRequestException('Nome é obrigatório');
-    }
-    if (!isStudioRole(dto.role)) {
-      throw new BadRequestException('Papel inválido');
-    }
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
       throw new BadRequestException('Este e-mail já tem conta');
     }
-    const passwordHash = await bcrypt.hash(dto.password, 10);
-    return this.prisma.user.create({
+    const name = nameFromEmail(email);
+    const password = generatePassword();
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await this.prisma.user.create({
       data: {
         email,
         name,
         passwordHash,
-        role: dto.role,
+        role: USER_ROLE.OPERATOR,
       },
       select: STUDIO_USER_SELECT,
     });
+    try {
+      await this.mail.sendStudioWelcome({
+        to: user.email,
+        name: user.name,
+        email: user.email,
+        password,
+        loginUrl: this.studioLoginUrl(),
+        kind: 'welcome',
+      });
+    } catch (error) {
+      await this.prisma.user.delete({ where: { id: user.id } }).catch(() => {});
+      throw error;
+    }
+    return user;
   }
 
   async update(id: string, dto: UpdateStudioUserDto, actor: JwtUser) {
@@ -88,15 +110,13 @@ export class StudioUsersService {
       where: { id },
       data: { passwordHash },
     });
-    const origin = (
-      this.config.get<string>('NAMAO_STUDIO_URL') || 'http://localhost:5173'
-    ).replace(/\/$/, '');
-    await this.mail.sendCredentials({
+    await this.mail.sendStudioWelcome({
       to: user.email,
       name: user.name,
       email: user.email,
       password,
-      loginUrl: `${origin}/login`,
+      loginUrl: this.studioLoginUrl(),
+      kind: 'reset',
     });
     return { ok: true as const };
   }
@@ -111,6 +131,40 @@ export class StudioUsersService {
     }
     await this.prisma.user.delete({ where: { id } });
     return { ok: true as const };
+  }
+
+  async listActivity(id: string): Promise<{ items: StudioUserActivityItem[] }> {
+    const user = await this.requireStudioUser(id);
+    const rows = await this.prisma.studioUserActivity.findMany({
+      where: { userId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    const items: StudioUserActivityItem[] = [
+      ...rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        summary: row.summary || null,
+        kind: row.kind,
+        at: row.createdAt.toISOString(),
+      })),
+      {
+        id: 'system:created',
+        title: 'Conta criada',
+        summary: null,
+        kind: 'account.created',
+        at: user.createdAt.toISOString(),
+      },
+    ];
+    items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+    return { items };
+  }
+
+  private studioLoginUrl() {
+    const origin = (
+      this.config.get<string>('NAMAO_STUDIO_URL') || 'http://localhost:5173'
+    ).replace(/\/$/, '');
+    return `${origin}/login`;
   }
 
   private async requireStudioUser(id: string) {

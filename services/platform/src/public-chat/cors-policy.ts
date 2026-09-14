@@ -1,3 +1,5 @@
+import { withWwwAliases } from '../auth/cookie-origin';
+
 export const PREVIEW_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -18,19 +20,37 @@ export function isLoopbackHttpOrigin(origin: string): boolean {
   }
 }
 
-export function staticCorsOrigins(): string[] {
-  return [
-    ...PREVIEW_ORIGINS,
-    process.env.NAMAO_PUBLIC_URL?.replace(/\/$/, '') || '',
-    process.env.NAMAO_STUDIO_URL?.replace(/\/$/, '') || '',
-  ].filter(Boolean);
+export function allowLoopbackCors(
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): boolean {
+  return nodeEnv !== 'production';
 }
 
-export function isPreviewOrigin(origin?: string | null): boolean {
+export function staticCorsOrigins(
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): string[] {
+  const configured = withWwwAliases([
+    process.env.NAMAO_PUBLIC_URL?.replace(/\/$/, '') || '',
+    process.env.NAMAO_STUDIO_URL?.replace(/\/$/, '') || '',
+  ]);
+  if (!allowLoopbackCors(nodeEnv)) return configured.filter(Boolean);
+  return [...PREVIEW_ORIGINS, ...configured].filter(Boolean);
+}
+
+export function isPreviewOrigin(
+  origin?: string | null,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): boolean {
   if (!origin) return true;
   const normalized = origin.replace(/\/$/, '');
-  if (staticCorsOrigins().includes(normalized)) return true;
+  if (staticCorsOrigins(nodeEnv).includes(normalized)) return true;
+  if (!allowLoopbackCors(nodeEnv)) return false;
   return isLoopbackHttpOrigin(normalized);
+}
+
+export function isPublicChatPath(path?: string | null): boolean {
+  const pathname = String(path || '').split('?')[0];
+  return pathname === '/public/chat' || pathname.startsWith('/public/chat/');
 }
 
 export function originAllowedForLead(

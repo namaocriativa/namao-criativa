@@ -40,9 +40,11 @@ model Lead {
   vercelProjectId     String?
   vercelDeploymentId  String?
   fromPublicSignup    Boolean  @default(false)
+  createdByUserId     String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  createdBy User? @relation("LeadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   images  LeadImage[]
   sources LeadSource[]
   users   User[]
@@ -53,8 +55,10 @@ model Lead {
   chatSessions ChatSession[]
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
+  studioShares StudioLeadShare[]
 
   @@index([fromPublicSignup])
+  @@index([createdByUserId])
 }
 
 model Customer {
@@ -90,10 +94,12 @@ model Customer {
   vercelProjectId     String?
   vercelDeploymentId  String?
   fromPublicSignup    Boolean  @default(false)
+  createdByUserId     String?
   convertedAt DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  createdBy User? @relation("CustomerCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   images  LeadImage[]
   sources LeadSource[]
   users   User[]
@@ -104,8 +110,10 @@ model Customer {
   chatSessions ChatSession[]
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
+  studioShares StudioLeadShare[]
 
   @@index([fromPublicSignup])
+  @@index([createdByUserId])
 }
 
 model LeadActivity {
@@ -247,9 +255,47 @@ model User {
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   instagramConnections InstagramConnection[]
   chatSessions ChatSession[]
+  studioActivities StudioUserActivity[]
+  createdLeads Lead[] @relation("LeadCreatedBy")
+  createdCustomers Customer[] @relation("CustomerCreatedBy")
+  studioLeadShares StudioLeadShare[]
 
   @@index([leadId])
   @@index([customerId])
+}
+
+model StudioLeadShare {
+  id         String   @id @default(cuid())
+  leadId     String?
+  customerId String?
+  userId     String
+  createdAt  DateTime @default(now())
+
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, userId])
+  @@unique([customerId, userId])
+  @@index([userId])
+  @@index([leadId])
+  @@index([customerId])
+}
+
+model StudioUserActivity {
+  id        String   @id @default(cuid())
+  userId    String
+  method    String
+  path      String
+  kind      String
+  title     String
+  summary   String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model Invite {

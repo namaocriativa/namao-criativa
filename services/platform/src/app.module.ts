@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { join } from 'path';
+import { StudioActivityModule } from './studio-activity/studio-activity.module';
+import { StudioLeadAccessModule } from './studio-lead-access/studio-lead-access.module';
 import { StudioUsersModule } from './studio-users/studio-users.module';
 import { EnrichmentModule } from './enrichment/enrichment.module';
 import { CustomerModule } from './customer/customer.module';
@@ -32,6 +34,7 @@ import { NamaoChatModule } from './namao-chat/namao-chat.module';
     }),
     PrismaModule,
     OwnerModule,
+    StudioLeadAccessModule,
     RedisModule,
     StorageModule,
     LlmModule,
@@ -50,6 +53,7 @@ import { NamaoChatModule } from './namao-chat/namao-chat.module';
     NamaoChatModule,
     InviteRequestsModule,
     DashboardModule,
+    StudioActivityModule,
     StudioUsersModule,
   ],
   controllers: [HealthController],

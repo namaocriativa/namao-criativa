@@ -13,6 +13,8 @@ import {
   UPLOAD_MIME_TYPES,
 } from '../storage/storage.service';
 import { PROFILE_DETAIL_INCLUDE, PROFILE_LIST_INCLUDE } from '../owner/owner.util';
+import type { JwtUser } from '../auth/jwt.strategy';
+import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
@@ -24,23 +26,29 @@ export class CustomerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly access: StudioLeadAccessService,
   ) {}
 
-  async findAll() {
-    return this.prisma.customer.findMany({
+  async findAll(actor: JwtUser) {
+    const customers = await this.prisma.customer.findMany({
+      where: this.access.visibleWhere(actor),
       orderBy: { updatedAt: 'desc' },
       include: PROFILE_LIST_INCLUDE,
       omit: { generateConfig: true },
     });
+    return customers.map((customer) => this.access.present(actor, customer));
   }
 
-  async findById(id: string) {
+  async findById(id: string, actor?: JwtUser) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
       include: PROFILE_DETAIL_INCLUDE,
     });
     if (!customer) {
       throw new NotFoundException(`Customer ${id} not found`);
+    }
+    if (actor) {
+      return this.access.present(actor, customer);
     }
     return customer;
   }
@@ -58,7 +66,7 @@ export class CustomerService {
     return { id: existing.id, name: existing.name, deleted: true };
   }
 
-  async update(id: string, dto: UpdateLeadDto) {
+  async update(id: string, dto: UpdateLeadDto, actor?: JwtUser) {
     await this.findById(id);
     const data: Prisma.CustomerUpdateInput = {};
     if (dto.city !== undefined) data.city = dto.city;
@@ -70,10 +78,10 @@ export class CustomerService {
     if (Object.keys(data).length) {
       await this.prisma.customer.update({ where: { id }, data });
     }
-    return this.findById(id);
+    return this.findById(id, actor);
   }
 
-  async addImages(customerId: string, files: LeadUploadFile[]) {
+  async addImages(customerId: string, files: LeadUploadFile[], actor?: JwtUser) {
     await this.findById(customerId);
     if (!files.length) {
       throw new BadRequestException('Envie ao menos uma imagem');
@@ -113,7 +121,7 @@ export class CustomerService {
         },
       });
     }
-    return this.findById(customerId);
+    return this.findById(customerId, actor);
   }
 
   async addVideo(
@@ -180,7 +188,7 @@ export class CustomerService {
     };
   }
 
-  async deleteImage(customerId: string, imageId: string) {
+  async deleteImage(customerId: string, imageId: string, actor?: JwtUser) {
     const image = await this.prisma.leadImage.findFirst({
       where: { id: imageId, customerId },
     });
@@ -189,7 +197,7 @@ export class CustomerService {
     }
     await this.storageService.removeImageFile(image.localPath);
     await this.prisma.leadImage.delete({ where: { id: image.id } });
-    return this.findById(customerId);
+    return this.findById(customerId, actor);
   }
 
   private async readUploadBuffer(file: LeadUploadFile): Promise<Buffer> {

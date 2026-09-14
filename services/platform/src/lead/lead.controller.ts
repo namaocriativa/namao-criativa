@@ -9,6 +9,7 @@ import {
   Query,
   UploadedFile,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
@@ -18,11 +19,18 @@ import { LeadMailService } from '../lead-mail/lead-mail.service';
 import { SendLeadWhatsAppDto } from '../lead-whatsapp/dto/send-lead-whatsapp.dto';
 import { LeadWhatsAppService } from '../lead-whatsapp/lead-whatsapp.service';
 import { StudioAuth } from '../auth/studio-auth.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { JwtUser } from '../auth/jwt.strategy';
 import { ConvertToCustomerService } from '../owner/convert-to-customer.service';
+import { CreateStudioLeadShareDto } from '../studio-lead-access/dto/create-studio-lead-share.dto';
+import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
+import { StudioLeadShareService } from '../studio-lead-access/studio-lead-share.service';
+import { StudioProfileAccessGuard } from '../studio-lead-access/studio-profile-access.guard';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadService, type LeadUploadFile } from './lead.service';
 
 @StudioAuth()
+@UseGuards(StudioProfileAccessGuard)
 @Controller('leads')
 export class LeadController {
   constructor(
@@ -32,11 +40,36 @@ export class LeadController {
     private readonly whatsapp: LeadWhatsAppService,
     private readonly activity: LeadActivityService,
     private readonly convertToCustomer: ConvertToCustomerService,
+    private readonly shares: StudioLeadShareService,
+    private readonly access: StudioLeadAccessService,
   ) {}
 
   @Get()
-  findAll() {
-    return this.leadService.findAll();
+  findAll(@CurrentUser() user: JwtUser) {
+    return this.leadService.findAll(user);
+  }
+
+  @Get(':id/shares')
+  listShares(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    return this.shares.list(user, id);
+  }
+
+  @Post(':id/shares')
+  addShare(
+    @Param('id') id: string,
+    @Body() dto: CreateStudioLeadShareDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.shares.add(user, id, dto.userId);
+  }
+
+  @Delete(':id/shares/:userId')
+  removeShare(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.shares.remove(user, id, userId);
   }
 
   @Get(':id/account')
@@ -94,18 +127,26 @@ export class LeadController {
   }
 
   @Post(':id/convert-to-customer')
-  convertToCustomerAction(@Param('id') id: string) {
-    return this.convertToCustomer.convert(id);
+  async convertToCustomerAction(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    const customer = await this.convertToCustomer.convert(id);
+    return this.access.present(user, customer);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.leadService.findById(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    return this.leadService.findById(id, user);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateLeadDto) {
-    return this.leadService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateLeadDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.leadService.update(id, dto, user);
   }
 
   @Post(':id/images')
@@ -117,8 +158,9 @@ export class LeadController {
   uploadImages(
     @Param('id') id: string,
     @UploadedFiles() files: LeadUploadFile[],
+    @CurrentUser() user: JwtUser,
   ) {
-    return this.leadService.addImages(id, files ?? []);
+    return this.leadService.addImages(id, files ?? [], user);
   }
 
   @Get(':id/videos')
@@ -144,8 +186,9 @@ export class LeadController {
   removeImage(
     @Param('id') id: string,
     @Param('imageId') imageId: string,
+    @CurrentUser() user: JwtUser,
   ) {
-    return this.leadService.deleteImage(id, imageId);
+    return this.leadService.deleteImage(id, imageId, user);
   }
 
   @Delete(':id')

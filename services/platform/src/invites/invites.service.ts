@@ -126,6 +126,15 @@ export class InvitesService {
     };
   }
 
+  async getStudioInvite(id: string) {
+    const invite = await this.prisma.invite.findUnique({
+      where: { id },
+      select: { id: true, leadId: true, customerId: true },
+    });
+    if (!invite) throw new NotFoundException('Convite não encontrado');
+    return invite;
+  }
+
   async sendWhatsApp(id: string) {
     const invite = await this.prisma.invite.findUnique({
       where: { id },

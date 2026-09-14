@@ -3,21 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Entrar — Namão Criativa</title>
-    <link rel="icon" type="image/png" href="/logo-icon.png" />
-    <link rel="apple-touch-icon" href="/logo-icon.png" />
-    <meta name="theme-color" content="#050505" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Figtree:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <!--seo-->
   </head>
   <body class="auth-body">
     <header class="site-nav">
       <a class="nav-brand" href="/">
-        <img src="/logo-icon.png" alt="" width="40" height="40" decoding="async" />
+        <img src="/logo-mark.png" alt="Namão Criativa" width="40" height="40" decoding="async" />
         <span>Namão</span>
       </a>
       <nav><a href="/register.html">Criar conta</a></nav>
@@ -28,7 +19,7 @@
       <form id="login-form">
         <label>E-mail <input name="email" type="email" required autocomplete="email" /></label>
         <label>Senha <input name="password" type="password" required minlength="8" autocomplete="current-password" /></label>
-        <button type="submit">Entrar</button>
+        <button type="submit" id="login-btn">Entrar</button>
       </form>
       <p class="status" id="login-status"></p>
     </main>

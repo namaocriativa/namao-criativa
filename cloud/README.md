@@ -146,9 +146,9 @@ Isso cria (ou atualiza) o projeto `namao-website`, grava o `*.pages.dev` em `sta
 Em push/merge em `main`, [`.github/workflows/cd-website.yml`](../.github/workflows/cd-website.yml):
 
 1. Detecta mudanças em `apps/website/**` (e nos scripts de `_redirects`)
-2. Gera o proxy same-origin (`public/_redirects`, gitignored)
-3. `npm run build -w @namao/website`
-4. `wrangler pages deploy` → produção (`branch=main`)
+2. Gera `public/_redirects` (legado; o Pages ignora rewrite 200 para origem externa)
+3. Testes (`npm test -w @namao/website`) e `npm run build -w @namao/website` (`VITE_WEBSITE_GTM_ID` se a variable `WEBSITE_GTM_CONTAINER_ID` existir)
+4. `wrangler pages deploy` (inclui `functions/_middleware.ts`) → produção (`branch=main`). A Function também faz 301 de `www` para o apex.
 
 `workflow_dispatch` força o deploy. O `wrangler.toml` em `apps/website/` é a config versionada do projeto.
 
@@ -161,8 +161,9 @@ Em push/merge em `main`, [`.github/workflows/cd-website.yml`](../.github/workflo
 | `CLOUDFLARE_API_TOKEN` | Secret | Token com **Account → Cloudflare Pages → Edit** (template *Edit Cloudflare Pages*) |
 | `CLOUDFLARE_ACCOUNT_ID` | **Variable** | Account ID no dashboard (barra lateral direita) |
 | `WEBSITE_API_ORIGIN` | Variable | Origem pública da API, ex. `https://api.namaocriativa.com.br` |
+| `WEBSITE_GTM_CONTAINER_ID` | Variable | Opcional. `GTM-XXXX` do site institucional (hostname `namaocriativa.com.br`). O CD injeta no build Vite. |
 
-Sem `WEBSITE_API_ORIGIN` o site publica, mas login/cadastro/convites não têm para onde proxiar.
+`WEBSITE_API_ORIGIN` também vai no `apps/website/wrangler.toml` (`[vars]`), porque Direct Upload não copia plaintext do dashboard para a Function. Sem a origin, a Function cai no fallback `https://api.namaocriativa.com.br`.
 
 ### DNS
 
@@ -344,7 +345,7 @@ Ordem do apply: Postgres → Redis → Evolution (Application) → API (`namao-a
 | DNS: zona não listada | Token sem *Zone.DNS Edit* / *Zone.Zone Read*, ou domínio noutra conta Cloudflare |
 | Studio redireciona sempre para login | `JWT_SECRET` do Pages diferente da API, ou cookie sem `Secure` em HTTP |
 | Pages 403 no wrangler | Token sem ability *Cloudflare Pages Edit*, ou Account ID de outra conta |
-| Convite / login 404 no site | `WEBSITE_API_ORIGIN` não gerou `_redirects` |
+| Convite / login 405 no site | Function de proxy ausente no deploy (`apps/website/functions`). `_redirects` 200 para a API não funciona no Pages |
 | Evolution ignora envs | Confira envs na Application; `AUTHENTICATION_API_KEY`, `DATABASE_CONNECTION_URI`, `CACHE_REDIS_URI` |
 | Domain conflict 409 | Remova domínio de outro recurso ou use `force_domain_override` na UI |
 
