@@ -260,6 +260,31 @@
   color: #444;
 }
 
+.namao-chat__terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 400;
+  color: #555;
+  padding: 0 4px;
+}
+
+.namao-chat__terms input {
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: #111;
+}
+
+.namao-chat__terms a {
+  color: #111;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .namao-chat__form {
   display: flex;
   align-items: center;

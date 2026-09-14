@@ -26,6 +26,8 @@ export default defineConfig({
         login: 'login.html',
         conectar: 'conectar.html',
         dashboard: 'dashboard.html',
+        termos: 'termos.html',
+        privacidade: 'privacidade.html',
       },
     },
   },

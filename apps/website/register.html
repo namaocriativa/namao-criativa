@@ -31,10 +31,30 @@
         <label>E-mail <input name="email" type="email" required autocomplete="email" maxlength="254" /></label>
         <label>Instagram do negócio <input name="instagram" required autocomplete="username" placeholder="@seu.negocio" maxlength="80" /></label>
         <p class="form-note">Enviamos a senha e o link de acesso para este e-mail.</p>
+        <label class="legal-accept">
+          <input type="checkbox" name="acceptedTerms" required />
+          <span>
+            Li e aceito os
+            <a href="/termos.html" target="_blank" rel="noopener noreferrer">Termos de uso</a>
+            e a
+            <a href="/privacidade.html" target="_blank" rel="noopener noreferrer">Política de privacidade</a>.
+          </span>
+        </label>
         <button type="submit" id="register-btn">Criar conta</button>
       </form>
       <p class="status" id="register-status"></p>
     </main>
+    <footer class="site-footer site-footer--compact">
+      <div class="footer-inner">
+        <div class="footer-meta">
+          <p>© 2026 Namão Criativa</p>
+          <nav class="footer-legal" aria-label="Documentos legais">
+            <a href="/termos.html">Termos de uso</a>
+            <a href="/privacidade.html">Privacidade</a>
+          </nav>
+        </div>
+      </div>
+    </footer>
     <script type="module" src="/src/register.ts"></script>
   </body>
 </html>

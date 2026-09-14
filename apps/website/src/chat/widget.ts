@@ -37,11 +37,29 @@ function renderMarkdown(value: string): string {
 }
 
 const AVATAR_SRC = '/logo-icon-with-effects.png';
+const TERMS_STORAGE_KEY = 'namao-legal-accept';
 
-export function mountNamaoChat() {
+function readGuestTermsAccepted(): boolean {
+  try {
+    return sessionStorage.getItem(TERMS_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeGuestTermsAccepted(value: boolean) {
+  try {
+    if (value) sessionStorage.setItem(TERMS_STORAGE_KEY, '1');
+    else sessionStorage.removeItem(TERMS_STORAGE_KEY);
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function mountNamaoChat(loggedIn = isLoggedIn()) {
   if (document.querySelector('.namao-chat')) return;
 
-  const mode = isLoggedIn() ? 'auth' : 'guest';
+  const mode = loggedIn ? 'auth' : 'guest';
   const root = document.createElement('div');
   root.className = `namao-chat namao-chat--${mode}`;
   root.innerHTML = `
@@ -59,6 +77,14 @@ export function mountNamaoChat() {
       <div class="namao-chat__chips"></div>
       <div class="namao-chat__footer">
         <a class="namao-chat__whatsapp" hidden target="_blank" rel="noopener noreferrer">Falar com um humano no WhatsApp</a>
+        ${
+          mode === 'guest'
+            ? `<label class="namao-chat__terms">
+          <input type="checkbox" name="acceptedTerms" />
+          <span>Li e aceito os <a href="/termos.html" target="_blank" rel="noopener noreferrer">Termos</a> e a <a href="/privacidade.html" target="_blank" rel="noopener noreferrer">Privacidade</a>.</span>
+        </label>`
+            : ''
+        }
         <form class="namao-chat__form">
           <input name="message" maxlength="2000" autocomplete="off" placeholder="Sua resposta..." />
           <button class="namao-chat__send" type="submit" aria-label="Enviar">
@@ -105,12 +131,31 @@ export function mountNamaoChat() {
   const input = form.querySelector('input')!;
   const sendBtn = form.querySelector<HTMLButtonElement>('.namao-chat__send')!;
   const whatsapp = root.querySelector<HTMLAnchorElement>('.namao-chat__whatsapp')!;
+  const termsInput = root.querySelector<HTMLInputElement>(
+    '.namao-chat__terms input',
+  );
 
   let open = false;
   let typing = false;
   let session: ChatSessionPayload | null = null;
   let messages: ChatMessage[] = [];
   let started = false;
+
+  function guestAcceptedTerms() {
+    return mode === 'auth' || Boolean(termsInput?.checked);
+  }
+
+  function syncGuestTermsUi() {
+    if (!termsInput) return;
+    const accepted = termsInput.checked;
+    writeGuestTermsAccepted(accepted);
+    input.disabled = !accepted;
+    sendBtn.disabled = !accepted || typing;
+    chipsEl.querySelectorAll<HTMLButtonElement>('.namao-chat__chip').forEach((chip) => {
+      chip.disabled = !accepted;
+    });
+    if (accepted) showError(null);
+  }
 
   function setOpen(next: boolean) {
     open = next;
@@ -160,6 +205,7 @@ export function mountNamaoChat() {
           )
           .join('')
       : '';
+    syncGuestTermsUi();
   }
 
   function setWhatsapp(url: string | null) {
@@ -192,6 +238,10 @@ export function mountNamaoChat() {
   async function send(text: string) {
     const content = text.trim();
     if (!content || typing) return;
+    if (!guestAcceptedTerms()) {
+      showError('Aceite os Termos e a Privacidade para conversar.');
+      return;
+    }
     showError(null);
     const current = await ensureSession();
     const stored = readStoredSession();
@@ -285,4 +335,10 @@ export function mountNamaoChat() {
     const stored = readStoredSession();
     void sendChatEvent(stored?.sessionToken || null, 'whatsapp_clicked');
   });
+
+  if (termsInput) {
+    termsInput.checked = readGuestTermsAccepted();
+    termsInput.addEventListener('change', () => syncGuestTermsUi());
+    syncGuestTermsUi();
+  }
 }
