@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { CreatePackageDto } from './dto/create-package.dto';
+import { UpdateOfferTemplateDto } from './dto/update-offer-template.dto';
 import { UpdatePackageDto } from './dto/update-package.dto';
 import { PackagesService, type PackageUploadFile } from './packages.service';
 import { StudioAuth } from '../auth/studio-auth.decorator';
@@ -23,6 +24,16 @@ export class PackagesController {
   @Get()
   findAll() {
     return this.packagesService.findAll();
+  }
+
+  @Get('offer-template')
+  getOfferTemplate() {
+    return this.packagesService.getOfferTemplate();
+  }
+
+  @Patch('offer-template')
+  updateOfferTemplate(@Body() dto: UpdateOfferTemplateDto) {
+    return this.packagesService.updateOfferTemplate(dto);
   }
 
   @Get(':id')

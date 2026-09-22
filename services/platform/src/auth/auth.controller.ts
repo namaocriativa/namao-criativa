@@ -17,7 +17,11 @@ import { RegisterDto } from './dto/register.dto';
 import { authCookieOptions } from './jwt-cookie';
 import type { JwtUser } from './jwt.strategy';
 import { Public } from './public.decorator';
-import { CLIENT_TOKEN_COOKIE, STUDIO_TOKEN_COOKIE } from './roles';
+import {
+  ADMIN_TOKEN_COOKIE,
+  CLIENT_TOKEN_COOKIE,
+  STUDIO_TOKEN_COOKIE,
+} from './roles';
 
 @Controller('auth')
 export class AuthController {
@@ -62,7 +66,11 @@ export class AuthController {
   ) {
     await this.assertAuthRateLimit(req);
     const { accessToken, user } = await this.authService.studioLogin(dto);
-    res.cookie(STUDIO_TOKEN_COOKIE, accessToken, authCookieOptions(req));
+    res.cookie(
+      STUDIO_TOKEN_COOKIE,
+      accessToken,
+      authCookieOptions(req, { rememberMe: dto.rememberMe !== false }),
+    );
     return { user };
   }
 
@@ -74,6 +82,30 @@ export class AuthController {
   ) {
     await this.authService.recordStudioLogout(req);
     res.clearCookie(STUDIO_TOKEN_COOKIE, authCookieOptions(req));
+    return { ok: true as const };
+  }
+
+  @Public()
+  @Post('admin/login')
+  async adminLogin(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() dto: LoginDto,
+  ) {
+    await this.assertAuthRateLimit(req);
+    const { accessToken, user } = await this.authService.adminLogin(dto);
+    res.cookie(
+      ADMIN_TOKEN_COOKIE,
+      accessToken,
+      authCookieOptions(req, { rememberMe: dto.rememberMe !== false }),
+    );
+    return { user };
+  }
+
+  @Public()
+  @Post('admin/logout')
+  adminLogout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    res.clearCookie(ADMIN_TOKEN_COOKIE, authCookieOptions(req));
     return { ok: true as const };
   }
 

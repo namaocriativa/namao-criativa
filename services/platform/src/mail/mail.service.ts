@@ -21,6 +21,7 @@ import {
   studioWelcomeEmailText,
   type StudioWelcomeKind,
 } from './studio-welcome-email';
+import { transactionalMailFields } from './mail-outbound';
 import { publicLogoUrl } from '../lead-account/lead-account.util';
 
 @Injectable()
@@ -138,6 +139,15 @@ export class MailService {
     });
   }
 
+  async sendPackageOffer(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }) {
+    await this.send(params);
+  }
+
   private logoUrl(): string {
     return publicLogoUrl(this.config.get<string>('NAMAO_PUBLIC_URL'));
   }
@@ -157,14 +167,18 @@ export class MailService {
 
     const from =
       this.config.get<string>('RESEND_FROM')?.trim() ||
-      'Namão Criativa <noreply@seudominio.com>';
+      'Namão Criativa <contato@namaocriativa.com.br>';
+    const outbound = transactionalMailFields(from);
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
       from,
       to: params.to,
+      replyTo: outbound.replyTo,
       subject: params.subject,
       html: params.html,
       text: params.text,
+      headers: outbound.headers,
+      tags: outbound.tags,
     });
 
     if (error) {

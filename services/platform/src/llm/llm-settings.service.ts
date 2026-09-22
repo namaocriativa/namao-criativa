@@ -1,5 +1,6 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { requireTenantId } from '../tenant/tenant.util';
 import {
   GEMINI_DEFAULTS,
   LLM_ROLES,
@@ -10,18 +11,15 @@ import {
 } from './llm.types';
 
 @Injectable()
-export class LlmSettingsService implements OnModuleInit {
+export class LlmSettingsService {
   private readonly logger = new Logger(LlmSettingsService.name);
-  private cache: LlmSettings | null = null;
+  private readonly cache = new Map<string, LlmSettings>();
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async onModuleInit() {
-    this.cache = await this.load();
-  }
-
   get(): LlmSettings {
-    return this.cache ?? this.defaults();
+    const tenantId = requireTenantId();
+    return this.cache.get(tenantId) ?? this.defaults();
   }
 
   defaults(): LlmSettings {
@@ -39,21 +37,34 @@ export class LlmSettingsService implements OnModuleInit {
     return GEMINI_DEFAULTS[role];
   }
 
+  async ensureLoaded(tenantId = requireTenantId()): Promise<LlmSettings> {
+    const cached = this.cache.get(tenantId);
+    if (cached) return cached;
+    const loaded = await this.load(tenantId);
+    this.cache.set(tenantId, loaded);
+    return loaded;
+  }
+
   async save(input: LlmSettings): Promise<LlmSettings> {
+    const tenantId = requireTenantId();
     const next = this.normalize(input);
     await this.prisma.appSetting.upsert({
-      where: { key: LLM_SETTING_KEY },
-      create: { key: LLM_SETTING_KEY, value: JSON.stringify(next) },
+      where: { tenantId_key: { tenantId, key: LLM_SETTING_KEY } },
+      create: {
+        tenantId,
+        key: LLM_SETTING_KEY,
+        value: JSON.stringify(next),
+      },
       update: { value: JSON.stringify(next) },
     });
-    this.cache = next;
+    this.cache.set(tenantId, next);
     return next;
   }
 
-  private async load(): Promise<LlmSettings> {
+  private async load(tenantId: string): Promise<LlmSettings> {
     try {
       const row = await this.prisma.appSetting.findUnique({
-        where: { key: LLM_SETTING_KEY },
+        where: { tenantId_key: { tenantId, key: LLM_SETTING_KEY } },
       });
       if (!row?.value) return this.defaults();
       return this.normalize(JSON.parse(row.value) as Partial<LlmSettings>);

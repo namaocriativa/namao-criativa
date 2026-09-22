@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { getStudioUser } from "./session";
+import { canAccessImages, canAccessVideos, getStudioUser } from "./session";
 import { hrefFor, navigate, titleForRoute, type AppRoute } from "./router";
 
 type StudioUserRow = {
@@ -7,6 +7,8 @@ type StudioUserRow = {
   email: string;
   name: string;
   role: string;
+  canAccessImages?: boolean;
+  canAccessVideos?: boolean;
   createdAt: string;
 };
 
@@ -32,6 +34,16 @@ function errorMessage(error: unknown, fallback: string): string {
 
 function roleLabel(role: string): string {
   return role === "ADMIN" ? "Admin" : "Operador";
+}
+
+function permissionChipsHtml(user: StudioUserRow): string {
+  const chips: string[] = [];
+  if (canAccessImages(user)) chips.push("Imagens");
+  if (canAccessVideos(user)) chips.push("Vídeos");
+  if (!chips.length) return "";
+  return `<div class="users-card-perms">${chips
+    .map((label) => `<span class="users-perm">${escapeHtml(label)}</span>`)
+    .join("")}</div>`;
 }
 
 function formatDate(value: string | Date | null | undefined) {
@@ -72,6 +84,9 @@ export function initUsersTab() {
   const meta = el<HTMLElement>("user-detail-meta");
   const detailStatus = el<HTMLElement>("user-detail-status");
   const roleSelect = el<HTMLSelectElement>("user-role-select");
+  const imagesPermission = el<HTMLInputElement>("user-permission-images");
+  const videosPermission = el<HTMLInputElement>("user-permission-videos");
+  const permissionsHint = el<HTMLElement>("user-permissions-hint");
   const resetBtn = el<HTMLButtonElement>("user-reset-btn");
   const deleteBtn = el<HTMLButtonElement>("user-delete-btn");
   const activityList = el<HTMLElement>("user-activity-list");
@@ -110,6 +125,7 @@ export function initUsersTab() {
               <span class="users-role">${escapeHtml(roleLabel(user.role))}</span>
             </div>
             <p class="users-email">${escapeHtml(user.email)}</p>
+            ${permissionChipsHtml(user)}
           </a>
         </li>`;
       })
@@ -145,6 +161,14 @@ export function initUsersTab() {
     meta.textContent = `${user.email} · ${roleLabel(user.role)} · desde ${formatDate(user.createdAt)}`;
     roleSelect.value = user.role === "ADMIN" ? "ADMIN" : "OPERATOR";
     roleSelect.disabled = self;
+    const adminUser = user.role === "ADMIN";
+    imagesPermission.checked = canAccessImages(user);
+    videosPermission.checked = canAccessVideos(user);
+    imagesPermission.disabled = adminUser;
+    videosPermission.disabled = adminUser;
+    permissionsHint.textContent = adminUser
+      ? "Admin já tem acesso às abas Imagens e Vídeos."
+      : "Libere as abas que esta pessoa pode usar.";
     deleteBtn.disabled = self;
     document.title = titleForRoute({ name: "user", id: user.id }, user.name);
   }
@@ -235,6 +259,46 @@ export function initUsersTab() {
       setDetailStatus(errorMessage(error, "Falha ao atualizar"), true);
       if (current) roleSelect.value = current.role === "ADMIN" ? "ADMIN" : "OPERATOR";
     }
+  });
+
+  async function patchPermission(
+    field: "canAccessImages" | "canAccessVideos",
+    checkbox: HTMLInputElement,
+    okMessage: string,
+  ) {
+    if (!current || current.role === "ADMIN") return;
+    const next = checkbox.checked;
+    setDetailStatus("Atualizando acesso…");
+    try {
+      const res = await api(`/studio/users/${encodeURIComponent(current.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: next }),
+      });
+      if (!res.ok) throw new Error(await readError(res));
+      const user = (await res.json()) as StudioUserRow;
+      fillDetail(user);
+      setDetailStatus(okMessage);
+    } catch (error) {
+      checkbox.checked = !next;
+      setDetailStatus(errorMessage(error, "Falha ao atualizar acesso"), true);
+    }
+  }
+
+  imagesPermission.addEventListener("change", () => {
+    void patchPermission(
+      "canAccessImages",
+      imagesPermission,
+      "Acesso a Imagens atualizado.",
+    );
+  });
+
+  videosPermission.addEventListener("change", () => {
+    void patchPermission(
+      "canAccessVideos",
+      videosPermission,
+      "Acesso a Vídeos atualizado.",
+    );
   });
 
   resetBtn.addEventListener("click", async () => {

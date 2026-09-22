@@ -10,17 +10,21 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { primaryOrigin } from '../auth/cookie-origin';
 import type { JwtUser } from '../auth/jwt.strategy';
-import { isStudioRole, USER_ROLE } from '../auth/roles';
+import { isTenantStaffRole, USER_ROLE } from '../auth/roles';
 import { MailService } from '../mail/mail.service';
 import { CreateStudioUserDto } from './dto/create-studio-user.dto';
 import { UpdateStudioUserDto } from './dto/update-studio-user.dto';
 import { nameFromEmail } from './studio-users.util';
+import { requireTenantId } from '../tenant/tenant.util';
 
 const STUDIO_USER_SELECT = {
   id: true,
   email: true,
   name: true,
   role: true,
+  tenantId: true,
+  canAccessImages: true,
+  canAccessVideos: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -43,7 +47,10 @@ export class StudioUsersService {
 
   list() {
     return this.prisma.user.findMany({
-      where: { role: { in: [USER_ROLE.ADMIN, USER_ROLE.OPERATOR] } },
+      where: {
+        tenantId: requireTenantId(),
+        role: { in: [USER_ROLE.ADMIN, USER_ROLE.OPERATOR] },
+      },
       select: STUDIO_USER_SELECT,
       orderBy: [{ role: 'asc' }, { name: 'asc' }],
     });
@@ -71,6 +78,7 @@ export class StudioUsersService {
         name,
         passwordHash,
         role: USER_ROLE.OPERATOR,
+        tenantId: requireTenantId(),
       },
       select: STUDIO_USER_SELECT,
     });
@@ -101,6 +109,12 @@ export class StudioUsersService {
       data: {
         ...(name ? { name } : {}),
         ...(dto.role ? { role: dto.role } : {}),
+        ...(dto.canAccessImages !== undefined
+          ? { canAccessImages: dto.canAccessImages }
+          : {}),
+        ...(dto.canAccessVideos !== undefined
+          ? { canAccessVideos: dto.canAccessVideos }
+          : {}),
       },
       select: STUDIO_USER_SELECT,
     });
@@ -177,7 +191,7 @@ export class StudioUsersService {
       where: { id },
       select: STUDIO_USER_SELECT,
     });
-    if (!user || !isStudioRole(user.role)) {
+    if (!user || !isTenantStaffRole(user.role) || user.tenantId !== requireTenantId()) {
       throw new NotFoundException('Usuário não encontrado');
     }
     return user;
@@ -188,7 +202,7 @@ export class StudioUsersService {
     nextRole: string,
     actor: JwtUser,
   ) {
-    if (!isStudioRole(nextRole)) {
+    if (!isTenantStaffRole(nextRole)) {
       throw new BadRequestException('Papel inválido');
     }
     if (user.role === USER_ROLE.ADMIN && nextRole !== USER_ROLE.ADMIN) {
@@ -203,6 +217,7 @@ export class StudioUsersService {
     const remaining = await this.prisma.user.count({
       where: {
         role: USER_ROLE.ADMIN,
+        tenantId: requireTenantId(),
         id: { not: exceptId },
       },
     });

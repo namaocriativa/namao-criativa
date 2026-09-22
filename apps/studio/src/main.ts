@@ -1,16 +1,36 @@
 import "./style.css";
 import type { CitySuggestion, Lead, NeighborhoodSuggestion } from "./types";
+import { initStudioTheme } from "./theme";
 import { api } from "./api";
 import { initConfigTab } from "./config-tab";
 import { initPackagesTab } from "./packages-tab";
+import { initCalendarTab } from "./calendar-tab";
+import { initCreativeTab } from "./creative-tab";
+import { initPersonagensTab } from "./personagens-tab";
+import { initMoviesTab } from "./movies-tab";
+import { initInicioFimTab } from "./inicio-fim-tab";
+import { initUgcSkillsTab } from "./ugc-skills-tab";
+import { initImagensTab } from "./imagens-tab";
+import { initImagensStudio } from "./imagens-studio";
+import { initCriativoGallery } from "./criativo-gallery";
+import { initVideosTab } from "./videos-tab";
+import { initVideosStudio } from "./videos-studio";
 import { initUsersTab } from "./users-tab";
+import { isVideoCreativeSkill } from "./creative/features";
 import {
+  canAccessCreative,
+  canAccessImages,
+  canAccessVideos,
   logoutStudio,
   requireStudioSession,
   isStudioAdmin,
+  setStudioUser,
   type StudioUser,
 } from "./session";
 import {
+  isCriativoGalleryRoute,
+  isImagensStudioRoute,
+  isVideosStudioRoute,
   hrefFor,
   navigate,
   navRouteFor,
@@ -130,8 +150,10 @@ const customersCategoryFilter = el<HTMLSelectElement>(
   "customers-category-filter",
 );
 const navLinks = document.querySelectorAll<HTMLAnchorElement>(
-  ".nav-tabs a[data-route], .side-nav a[data-route]",
+  ".side-nav a[data-route]",
 );
+
+initStudioTheme(document.getElementById("studio-theme-btn"));
 
 /** Cache da lista completa para filtrar no client. */
 let savedLeadsCache: Lead[] = [];
@@ -179,6 +201,22 @@ function setLeadView(on: boolean) {
   }
 }
 
+function nameFromImagensStudio(): string | undefined {
+  const input = document.getElementById("imagens-project-name");
+  if (input instanceof HTMLInputElement && input.value.trim()) {
+    return input.value.trim();
+  }
+  return undefined;
+}
+
+function nameFromVideosStudio(): string | undefined {
+  const input = document.getElementById("videos-project-name");
+  if (input instanceof HTMLInputElement && input.value.trim()) {
+    return input.value.trim();
+  }
+  return undefined;
+}
+
 function showTab(tabId: string) {
   document.querySelectorAll(".tab-panel").forEach((panel) => {
     panel.classList.toggle("active", panel.id === `tab-${tabId}`);
@@ -197,6 +235,17 @@ function syncNav(route: AppRoute) {
 }
 
 const packagesTab = initPackagesTab();
+const calendarTab = initCalendarTab();
+const creativeTab = initCreativeTab();
+const personagensTab = initPersonagensTab();
+const moviesTab = initMoviesTab();
+const inicioFimTab = initInicioFimTab();
+const ugcSkillsTab = initUgcSkillsTab();
+const imagensTab = initImagensTab();
+const imagensStudio = initImagensStudio();
+const criativoGallery = initCriativoGallery();
+const videosTab = initVideosTab();
+const videosStudio = initVideosStudio();
 const usersTab = initUsersTab();
 let currentUser: StudioUser | null = null;
 
@@ -206,13 +255,20 @@ function currentProfileApi(suffix = "", id = currentLeadId) {
 }
 
 function applyRoute(route: AppRoute) {
+  document.body.classList.toggle("is-imagens-studio", isImagensStudioRoute(route));
+  document.body.classList.toggle("is-videos-studio", isVideosStudioRoute(route));
+  document.body.classList.toggle("is-criativo-gallery", isCriativoGalleryRoute(route));
   showTab(tabForRoute(route));
   syncNav(route);
   if (route.name !== "lead" && route.name !== "customer") setLeadView(false);
   const titleHint =
     route.name === "lead" || route.name === "customer"
       ? detailHeading.textContent || undefined
-      : undefined;
+      : isImagensStudioRoute(route)
+        ? nameFromImagensStudio()
+        : isVideosStudioRoute(route)
+          ? nameFromVideosStudio()
+          : undefined;
   document.title = titleForRoute(route, titleHint);
   if (route.name === "lead") {
     if (currentLeadId !== route.id || currentEntityKind !== "lead") {
@@ -223,19 +279,99 @@ function applyRoute(route: AppRoute) {
       void openSavedLead(route.id, "customer");
     }
   }
-  packagesTab.onRoute(route);
-  if (route.name === "users" || route.name === "user") {
-    if (currentUser?.role !== "ADMIN") {
+  if (
+    route.name === "criativo" ||
+    route.name === "criativo-skill" ||
+    route.name === "criativo-gallery"
+  ) {
+    if (!canAccessCreative(currentUser)) {
+      showTab("not-found");
+      document.title = titleForRoute({ name: "not-found" });
+      document.body.classList.remove(
+        "is-imagens-studio",
+        "is-videos-studio",
+        "is-criativo-gallery",
+      );
+      return;
+    }
+    if (route.name === "criativo-skill") {
+      const videoSkill = isVideoCreativeSkill(route.id);
+      const allowed = videoSkill
+        ? canAccessVideos(currentUser)
+        : canAccessImages(currentUser);
+      if (!allowed) {
+        document.body.classList.remove(
+          "is-imagens-studio",
+          "is-videos-studio",
+          "is-criativo-gallery",
+        );
+        showTab("not-found");
+        document.title = titleForRoute({ name: "not-found" });
+        return;
+      }
+    }
+    if (route.name === "criativo") {
+      if (route.kind === "image" && !canAccessImages(currentUser) && canAccessVideos(currentUser)) {
+        navigate({ name: "criativo", kind: "video" }, { replace: true });
+        return;
+      }
+      if (route.kind === "video" && !canAccessVideos(currentUser) && canAccessImages(currentUser)) {
+        navigate({ name: "criativo", kind: "image" }, { replace: true });
+        return;
+      }
+    }
+  }
+  if (route.name === "imagens" || route.name === "imagens-project") {
+    if (!canAccessImages(currentUser)) {
+      document.body.classList.remove(
+        "is-imagens-studio",
+        "is-videos-studio",
+        "is-criativo-gallery",
+      );
       showTab("not-found");
       document.title = titleForRoute({ name: "not-found" });
       return;
     }
+  }
+  if (route.name === "videos" || route.name === "videos-project") {
+    if (!canAccessVideos(currentUser)) {
+      document.body.classList.remove(
+        "is-imagens-studio",
+        "is-videos-studio",
+        "is-criativo-gallery",
+      );
+      showTab("not-found");
+      document.title = titleForRoute({ name: "not-found" });
+      return;
+    }
+  }
+  if (route.name === "users" || route.name === "user" || route.name === "ui-lib") {
+    if (!isStudioAdmin()) {
+      showTab("not-found");
+      document.title = titleForRoute({ name: "not-found" });
+      return;
+    }
+  }
+  packagesTab.onRoute(route);
+  calendarTab.onRoute(route);
+  creativeTab.onRoute(route);
+  imagensTab.onRoute(route);
+  imagensStudio.onRoute(route);
+  personagensTab.onRoute(route);
+  criativoGallery.onRoute(route);
+  videosTab.onRoute(route);
+  videosStudio.onRoute(route);
+  moviesTab.onRoute(route);
+  inicioFimTab.onRoute(route);
+  ugcSkillsTab.onRoute(route);
+  if (route.name === "users" || route.name === "user") {
     usersTab.onRoute(route);
   }
 }
 
 initUiLib(el<HTMLElement>("ui-lib-root"));
 initConfigTab({ onSaved: () => void refreshLlmStatus() });
+window.addEventListener("app:llm-saved", () => void refreshLlmStatus());
 mountSiteWizard(el<HTMLElement>("site-wizard-root"));
 const leadGallery = initLeadGallery(el<HTMLElement>("lead-gallery-root"), {
   onLeadUpdated: (lead) => {
@@ -612,18 +748,18 @@ function renderLeadContext(lead: Lead) {
   const foldSummary = document.querySelector("#lead-context-fold > summary");
   if (foldSummary) {
     foldSummary.textContent = isCustomer
-      ? "Contexto do customer"
+      ? "Contexto do cliente"
       : "Contexto do lead";
   }
   const summaryTitle = leadContextSummary.closest(".app-card")?.querySelector("h3");
   if (summaryTitle) {
-    summaryTitle.textContent = isCustomer ? "Resumo do customer" : "Resumo do lead";
+    summaryTitle.textContent = isCustomer ? "Resumo do cliente" : "Resumo do lead";
   }
   const backBtn = document.getElementById("detail-back-btn");
   if (backBtn instanceof HTMLAnchorElement) {
     backBtn.href = isCustomer ? "/customers" : "/leads";
     backBtn.textContent = isCustomer
-      ? "← Voltar aos customers"
+      ? "← Voltar aos clientes"
       : "← Voltar aos leads";
   }
   leadContextEditBtn.hidden = !lead.id;
@@ -673,7 +809,7 @@ function renderLeadContext(lead: Lead) {
     }
     ${
       lead.id && !isCustomer
-        ? `<button type="button" data-context-action="convert-customer">Transformar em Customer</button>`
+        ? `<button type="button" data-context-action="convert-customer">Transformar em cliente</button>`
         : ""
     }
   `;
@@ -737,13 +873,13 @@ function fallbackHistory(lead: Lead): HistoryItem[] {
   }
   if (lead.updatedAt) {
     history.push({
-      title: entityKindOf(lead) === "customer" ? "Customer atualizado" : "Lead atualizado",
+      title: entityKindOf(lead) === "customer" ? "Cliente atualizado" : "Lead atualizado",
       at: formatDate(lead.updatedAt),
     });
   }
   if (lead.createdAt) {
     history.push({
-      title: entityKindOf(lead) === "customer" ? "Customer criado" : "Lead criado",
+      title: entityKindOf(lead) === "customer" ? "Cliente criado" : "Lead criado",
       at: formatDate(lead.createdAt),
     });
   }
@@ -821,7 +957,7 @@ function renderLead(lead: Lead) {
           <strong>${escapeHtml(lead.name || "Sem nome")}</strong>
           <span class="lead-badge">${
             entityKindOf(lead) === "customer"
-              ? "Customer"
+              ? "Cliente"
               : "Lead atualizado"
           }</span>
         </p>
@@ -845,7 +981,7 @@ function renderLead(lead: Lead) {
 
   leadDataExtra.innerHTML = `
     <details class="lead-data-fold">
-      <summary>${entityKindOf(lead) === "customer" ? "Dados do customer" : "Dados do lead"}</summary>
+      <summary>${entityKindOf(lead) === "customer" ? "Dados do cliente" : "Dados do lead"}</summary>
       <div class="lead-data-body">
         <dl>
           ${field("Categoria", lead.category)}
@@ -940,7 +1076,7 @@ function renderLead(lead: Lead) {
   currentLeadId = nextId;
   currentLead = lead;
   currentEntityKind = entityKindOf(lead);
-  detailHeading.textContent = lead.name || (currentEntityKind === "customer" ? "Customer" : "Lead");
+  detailHeading.textContent = lead.name || (currentEntityKind === "customer" ? "Cliente" : "Lead");
   leadSitePanel.hidden = !currentLeadId;
   siteActions.hidden = !currentLeadId;
   setSiteActionsEnabled(Boolean(currentLeadId));
@@ -1072,7 +1208,7 @@ async function loadSavedCustomers() {
     const res = await api("/customers");
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.message || "Falha ao listar customers");
+      throw new Error(data.message || "Falha ao listar clientes");
     }
     savedCustomersCache = (data as Lead[]).map((item) => ({
       ...item,
@@ -1085,7 +1221,7 @@ async function loadSavedCustomers() {
     savedCustomers.innerHTML = "";
     setStatus(
       savedCustomersStatus,
-      errorMessage(error, "Erro ao carregar customers"),
+      errorMessage(error, "Erro ao carregar clientes"),
       true,
     );
   } finally {
@@ -1266,7 +1402,7 @@ function renderSavedCustomersList() {
   savedCustomers.innerHTML = "";
 
   if (!savedCustomersCache.length) {
-    setStatus(savedCustomersStatus, "Nenhum customer ainda.");
+    setStatus(savedCustomersStatus, "Nenhum cliente ainda.");
     return;
   }
 
@@ -1276,14 +1412,14 @@ function renderSavedCustomersList() {
   setStatus(
     savedCustomersStatus,
     filtering
-      ? `${leads.length} de ${savedCustomersCache.length} customer(s).`
-      : `${savedCustomersCache.length} customer(s) no banco.`,
+      ? `${leads.length} de ${savedCustomersCache.length} cliente(s).`
+      : `${savedCustomersCache.length} cliente(s) no banco.`,
   );
 
   if (!leads.length) {
     const empty = document.createElement("li");
     empty.className = "empty-filter";
-    empty.textContent = "Nenhum customer corresponde aos filtros.";
+    empty.textContent = "Nenhum cliente corresponde aos filtros.";
     savedCustomers.appendChild(empty);
     return;
   }
@@ -1324,7 +1460,7 @@ function renderSavedCustomersList() {
     deleteBtn.className = "danger";
     deleteBtn.textContent = "Deletar";
     deleteBtn.addEventListener("click", () => {
-      if (lead.id) void deleteSavedCustomer(lead.id, lead.name || "este customer");
+      if (lead.id) void deleteSavedCustomer(lead.id, lead.name || "este cliente");
     });
     actions?.appendChild(deleteBtn);
     savedCustomers.appendChild(li);
@@ -1342,7 +1478,7 @@ customersCategoryFilter.addEventListener("change", () => {
 
 async function deleteSavedCustomer(id: string, name: string) {
   const confirmed = window.confirm(
-    `Deletar o customer "${name}"? Isso remove o registro e as imagens do storage.`,
+    `Deletar o cliente "${name}"? Isso remove o registro e as imagens do storage.`,
   );
   if (!confirmed) return;
   setStatus(savedCustomersStatus, `Deletando "${name}"...`);
@@ -1353,10 +1489,10 @@ async function deleteSavedCustomer(id: string, name: string) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(
-        (data as { message?: string }).message || "Falha ao deletar customer",
+        (data as { message?: string }).message || "Falha ao deletar cliente",
       );
     }
-    setStatus(savedCustomersStatus, `Customer "${name}" deletado.`);
+    setStatus(savedCustomersStatus, `Cliente "${name}" deletado.`);
     if (currentLeadId === id && currentEntityKind === "customer") {
       currentLeadId = null;
       currentLead = null;
@@ -1366,7 +1502,7 @@ async function deleteSavedCustomer(id: string, name: string) {
   } catch (error) {
     setStatus(
       savedCustomersStatus,
-      errorMessage(error, "Erro ao deletar customer"),
+      errorMessage(error, "Erro ao deletar cliente"),
       true,
     );
   }
@@ -1411,7 +1547,7 @@ let openLeadRequest = 0;
 async function convertLeadToCustomer(lead: Lead) {
   if (!lead.id) return;
   const confirmed = window.confirm(
-    `Transformar "${lead.name || "este lead"}" em Customer? O lead será excluído e passará a ser um Customer.`,
+    `Transformar "${lead.name || "este lead"}" em cliente? O lead será excluído e passará a ser um cliente.`,
   );
   if (!confirmed) return;
   try {
@@ -1423,7 +1559,7 @@ async function convertLeadToCustomer(lead: Lead) {
     if (!res.ok) {
       throw new Error(
         (data as { message?: string }).message ||
-          "Falha ao transformar em Customer",
+          "Falha ao transformar em cliente",
       );
     }
     const customer = {
@@ -1434,7 +1570,7 @@ async function convertLeadToCustomer(lead: Lead) {
     await loadSavedCustomers();
     renderLead(customer);
   } catch (error) {
-    window.alert(errorMessage(error, "Falha ao transformar em Customer"));
+    window.alert(errorMessage(error, "Falha ao transformar em cliente"));
   }
 }
 
@@ -1442,14 +1578,14 @@ async function openSavedLead(id: string, kind: EntityKind = "lead") {
   const request = ++openLeadRequest;
   currentEntityKind = kind;
   const statusEl = kind === "customer" ? savedCustomersStatus : savedLeadsStatus;
-  setStatus(statusEl, kind === "customer" ? "Abrindo customer..." : "Abrindo lead...");
+  setStatus(statusEl, kind === "customer" ? "Abrindo cliente..." : "Abrindo lead...");
   try {
     const res = await api(profileApi(kind, id));
     const data = await res.json();
     if (!res.ok) {
       throw new Error(
         data.message ||
-          (kind === "customer" ? "Customer não encontrado" : "Lead não encontrado"),
+          (kind === "customer" ? "Cliente não encontrado" : "Lead não encontrado"),
       );
     }
     if (request !== openLeadRequest) return;
@@ -1462,7 +1598,7 @@ async function openSavedLead(id: string, kind: EntityKind = "lead") {
     currentEntityKind = kind;
     leadSitePanel.hidden = true;
     setSiteActionsEnabled(false);
-    const label = kind === "customer" ? "Customer" : "Lead";
+    const label = kind === "customer" ? "Cliente" : "Lead";
     detailHeading.textContent = `${label} não encontrado`;
     leadDetail.innerHTML = `<p class="empty-detail">${escapeHtml(
       errorMessage(error, `Erro ao abrir ${label.toLowerCase()}`),
@@ -1875,16 +2011,28 @@ refreshLeadsBtn.addEventListener("click", () => loadSavedLeads());
 refreshCustomersBtn.addEventListener("click", () => loadSavedCustomers());
 
 function applyStudioChrome(user: StudioUser) {
+  setStudioUser(user);
   currentUser = user;
   document.body.classList.remove("is-auth-pending");
   document.querySelectorAll<HTMLElement>("[data-admin-only]").forEach((node) => {
-    node.hidden = user.role !== "ADMIN";
+    node.hidden = !isStudioAdmin();
+  });
+  document.querySelectorAll<HTMLElement>("[data-feature]").forEach((node) => {
+    const feature = node.dataset.feature;
+    if (feature === "images") node.hidden = !canAccessImages(user);
+    else if (feature === "videos") node.hidden = !canAccessVideos(user);
+    else if (feature === "creative") node.hidden = !canAccessCreative(user);
   });
   const nameEl = document.getElementById("studio-user-name");
   if (nameEl) nameEl.textContent = user.name;
   const roleEl = document.getElementById("studio-user-role");
   if (roleEl) {
-    roleEl.textContent = user.role === "ADMIN" ? "Administrador" : "Operador";
+    roleEl.textContent =
+      user.role === "ROOT"
+        ? `Root · ${user.tenantName || "Namão"}`
+        : user.role === "ADMIN"
+          ? "Administrador"
+          : "Operador";
   }
 }
 

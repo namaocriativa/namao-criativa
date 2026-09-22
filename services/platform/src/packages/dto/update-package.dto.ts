@@ -33,6 +33,13 @@ export class UpdatePackageDto {
   price?: number | null;
 
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  promoPrice?: number | null;
+
+  @IsOptional()
   @IsString()
   @MaxLength(8)
   currency?: string;
@@ -44,24 +51,6 @@ export class UpdatePackageDto {
 
   @IsOptional()
   @IsString()
-  whatsappMessage?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  emailSubject?: string | null;
-
-  @IsOptional()
-  @IsString()
-  emailBody?: string | null;
-
-  @IsOptional()
-  @IsString()
   @IsIn(['draft', 'active'])
   status?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  sortOrder?: number;
 }

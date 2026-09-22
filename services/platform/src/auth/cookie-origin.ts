@@ -12,10 +12,17 @@ const CLIENT_LOOPBACK = [
   'http://127.0.0.1:5174',
 ];
 
+const ADMIN_LOOPBACK = [
+  'http://localhost:5175',
+  'http://127.0.0.1:5175',
+];
+
 /** Cloudflare Pages project for the studio (custom domain + *.pages.dev). */
 export const STUDIO_PAGES_PROJECT = 'namao-studio';
 /** Cloudflare Pages project for the public website. */
 export const CLIENT_PAGES_PROJECT = 'namao-website';
+/** Cloudflare Pages project for the platform admin. */
+export const ADMIN_PAGES_PROJECT = 'namao-admin';
 export const DEFAULT_STUDIO_ORIGIN = 'https://studio.namaocriativa.com.br';
 
 export function parseOriginList(value?: string | null): string[] {
@@ -54,7 +61,9 @@ export function isPagesProjectOrigin(origin: string, project: string): boolean {
 export function pagesProjectForCookie(
   source: Exclude<JwtRequestSource, 'bearer'>,
 ): string {
-  return source === 'studio-cookie' ? STUDIO_PAGES_PROJECT : CLIENT_PAGES_PROJECT;
+  if (source === 'studio-cookie') return STUDIO_PAGES_PROJECT;
+  if (source === 'admin-cookie') return ADMIN_PAGES_PROJECT;
+  return CLIENT_PAGES_PROJECT;
 }
 
 export function isLoopbackOrigin(origin: string): boolean {
@@ -131,8 +140,16 @@ export function allowedOriginsForCookie(
   env: {
     studioUrl?: string | null;
     publicUrl?: string | null;
+    adminUrl?: string | null;
   } = {},
 ): string[] {
+  if (source === 'admin-cookie') {
+    return withWwwAliases([
+      ...parseOriginList(env.adminUrl || process.env.NAMAO_ADMIN_URL),
+      pagesProjectOrigin(ADMIN_PAGES_PROJECT),
+      ...ADMIN_LOOPBACK,
+    ]);
+  }
   const configured =
     source === 'studio-cookie'
       ? env.studioUrl || process.env.NAMAO_STUDIO_URL
@@ -149,10 +166,54 @@ export function allowedOriginsForCookie(
   ]);
 }
 
+export function cookieSourceForOrigin(
+  origin: string | null,
+  env: {
+    studioUrl?: string | null;
+    publicUrl?: string | null;
+    adminUrl?: string | null;
+  } = {},
+): Exclude<JwtRequestSource, 'bearer'> | null {
+  if (!origin) return null;
+  if (
+    allowedOriginsForCookie('admin-cookie', env).includes(origin) ||
+    isPagesProjectOrigin(origin, ADMIN_PAGES_PROJECT)
+  ) {
+    return 'admin-cookie';
+  }
+  if (
+    allowedOriginsForCookie('studio-cookie', env).includes(origin) ||
+    isPagesProjectOrigin(origin, STUDIO_PAGES_PROJECT)
+  ) {
+    return 'studio-cookie';
+  }
+  if (
+    allowedOriginsForCookie('client-cookie', env).includes(origin) ||
+    isPagesProjectOrigin(origin, CLIENT_PAGES_PROJECT)
+  ) {
+    return 'client-cookie';
+  }
+  if (allowDevLoopbackOrigins() && isLoopbackOrigin(origin)) {
+    try {
+      const port = new URL(origin).port;
+      if (port === '5175') return 'admin-cookie';
+      if (port === '5173') return 'studio-cookie';
+      if (port === '5174') return 'client-cookie';
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export function assertCookieOrigin(
   req: Pick<Request, 'headers' | 'method'>,
   source: JwtRequestSource,
-  env?: { studioUrl?: string | null; publicUrl?: string | null },
+  env?: {
+    studioUrl?: string | null;
+    publicUrl?: string | null;
+    adminUrl?: string | null;
+  },
 ): void {
   if (source === 'bearer') return;
   const origin = requestOrigin(req);

@@ -1,3 +1,5 @@
+import { mailFooterHtml, mailFooterText } from './mail-branding';
+
 export function namaoWhatsAppUrl(
   phone: string | null | undefined,
   leadName: string,
@@ -90,7 +92,7 @@ export function siteIntroductionEmailHtml(params: {
             </tr>
             <tr>
               <td style="padding:22px 8px 0;text-align:center;font-size:12px;color:#8c8c8c;">
-                Namão Criativa — presença digital com inteligência.
+                ${mailFooterHtml()}
               </td>
             </tr>
           </table>
@@ -128,7 +130,7 @@ export function siteIntroductionEmailText(params: {
   if (params.whatsappUrl) {
     lines.push('', `Falar no WhatsApp: ${params.whatsappUrl}`);
   }
-  lines.push('', 'Namão Criativa');
+  lines.push('', mailFooterText());
   return lines.join('\n');
 }
 

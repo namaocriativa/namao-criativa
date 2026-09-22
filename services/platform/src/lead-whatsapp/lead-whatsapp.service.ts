@@ -13,6 +13,8 @@ import { LeadActivityService } from '../lead-activity/lead-activity.service';
 import { OwnerLookup } from '../owner/owner-lookup.service';
 import { ownerWhere } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { PackagesService } from '../packages/packages.service';
+import { renderOfferTemplate } from '../packages/offer-template';
 import {
   PREVIEW_INVITE_TOKEN,
   PREVIEW_PASSWORD,
@@ -26,6 +28,7 @@ export const LEAD_WHATSAPP_KINDS = [
   'site-introduction',
   'instagram-permission',
   'credentials',
+  'package-offer',
 ] as const;
 
 export type LeadWhatsAppKind = (typeof LEAD_WHATSAPP_KINDS)[number];
@@ -47,6 +50,11 @@ const TEMPLATES: Record<
     title: 'Acesso ao painel',
     description: 'Envia o login e uma nova senha para o lead.',
   },
+  'package-offer': {
+    title: 'Enviar pacote',
+    description:
+      'Envia a proposta comercial usando um pacote ativo como conteúdo.',
+  },
 };
 
 @Injectable()
@@ -59,6 +67,7 @@ export class LeadWhatsAppService {
     private readonly accounts: LeadAccountService,
     private readonly activity: LeadActivityService,
     private readonly owners: OwnerLookup,
+    private readonly packages: PackagesService,
   ) {}
 
   async list(leadId: string) {
@@ -70,6 +79,12 @@ export class LeadWhatsAppService {
     const client = await this.prisma.clientAccount.findFirst({
       where: ownerWhere(lead.id),
       select: { id: true },
+    });
+    const activePackages = await this.packages.findActive();
+    const offerReason = this.channelReason(to, evolutionReady, {
+      extra: activePackages.length
+        ? null
+        : 'Nenhum pacote ativo cadastrado.',
     });
 
     return {
@@ -96,16 +111,28 @@ export class LeadWhatsAppService {
             extra: client ? null : 'Lead ainda não tem login no painel.',
           }),
         }),
+        {
+          ...this.listItem('package-offer', to, {
+            available:
+              Boolean(to) && evolutionReady && activePackages.length > 0,
+            unavailableReason: offerReason,
+          }),
+          packages: activePackages,
+        },
       ],
     };
   }
 
-  async preview(leadId: string, kind: string) {
+  async preview(leadId: string, kind: string, packageId?: string) {
     const messageKind = this.parseKind(kind);
     const lead = await this.requireLead(leadId);
     const to = this.phoneOf(lead) || '—';
     const evolutionReady = this.evolution.configured();
     const hasAccount = lead.clientAccounts.length > 0;
+
+    if (messageKind === 'package-offer') {
+      return this.previewPackageOffer(lead, to, evolutionReady, packageId);
+    }
 
     if (messageKind === 'site-introduction') {
       const siteUrl = lead.publishedOrigin?.trim() || null;
@@ -186,7 +213,7 @@ export class LeadWhatsAppService {
     };
   }
 
-  async send(leadId: string, kind: string, editedText?: string) {
+  async send(leadId: string, kind: string, editedText?: string, packageId?: string) {
     const messageKind = this.parseKind(kind);
     const lead = await this.requireLead(leadId);
     const phone = this.phoneOf(lead);
@@ -197,6 +224,10 @@ export class LeadWhatsAppService {
     }
     if (!this.evolution.configured()) {
       throw new BadRequestException('WhatsApp (Evolution) não configurado.');
+    }
+
+    if (messageKind === 'package-offer') {
+      return this.sendPackageOffer(lead, phone, editedText, packageId);
     }
 
     if (messageKind === 'instagram-permission' && lead.instagramConnections.length) {
@@ -237,6 +268,81 @@ export class LeadWhatsAppService {
       sent: true as const,
       to: phone,
       inviteId: prepared.inviteId,
+      text,
+    };
+  }
+
+  private async previewPackageOffer(
+    lead: { name: string; whatsapp: string | null; phone: string | null },
+    to: string,
+    evolutionReady: boolean,
+    packageId?: string,
+  ) {
+    const pkg = await this.packages.requireActive(packageId || '');
+    const template = await this.packages.getOfferTemplate();
+    const rendered = renderOfferTemplate(template, lead.name, {
+      name: pkg.name,
+      summary: pkg.summary,
+      description: pkg.description,
+      benefits: pkg.benefits,
+      price: pkg.price,
+      promoPrice: pkg.promoPrice,
+      currency: pkg.currency,
+    });
+    const notices = [
+      this.phoneNotice(lead),
+      this.evolutionNotice(evolutionReady),
+    ].filter(Boolean);
+    return {
+      id: 'package-offer' as const,
+      ...TEMPLATES['package-offer'],
+      to,
+      canSend: Boolean(this.phoneOf(lead)) && evolutionReady,
+      text: rendered.whatsappMessage,
+      notice: notices.join(' ') || null,
+      packageId: pkg.id,
+    };
+  }
+
+  private async sendPackageOffer(
+    lead: { id: string; name: string },
+    phone: string,
+    editedText: string | undefined,
+    packageId?: string,
+  ) {
+    const pkg = await this.packages.requireActive(packageId || '');
+    const template = await this.packages.getOfferTemplate();
+    const rendered = renderOfferTemplate(template, lead.name, {
+      name: pkg.name,
+      summary: pkg.summary,
+      description: pkg.description,
+      benefits: pkg.benefits,
+      price: pkg.price,
+      promoPrice: pkg.promoPrice,
+      currency: pkg.currency,
+    });
+    const text = editedText?.trim() || rendered.whatsappMessage;
+    const result = await this.evolution.sendText({ phone, text });
+    if (result.skipped) {
+      throw new BadGatewayException('WhatsApp (Evolution) não configurado.');
+    }
+    if (!result.ok) {
+      throw new BadGatewayException(
+        `Falha ao enviar WhatsApp: ${result.error}`,
+      );
+    }
+    await this.activity.record({
+      leadId: lead.id,
+      channel: 'whatsapp',
+      kind: 'package-offer',
+      title: `WhatsApp enviado: ${TEMPLATES['package-offer'].title}`,
+      summary: `Enviado para ${phone} · ${pkg.name}`,
+      payload: { to: phone, kind: 'package-offer', packageId: pkg.id },
+    });
+    return {
+      sent: true as const,
+      to: phone,
+      packageId: pkg.id,
       text,
     };
   }

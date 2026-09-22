@@ -83,6 +83,7 @@ describe('ConvertToCustomerService', () => {
       vercelDeploymentId: 'dpl',
       fromPublicSignup: true,
       createdByUserId: 'op-1',
+      tenantId: 't1',
       createdAt: new Date('2026-01-01'),
       updatedAt: new Date('2026-01-03'),
     });
@@ -102,6 +103,7 @@ describe('ConvertToCustomerService', () => {
         publicSiteId: 'site-1',
         fromPublicSignup: true,
         createdByUserId: 'op-1',
+        tenantId: 't1',
       }),
     });
     expect(tx.studioLeadShare.updateMany).toHaveBeenCalledWith({

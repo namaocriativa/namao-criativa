@@ -16,6 +16,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { LeadAccountService } from '../lead-account/lead-account.service';
 import { LeadActivityService } from '../lead-activity/lead-activity.service';
 import { LeadMailService } from '../lead-mail/lead-mail.service';
+import { SendLeadEmailDto } from '../lead-mail/dto/send-lead-email.dto';
 import { SendLeadWhatsAppDto } from '../lead-whatsapp/dto/send-lead-whatsapp.dto';
 import { LeadWhatsAppService } from '../lead-whatsapp/lead-whatsapp.service';
 import { StudioAuth } from '../auth/studio-auth.decorator';
@@ -90,13 +91,21 @@ export class CustomerController {
   }
 
   @Get(':id/emails/:kind/preview')
-  previewEmail(@Param('id') id: string, @Param('kind') kind: string) {
-    return this.mail.preview(id, kind);
+  previewEmail(
+    @Param('id') id: string,
+    @Param('kind') kind: string,
+    @Query('packageId') packageId?: string,
+  ) {
+    return this.mail.preview(id, kind, packageId);
   }
 
   @Post(':id/emails/:kind')
-  sendEmail(@Param('id') id: string, @Param('kind') kind: string) {
-    return this.mail.send(id, kind);
+  sendEmail(
+    @Param('id') id: string,
+    @Param('kind') kind: string,
+    @Body() dto: SendLeadEmailDto,
+  ) {
+    return this.mail.send(id, kind, dto?.packageId);
   }
 
   @Get(':id/whatsapp')
@@ -105,8 +114,12 @@ export class CustomerController {
   }
 
   @Get(':id/whatsapp/:kind/preview')
-  previewWhatsApp(@Param('id') id: string, @Param('kind') kind: string) {
-    return this.whatsapp.preview(id, kind);
+  previewWhatsApp(
+    @Param('id') id: string,
+    @Param('kind') kind: string,
+    @Query('packageId') packageId?: string,
+  ) {
+    return this.whatsapp.preview(id, kind, packageId);
   }
 
   @Post(':id/whatsapp/:kind')
@@ -115,7 +128,7 @@ export class CustomerController {
     @Param('kind') kind: string,
     @Body() dto: SendLeadWhatsAppDto,
   ) {
-    return this.whatsapp.send(id, kind, dto?.text);
+    return this.whatsapp.send(id, kind, dto?.text, dto?.packageId);
   }
 
   @Get(':id/history')

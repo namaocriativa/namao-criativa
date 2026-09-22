@@ -18,6 +18,10 @@ describe('InviteRequestsService', () => {
         findFirst: jest.fn().mockResolvedValue({ id: '1' }),
         create: jest.fn(),
       },
+      tenant: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'namao_default_tenant' }),
+        create: jest.fn(),
+      },
     };
     const rateLimit = { tooMany: jest.fn().mockResolvedValue(false) };
     const service = new InviteRequestsService(
@@ -34,6 +38,10 @@ describe('InviteRequestsService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: '2' }),
       },
+      tenant: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'namao_default_tenant' }),
+        create: jest.fn(),
+      },
     };
     const rateLimit = { tooMany: jest.fn().mockResolvedValue(false) };
     const service = new InviteRequestsService(
@@ -43,6 +51,7 @@ describe('InviteRequestsService', () => {
     await expect(service.create(req(), dto)).resolves.toEqual({ ok: true });
     expect(prisma.inviteRequest.create).toHaveBeenCalledWith({
       data: {
+        tenantId: 'namao_default_tenant',
         name: 'Ana',
         email: 'ana@loja.com',
         instagram: 'loja_ana',

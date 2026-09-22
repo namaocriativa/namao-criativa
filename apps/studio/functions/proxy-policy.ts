@@ -13,7 +13,11 @@ export function isUnauthenticatedApiAllowed(
   method: string,
   pathname: string,
 ): boolean {
-  if (method.toUpperCase() !== 'POST') return false;
+  const verb = method.toUpperCase();
+  if (verb === 'GET' && pathname.startsWith('/public/calendar-assets/')) {
+    return true;
+  }
+  if (verb !== 'POST') return false;
   return (
     pathname === '/auth/studio/login' || pathname === '/auth/studio/logout'
   );

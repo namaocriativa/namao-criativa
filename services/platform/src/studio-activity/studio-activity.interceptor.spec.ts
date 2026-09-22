@@ -34,6 +34,7 @@ describe('StudioActivityInterceptor', () => {
             email: 'op@namao.local',
             name: 'Op',
             role: USER_ROLE.OPERATOR,
+            tenantId: 't1',
             leadId: null,
             customerId: null,
           },

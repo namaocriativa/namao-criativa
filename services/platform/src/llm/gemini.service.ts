@@ -8,6 +8,12 @@ import {
   geminiHttpError,
   parseGeminiSseStream,
 } from './gemini-sse';
+import {
+  parseGeminiTurnResponse,
+  type GeminiToolDeclaration,
+  type GeminiTurnContent,
+  type GeminiTurnResult,
+} from './gemini-turn';
 import { parseJsonValue } from './json-parse';
 import { GEMINI_DEFAULTS, GEMINI_SUGGESTED_MODELS } from './llm.types';
 
@@ -153,6 +159,81 @@ export class GeminiService {
       }
       options.onChunk?.(text, text);
       return text;
+    } catch (error) {
+      throw new Error(geminiErrorMessage(error));
+    }
+  }
+
+  async generateTurn(input: {
+    model?: string;
+    systemInstruction?: string;
+    contents: GeminiTurnContent[];
+    tools?: GeminiToolDeclaration[];
+    temperature?: number;
+    signal?: AbortSignal;
+  }): Promise<GeminiTurnResult> {
+    if (!this.configured) {
+      throw new Error(
+        'GEMINI_API_KEY não configurada. Defina no .env (Google AI Studio).',
+      );
+    }
+    const model = this.normalizeModel(input.model || GEMINI_DEFAULTS.chat);
+    const url = `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`;
+    const body: Record<string, unknown> = {
+      contents: input.contents.map((content) => ({
+        role: content.role,
+        parts: content.parts.map((part) => {
+          if ('text' in part) return { text: part.text };
+          if ('functionCall' in part) {
+            return {
+              functionCall: {
+                name: part.functionCall.name,
+                args: part.functionCall.args,
+              },
+            };
+          }
+          return {
+            functionResponse: {
+              name: part.functionResponse.name,
+              response: part.functionResponse.response,
+            },
+          };
+        }),
+      })),
+      generationConfig: {
+        temperature: input.temperature ?? 0.4,
+      },
+    };
+    if (input.systemInstruction?.trim()) {
+      body.systemInstruction = {
+        parts: [{ text: input.systemInstruction.trim() }],
+      };
+    }
+    if (input.tools?.length) {
+      body.tools = [
+        {
+          functionDeclarations: input.tools,
+        },
+      ];
+    }
+
+    try {
+      const res = await axios.post(url, body, {
+        params: { key: this.apiKey },
+        timeout: 180_000,
+        signal: input.signal,
+      });
+      const parsed = parseGeminiTurnResponse(res.data);
+      if (!parsed.text && !parsed.functionCalls.length) {
+        const block = (res.data as { promptFeedback?: { blockReason?: string } })
+          ?.promptFeedback?.blockReason;
+        throw new Error(
+          block
+            ? `Gemini bloqueou a resposta: ${block}`
+            : 'Gemini retornou resposta vazia',
+        );
+      }
+      return parsed;
     } catch (error) {
       throw new Error(geminiErrorMessage(error));
     }

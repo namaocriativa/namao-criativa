@@ -1,6 +1,20 @@
 import { api } from "./api";
+import { profileApi, type EntityKind } from "./profile-api";
 
-type WhatsAppKind = "site-introduction" | "instagram-permission" | "credentials";
+type WhatsAppKind =
+  | "site-introduction"
+  | "instagram-permission"
+  | "credentials"
+  | "package-offer";
+
+type OfferPackage = {
+  id: string;
+  name: string;
+  summary?: string | null;
+  price?: number | null;
+  promoPrice?: number | null;
+  currency?: string | null;
+};
 
 type WhatsAppListItem = {
   id: WhatsAppKind;
@@ -9,6 +23,7 @@ type WhatsAppListItem = {
   to: string | null;
   available: boolean;
   unavailableReason: string | null;
+  packages?: OfferPackage[];
 };
 
 type WhatsAppPreview = {
@@ -19,6 +34,7 @@ type WhatsAppPreview = {
   text: string;
   notice?: string | null;
   canSend?: boolean;
+  packageId?: string;
 };
 
 type SendResult = {
@@ -47,7 +63,24 @@ function escapeHtml(value: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
-import { profileApi, type EntityKind } from "./profile-api";
+function formatOfferPrice(pkg: OfferPackage): string {
+  const currency = pkg.currency || "BRL";
+  const money = (value: number | null | undefined) => {
+    if (value == null || Number.isNaN(value)) return null;
+    try {
+      return new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency,
+      }).format(value);
+    } catch {
+      return `${currency} ${value}`;
+    }
+  };
+  const full = money(pkg.price);
+  const promo = money(pkg.promoPrice);
+  if (full && promo) return `de ${full} por ${promo}`;
+  return full || "Sob consulta";
+}
 
 export function initLeadWhatsAppModal(
   host: HTMLElement,
@@ -59,10 +92,11 @@ export function initLeadWhatsAppModal(
   let leadId: string | null = null;
   let apiKind: EntityKind = "lead";
   let busy = false;
-  let view: "list" | "preview" = "list";
+  let view: "list" | "packages" | "preview" = "list";
   let items: WhatsAppListItem[] = [];
   let preview: WhatsAppPreview | null = null;
   let sent = false;
+  let selectedPackageId: string | null = null;
 
   host.innerHTML = `
     <div class="site-wizard-modal lead-emails-modal lead-whatsapp-modal" hidden>
@@ -141,17 +175,64 @@ export function initLeadWhatsAppModal(
     listEl.querySelectorAll<HTMLButtonElement>("[data-wpp-kind]").forEach((btn) => {
       btn.disabled = next;
     });
+    listEl.querySelectorAll<HTMLButtonElement>("[data-wpp-package]").forEach((btn) => {
+      btn.disabled = next;
+    });
   }
 
   function showList() {
     view = "list";
     preview = null;
     sent = false;
+    selectedPackageId = null;
     titleEl.textContent = "WhatsApp";
     listEl.hidden = false;
     previewEl.hidden = true;
     textEl.value = "";
     sendBtn.disabled = true;
+  }
+
+  function offerItem() {
+    return items.find((item) => item.id === "package-offer") || null;
+  }
+
+  function showPackagePicker() {
+    const offer = offerItem();
+    const packages = offer?.packages || [];
+    view = "packages";
+    preview = null;
+    sent = false;
+    titleEl.textContent = "Escolher pacote";
+    listEl.hidden = false;
+    previewEl.hidden = true;
+    textEl.value = "";
+    sendBtn.disabled = true;
+    if (!packages.length) {
+      listEl.innerHTML = `<p class="lead-emails-empty">Nenhum pacote ativo cadastrado.</p>`;
+      return;
+    }
+    listEl.innerHTML =
+      `<p class="lead-emails-empty">Selecione o pacote para montar a proposta.</p>` +
+      packages
+        .map((pkg) => {
+          const summary = escapeHtml(pkg.summary || "Sem resumo");
+          const price = escapeHtml(formatOfferPrice(pkg));
+          return `
+          <button
+            type="button"
+            class="lead-emails-item"
+            data-wpp-package="${escapeHtml(pkg.id)}"
+          >
+            <strong>${escapeHtml(pkg.name)}</strong>
+            <span>${summary}</span>
+            <em>${price}</em>
+          </button>
+        `;
+        })
+        .join("") +
+      `<div class="lead-emails-actions" style="margin-top:0.85rem">
+        <button type="button" class="secondary" data-wpp-packages-back>Voltar</button>
+      </div>`;
   }
 
   function renderList(loading = false) {
@@ -234,13 +315,21 @@ export function initLeadWhatsAppModal(
     }
   }
 
-  async function openPreview(kind: WhatsAppKind) {
+  async function openPreview(kind: WhatsAppKind, packageId?: string) {
     if (!leadId || busy) return;
     setBusy(true);
     setStatus("Carregando prévia…");
     try {
+      const query =
+        kind === "package-offer" && packageId
+          ? `?packageId=${encodeURIComponent(packageId)}`
+          : "";
       const res = await api(
-        profileApi(apiKind, leadId, `/whatsapp/${encodeURIComponent(kind)}/preview`),
+        profileApi(
+          apiKind,
+          leadId,
+          `/whatsapp/${encodeURIComponent(kind)}/preview${query}`,
+        ),
       );
       const data = (await res.json().catch(() => ({}))) as WhatsAppPreview & {
         message?: string | string[];
@@ -266,7 +355,10 @@ export function initLeadWhatsAppModal(
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: textEl.value }),
+          body: JSON.stringify({
+            text: textEl.value,
+            packageId: preview.packageId || selectedPackageId || undefined,
+          }),
         },
       );
       const data = (await res.json().catch(() => ({}))) as SendResult;
@@ -306,6 +398,7 @@ export function initLeadWhatsAppModal(
     items = [];
     preview = null;
     sent = false;
+    selectedPackageId = null;
     textEl.value = "";
   }
 
@@ -315,6 +408,7 @@ export function initLeadWhatsAppModal(
     items = [];
     preview = null;
     sent = false;
+    selectedPackageId = null;
     renderList(true);
     showList();
     setStatus("");
@@ -329,6 +423,19 @@ export function initLeadWhatsAppModal(
       close();
       return;
     }
+    if (target?.closest("[data-wpp-packages-back]")) {
+      showList();
+      setStatus("");
+      void loadList();
+      return;
+    }
+    const packageId = target?.closest<HTMLElement>("[data-wpp-package]")?.dataset
+      .wppPackage;
+    if (packageId) {
+      selectedPackageId = packageId;
+      void openPreview("package-offer", packageId);
+      return;
+    }
     const kind = target?.closest<HTMLElement>("[data-wpp-kind]")?.dataset.wppKind;
     if (
       kind === "site-introduction" ||
@@ -336,13 +443,27 @@ export function initLeadWhatsAppModal(
       kind === "credentials"
     ) {
       void openPreview(kind);
+      return;
+    }
+    if (kind === "package-offer") {
+      const offer = offerItem();
+      if (!offer?.available) {
+        setStatus(offer?.unavailableReason || "Pacote indisponível.", true);
+        return;
+      }
+      showPackagePicker();
+      setStatus("");
     }
   });
 
   backBtn.addEventListener("click", () => {
     if (busy) return;
-    showList();
     setStatus("");
+    if (view === "preview" && preview?.id === "package-offer") {
+      showPackagePicker();
+      return;
+    }
+    showList();
     void loadList();
   });
   sendBtn.addEventListener("click", () => {
@@ -350,9 +471,15 @@ export function initLeadWhatsAppModal(
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || modal.hidden || busy) return;
-    if (view === "preview") {
+    if (view === "preview" && preview?.id === "package-offer") {
+      showPackagePicker();
+      setStatus("");
+      return;
+    }
+    if (view === "preview" || view === "packages") {
       showList();
       setStatus("");
+      void loadList();
       return;
     }
     close();

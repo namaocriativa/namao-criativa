@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { USER_ROLE } from '../auth/roles';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { EnrichmentService } from './enrichment.service';
+import { runWithTenant } from '../tenant/tenant-context';
 
 function actor(id = 'op-1'): JwtUser {
   return {
@@ -9,6 +10,7 @@ function actor(id = 'op-1'): JwtUser {
     email: `${id}@n.co`,
     name: id,
     role: USER_ROLE.OPERATOR,
+    tenantId: 'tenant-1',
     leadId: null,
     customerId: null,
   };
@@ -59,7 +61,9 @@ describe('EnrichmentService access', () => {
     access.hasAccess.mockResolvedValue(false);
 
     await expect(
-      service.enrich({ name: 'Firma', website: 'https://firma.com' }, actor()),
+      runWithTenant('tenant-1', () =>
+        service.enrich({ name: 'Firma', website: 'https://firma.com' }, actor()),
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.lead.update).not.toHaveBeenCalled();
     expect(prisma.lead.create).not.toHaveBeenCalled();
@@ -69,12 +73,15 @@ describe('EnrichmentService access', () => {
     prisma.lead.findMany.mockResolvedValue([]);
     prisma.lead.create.mockResolvedValue({ id: 'lead-new', name: 'Firma' });
 
-    await service.enrich({ name: 'Firma' }, actor('op-9'));
+    await runWithTenant('tenant-1', () =>
+      service.enrich({ name: 'Firma' }, actor('op-9')),
+    );
 
     expect(prisma.lead.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         name: 'Firma',
         createdByUserId: 'op-9',
+        tenantId: 'tenant-1',
       }),
     });
   });

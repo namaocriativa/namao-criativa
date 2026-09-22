@@ -37,6 +37,7 @@ const LEAD_COPY_FIELDS = [
   'vercelDeploymentId',
   'fromPublicSignup',
   'createdByUserId',
+  'tenantId',
   'createdAt',
 ] as const;
 
@@ -96,6 +97,7 @@ export class ConvertToCustomerService {
         vercelDeploymentId: existing.vercelDeploymentId,
         fromPublicSignup: existing.fromPublicSignup,
         createdByUserId: existing.createdByUserId,
+        tenantId: existing.tenantId,
         createdAt: existing.createdAt,
         updatedAt: existing.updatedAt,
         convertedAt: new Date(),

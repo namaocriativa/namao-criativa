@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   headersForStudioApiProxy,
   isHtmlNavigation,
+  isUnauthenticatedApiAllowed,
   studioProxyStatus,
 } from './proxy-policy';
 
@@ -59,4 +60,12 @@ test('studioProxyStatus não deixa 502/504 vazar para a página HTML da Cloudfla
   assert.equal(studioProxyStatus(502), 400);
   assert.equal(studioProxyStatus(504), 400);
   assert.equal(studioProxyStatus(503), 400);
+});
+
+test('mídia pública do calendário não exige cookie do studio', () => {
+  assert.equal(
+    isUnauthenticatedApiAllowed('GET', '/public/calendar-assets/abc'),
+    true,
+  );
+  assert.equal(isUnauthenticatedApiAllowed('GET', '/calendar/posts'), false);
 });

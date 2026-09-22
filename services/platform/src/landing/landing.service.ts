@@ -22,8 +22,9 @@ import { ScaffoldService } from './scaffold.service';
 import { PRESET_SECTIONS } from './section-catalog';
 import { VercelService } from './vercel.service';
 import type { JwtUser } from '../auth/jwt.strategy';
-import { isStudioAdmin } from '../auth/roles';
+import { isTenantAdmin } from '../auth/roles';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
+import { tenantWhere } from '../tenant/tenant.util';
 
 @Injectable()
 export class LandingService {
@@ -232,12 +233,20 @@ export class LandingService {
   }
 
   async listGenerations(user: JwtUser) {
-    const where = isStudioAdmin(user.role)
-      ? undefined
+    const tenantFilter = {
+      OR: [{ lead: tenantWhere() }, { customer: tenantWhere() }],
+    };
+    const where = isTenantAdmin(user)
+      ? tenantFilter
       : {
-          OR: [
-            { lead: this.access.visibleWhere(user) },
-            { customer: this.access.visibleWhere(user) },
+          AND: [
+            tenantFilter,
+            {
+              OR: [
+                { lead: this.access.visibleWhere(user) },
+                { customer: this.access.visibleWhere(user) },
+              ],
+            },
           ],
         };
     return this.prisma.landingGeneration.findMany({

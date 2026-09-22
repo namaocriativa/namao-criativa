@@ -81,6 +81,19 @@ export class StorageService {
   private readonly storageRoot = path.join(__dirname, '..', '..', 'storage');
   private readonly leadsRoot = path.join(this.storageRoot, 'leads');
   private readonly packagesRoot = path.join(this.storageRoot, 'packages');
+  private readonly imageProjectsRoot = path.join(
+    this.storageRoot,
+    'image-projects',
+  );
+  private readonly videoProjectsRoot = path.join(
+    this.storageRoot,
+    'video-projects',
+  );
+  private readonly charactersRoot = path.join(this.storageRoot, 'characters');
+  private readonly moviesRoot = path.join(this.storageRoot, 'movies');
+  private readonly startEndRoot = path.join(this.storageRoot, 'inicio-fim');
+  private readonly ugcSkillsRoot = path.join(this.storageRoot, 'ugc-skills');
+  private readonly calendarRoot = path.join(this.storageRoot, 'calendar');
 
   async ensureLeadImagesDir(leadId: string): Promise<string> {
     const dir = path.join(this.leadsRoot, leadId, 'images');
@@ -96,6 +109,48 @@ export class StorageService {
 
   async ensurePackageImagesDir(packageId: string): Promise<string> {
     const dir = path.join(this.packagesRoot, packageId, 'images');
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
+  }
+
+  async ensureImageProjectDir(projectId: string): Promise<string> {
+    const dir = path.join(this.imageProjectsRoot, projectId);
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
+  }
+
+  async ensureVideoProjectDir(projectId: string): Promise<string> {
+    const dir = path.join(this.videoProjectsRoot, projectId);
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
+  }
+
+  async ensureCharacterDir(characterId: string): Promise<string> {
+    const dir = path.join(this.charactersRoot, characterId);
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
+  }
+
+  async ensureMovieDir(movieId: string): Promise<string> {
+    const dir = path.join(this.moviesRoot, movieId);
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
+  }
+
+  async ensureStartEndDir(clipId: string): Promise<string> {
+    const dir = path.join(this.startEndRoot, clipId);
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
+  }
+
+  async ensureUgcSkillsDir(clipId: string): Promise<string> {
+    const dir = path.join(this.ugcSkillsRoot, clipId);
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
+  }
+
+  async ensureCalendarDir(postId: string): Promise<string> {
+    const dir = path.join(this.calendarRoot, postId);
     await fs.mkdir(dir, { recursive: true });
     return dir;
   }
@@ -328,6 +383,304 @@ export class StorageService {
     } catch (error) {
       this.logger.warn(
         `Failed to remove storage for package ${packageId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async saveImageProjectAsset(
+    projectId: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string | null,
+    prefix = 'asset',
+  ): Promise<SavedImage> {
+    const dir = await this.ensureImageProjectDir(projectId);
+    const ext = extensionForImage(mimeType, originalName);
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'asset';
+    const filename = `${safePrefix}-${randomUUID()}${ext}`;
+    await fs.writeFile(path.join(dir, filename), buffer);
+
+    const localPath = path
+      .join('storage', 'image-projects', projectId, filename)
+      .replace(/\\/g, '/');
+
+    return {
+      sourceUrl: `upload://${filename}`,
+      localPath,
+      filename,
+      mimeType,
+      width: null,
+      height: null,
+    };
+  }
+
+  async readStorageFile(localPath: string): Promise<Buffer | null> {
+    const absolute = this.resolveStorageFile(localPath);
+    if (!absolute) return null;
+    try {
+      return await fs.readFile(absolute);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') {
+        this.logger.warn(
+          `Failed to read ${localPath}: ${(error as Error).message}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  async saveVideoProjectAsset(
+    projectId: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string | null,
+    prefix = 'asset',
+  ): Promise<SavedVideo> {
+    const dir = await this.ensureVideoProjectDir(projectId);
+    const mime = (mimeType || '').split(';')[0].trim().toLowerCase();
+    const ext = mime.startsWith('video/')
+      ? extensionForVideo(mime, originalName)
+      : extensionForImage(mimeType, originalName);
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'asset';
+    const filename = `${safePrefix}-${randomUUID()}${ext}`;
+    await fs.writeFile(path.join(dir, filename), buffer);
+
+    const localPath = path
+      .join('storage', 'video-projects', projectId, filename)
+      .replace(/\\/g, '/');
+
+    return {
+      sourceUrl: `upload://${filename}`,
+      localPath,
+      filename,
+      mimeType: mimeType || (ext === '.mp4' ? 'video/mp4' : null),
+    };
+  }
+
+  async removeImageProjectDir(projectId: string): Promise<void> {
+    const dir = path.join(this.imageProjectsRoot, projectId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove storage for image project ${projectId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async removeVideoProjectDir(projectId: string): Promise<void> {
+    const dir = path.join(this.videoProjectsRoot, projectId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove storage for video project ${projectId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async saveCharacterAsset(
+    characterId: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string | null,
+    prefix = 'asset',
+  ): Promise<SavedImage> {
+    const dir = await this.ensureCharacterDir(characterId);
+    const mime = (mimeType || '').split(';')[0].trim().toLowerCase();
+    const ext = mime.startsWith('video/')
+      ? extensionForVideo(mime, originalName)
+      : extensionForImage(mimeType, originalName);
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'asset';
+    const filename = `${safePrefix}-${randomUUID()}${ext}`;
+    await fs.writeFile(path.join(dir, filename), buffer);
+
+    const localPath = path
+      .join('storage', 'characters', characterId, filename)
+      .replace(/\\/g, '/');
+
+    return {
+      sourceUrl: `upload://${filename}`,
+      localPath,
+      filename,
+      mimeType: mimeType || (ext === '.mp4' ? 'video/mp4' : null),
+      width: null,
+      height: null,
+    };
+  }
+
+  async removeCharacterDir(characterId: string): Promise<void> {
+    const dir = path.join(this.charactersRoot, characterId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove storage for character ${characterId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async saveMovieAsset(
+    movieId: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string | null,
+    prefix = 'shot',
+  ): Promise<SavedImage> {
+    const dir = await this.ensureMovieDir(movieId);
+    const mime = (mimeType || '').split(';')[0].trim().toLowerCase();
+    const ext = mime.startsWith('video/')
+      ? extensionForVideo(mime, originalName)
+      : extensionForImage(mimeType, originalName);
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'shot';
+    const filename = `${safePrefix}-${randomUUID()}${ext}`;
+    await fs.writeFile(path.join(dir, filename), buffer);
+
+    const localPath = path
+      .join('storage', 'movies', movieId, filename)
+      .replace(/\\/g, '/');
+
+    return {
+      sourceUrl: `upload://${filename}`,
+      localPath,
+      filename,
+      mimeType: mimeType || (ext === '.mp4' ? 'video/mp4' : null),
+      width: null,
+      height: null,
+    };
+  }
+
+  async removeMovieDir(movieId: string): Promise<void> {
+    const dir = path.join(this.moviesRoot, movieId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove storage for movie ${movieId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async saveStartEndAsset(
+    clipId: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string | null,
+    prefix = 'asset',
+  ): Promise<SavedImage> {
+    const dir = await this.ensureStartEndDir(clipId);
+    const mime = (mimeType || '').split(';')[0].trim().toLowerCase();
+    const ext = mime.startsWith('video/')
+      ? extensionForVideo(mime, originalName)
+      : extensionForImage(mimeType, originalName);
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'asset';
+    const filename = `${safePrefix}-${randomUUID()}${ext}`;
+    await fs.writeFile(path.join(dir, filename), buffer);
+
+    const localPath = path
+      .join('storage', 'inicio-fim', clipId, filename)
+      .replace(/\\/g, '/');
+
+    return {
+      sourceUrl: `upload://${filename}`,
+      localPath,
+      filename,
+      mimeType: mimeType || (ext === '.mp4' ? 'video/mp4' : null),
+      width: null,
+      height: null,
+    };
+  }
+
+  async removeStartEndDir(clipId: string): Promise<void> {
+    const dir = path.join(this.startEndRoot, clipId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove storage for start-end clip ${clipId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async saveUgcSkillsAsset(
+    clipId: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string | null,
+    prefix = 'asset',
+  ): Promise<SavedImage> {
+    const dir = await this.ensureUgcSkillsDir(clipId);
+    const mime = (mimeType || '').split(';')[0].trim().toLowerCase();
+    const ext = mime.startsWith('video/')
+      ? extensionForVideo(mime, originalName)
+      : extensionForImage(mimeType, originalName);
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'asset';
+    const filename = `${safePrefix}-${randomUUID()}${ext}`;
+    await fs.writeFile(path.join(dir, filename), buffer);
+
+    const localPath = path
+      .join('storage', 'ugc-skills', clipId, filename)
+      .replace(/\\/g, '/');
+
+    return {
+      sourceUrl: `upload://${filename}`,
+      localPath,
+      filename,
+      mimeType: mimeType || (ext === '.mp4' ? 'video/mp4' : null),
+      width: null,
+      height: null,
+    };
+  }
+
+  async removeUgcSkillsDir(clipId: string): Promise<void> {
+    const dir = path.join(this.ugcSkillsRoot, clipId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove storage for UGC clip ${clipId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async saveCalendarAsset(
+    postId: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string | null,
+    prefix = 'asset',
+  ): Promise<SavedImage> {
+    const dir = await this.ensureCalendarDir(postId);
+    const mime = (mimeType || '').split(';')[0].trim().toLowerCase();
+    const ext = mime.startsWith('video/')
+      ? extensionForVideo(mime, originalName)
+      : extensionForImage(mimeType, originalName);
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'asset';
+    const filename = `${safePrefix}-${randomUUID()}${ext}`;
+    await fs.writeFile(path.join(dir, filename), buffer);
+
+    const localPath = path
+      .join('storage', 'calendar', postId, filename)
+      .replace(/\\/g, '/');
+
+    return {
+      sourceUrl: `upload://${filename}`,
+      localPath,
+      filename,
+      mimeType: mimeType || (ext === '.mp4' ? 'video/mp4' : null),
+      width: null,
+      height: null,
+    };
+  }
+
+  async removeCalendarDir(postId: string): Promise<void> {
+    const dir = path.join(this.calendarRoot, postId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove storage for calendar post ${postId}: ${(error as Error).message}`,
       );
     }
   }

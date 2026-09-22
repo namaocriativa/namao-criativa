@@ -14,6 +14,7 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 import { STUDIO_CREATOR_SELECT, withPortalUsers } from '../owner/owner.util';
+import { assertSameTenant, tenantWhere } from '../tenant/tenant.util';
 
 export type LeadUploadFile = {
   buffer?: Buffer;
@@ -42,7 +43,7 @@ export class LeadService {
 
   async findAll(actor: JwtUser) {
     const leads = await this.prisma.lead.findMany({
-      where: this.access.visibleWhere(actor),
+      where: { AND: [tenantWhere(), this.access.visibleWhere(actor)] },
       orderBy: { updatedAt: 'desc' },
       include: {
         _count: {
@@ -100,6 +101,7 @@ export class LeadService {
     if (!lead) {
       throw new NotFoundException(`Lead ${id} not found`);
     }
+    assertSameTenant(lead, `Lead ${id} not found`);
 
     if (actor) {
       return withPortalUsers(this.access.present(actor, lead));
@@ -110,12 +112,13 @@ export class LeadService {
   async deleteById(id: string) {
     const existing = await this.prisma.lead.findUnique({
       where: { id },
-      select: { id: true, name: true },
+      select: { id: true, name: true, tenantId: true },
     });
 
     if (!existing) {
       throw new NotFoundException(`Lead ${id} not found`);
     }
+    assertSameTenant(existing, `Lead ${id} not found`);
 
     await this.prisma.lead.delete({ where: { id } });
     await this.storageService.removeLeadDir(id);

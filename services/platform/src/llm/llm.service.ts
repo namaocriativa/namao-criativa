@@ -4,6 +4,11 @@ import { extname } from 'path';
 import { EnvStatusService } from './env-status.service';
 import { GeminiService } from './gemini.service';
 import type { GenerateOptions } from './generate-options';
+import type {
+  GeminiToolDeclaration,
+  GeminiTurnContent,
+  GeminiTurnResult,
+} from './gemini-turn';
 import { LlmSettingsService } from './llm-settings.service';
 import {
   LLM_ROLES,
@@ -40,6 +45,7 @@ export class LlmService {
     validate: (value: unknown) => T,
     options: GenerateOptions & { expectedShape?: string } = {},
   ): Promise<T> {
+    await this.settingsService.ensureLoaded();
     const role = options.role || 'code';
     const resolved = this.resolve(role);
     const model = options.model || resolved.model;
@@ -47,10 +53,26 @@ export class LlmService {
     return this.gemini.generateJson(prompt, validate, { ...options, model });
   }
 
+  async generateTurn(input: {
+    systemInstruction?: string;
+    contents: GeminiTurnContent[];
+    tools?: GeminiToolDeclaration[];
+    temperature?: number;
+    model?: string;
+    signal?: AbortSignal;
+  }): Promise<GeminiTurnResult> {
+    await this.settingsService.ensureLoaded();
+    const resolved = this.resolve('chat');
+    const model = input.model || resolved.model;
+    this.logger.debug(`chat turn via gemini:${model}`);
+    return this.gemini.generateTurn({ ...input, model });
+  }
+
   async *generateStream(
     prompt: string,
     options: GenerateOptions = {},
   ): AsyncGenerator<string> {
+    await this.settingsService.ensureLoaded();
     const role = options.role || 'chat';
     const resolved = this.resolve(role);
     const model = options.model || resolved.model;
@@ -83,6 +105,7 @@ export class LlmService {
   }
 
   async status() {
+    await this.settingsService.ensureLoaded();
     const settings = this.settingsService.get();
     const gemini = await this.gemini.status();
     const roles = {} as Record<LlmRole, RoleStatus>;

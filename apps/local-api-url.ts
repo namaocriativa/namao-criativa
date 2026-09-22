@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { loadEnv } from 'vite';
 
-/** URL da API no host (Docker mapeia PLATFORM_PORT→3000 no container). */
+/** URL da API no host (`PLATFORM_PORT` no .env da raiz, default 4000). */
 export function resolveLocalApiUrl(repoRoot: string): string {
   const fromRoot = loadEnv('development', repoRoot, '');
   const fromPlatform = loadEnv(

@@ -9,6 +9,7 @@ function actor(id: string, role: string = USER_ROLE.OPERATOR): JwtUser {
     email: `${id}@n.co`,
     name: id,
     role,
+    tenantId: 't1',
     leadId: null,
     customerId: null,
   };
@@ -77,6 +78,7 @@ describe('StudioLeadShareService', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'op-2',
       role: USER_ROLE.OPERATOR,
+      tenantId: 't1',
     });
     prisma.studioLeadShare.findFirst.mockResolvedValue(null);
 
@@ -88,6 +90,24 @@ describe('StudioLeadShareService', () => {
     prisma.studioLeadShare.findFirst.mockResolvedValue({ id: 'share-1' });
     prisma.studioLeadShare.create.mockClear();
     await service.add(actor('op-1'), 'lead-1', 'op-2');
+    expect(prisma.studioLeadShare.create).not.toHaveBeenCalled();
+  });
+
+  it('POST recusa staff de outro tenant', async () => {
+    access.assertCanManageShares.mockResolvedValue({
+      kind: 'lead',
+      id: 'lead-1',
+      createdByUserId: 'op-1',
+      studioShares: [],
+    });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'op-x',
+      role: USER_ROLE.OPERATOR,
+      tenantId: 't2',
+    });
+    await expect(
+      service.add(actor('op-1'), 'lead-1', 'op-x'),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.studioLeadShare.create).not.toHaveBeenCalled();
   });
 

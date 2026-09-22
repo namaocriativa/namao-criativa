@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInviteRequestDto } from './dto/create-invite-request.dto';
 import { InviteRateLimitService } from './invite-rate-limit.service';
+import { resolveDefaultTenantId } from '../tenant/tenant.util';
 
 @Injectable()
 export class InviteRequestsService {
@@ -19,8 +20,9 @@ export class InviteRequestsService {
       );
     }
 
+    const tenantId = await resolveDefaultTenantId(this.prisma);
     const existing = await this.prisma.inviteRequest.findFirst({
-      where: { email: dto.email },
+      where: { email: dto.email, tenantId },
       select: { id: true },
     });
     if (existing) {
@@ -29,6 +31,7 @@ export class InviteRequestsService {
 
     await this.prisma.inviteRequest.create({
       data: {
+        tenantId,
         name: dto.name,
         email: dto.email,
         instagram: dto.instagram,

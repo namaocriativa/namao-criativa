@@ -17,7 +17,14 @@ const API_PREFIXES = [
   '/lead-discovery',
   '/enrichment',
   '/packages',
-  '/locations',
+  '/calendar',
+  '/public',
+  '/image-projects',
+  '/image-models',
+  '/video-projects',
+      '/video-models',
+      '/creative',
+      '/locations',
   '/storage',
   '/landing',
   '/config',
@@ -25,7 +32,7 @@ const API_PREFIXES = [
   '/studio',
 ];
 
-const STUDIO_ROLES = new Set(['ADMIN', 'OPERATOR']);
+const STUDIO_ROLES = new Set(['ROOT', 'ADMIN', 'OPERATOR']);
 
 function b64urlToBytes(value: string): Uint8Array {
   const pad = '='.repeat((4 - (value.length % 4)) % 4);

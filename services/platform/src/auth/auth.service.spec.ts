@@ -19,6 +19,11 @@ describe('AuthService', () => {
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+    },
+    tenant: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
     },
     clientAccount: {
       findUnique: jest.fn(),
@@ -81,6 +86,12 @@ describe('AuthService', () => {
     prisma.customer.findUnique.mockResolvedValue(null);
     prisma.instagramConnection.findFirst.mockResolvedValue(null);
     prisma.invite.update.mockResolvedValue({});
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'namao_default_tenant',
+      name: 'Namão',
+      status: 'active',
+    });
+    prisma.tenant.create.mockResolvedValue({ id: 'namao_default_tenant' });
     mail.sendCredentials.mockResolvedValue(undefined);
     activity.recordLogin.mockResolvedValue(undefined);
     activity.recordLogout.mockResolvedValue(undefined);
@@ -101,6 +112,7 @@ describe('AuthService', () => {
           email: 'ana@loja.com',
           instagram: 'https://www.instagram.com/loja_ana/',
           fromPublicSignup: true,
+          tenantId: 'namao_default_tenant',
         }),
       }),
     );
@@ -131,7 +143,7 @@ describe('AuthService', () => {
     });
     expect(prisma.clientAccount.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ leadId: 'lead-1', customerId: null }),
+        data: expect.objectContaining({ leadId: 'lead-1', customerId: null, tenantId: 'namao_default_tenant' }),
       }),
     );
     expect(prisma.user.create).not.toHaveBeenCalled();
@@ -171,6 +183,7 @@ describe('AuthService', () => {
     email: 'ana@loja.com',
     name: 'Ana',
     role: 'CLIENT',
+    tenantId: 'namao_default_tenant',
     leadId: 'lead-1',
     customerId: null as string | null,
   };
@@ -274,9 +287,11 @@ describe('AuthService', () => {
       email: 'admin@namao.local',
       name: 'Admin',
       role: 'ADMIN',
+      tenantId: 't1',
       leadId: null,
       customerId: null,
       passwordHash: hash,
+      tenant: { id: 't1', name: 'Namão', status: 'active' },
     });
     const result = await service.studioLogin({
       email: 'admin@namao.local',
@@ -291,11 +306,133 @@ describe('AuthService', () => {
         role: 'ADMIN',
         typ: 'staff',
       }),
+      { expiresIn: '30d' },
     );
     expect(activity.recordLogin).toHaveBeenCalledWith('a1');
   });
 
-  it('ensureStudioAdmin cria o primeiro admin', async () => {
+  it('studioLogin emite sessão curta quando rememberMe é false', async () => {
+    const hash = await require('bcryptjs').hash('password1', 4);
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'a1',
+      email: 'admin@namao.local',
+      name: 'Admin',
+      role: 'ADMIN',
+      tenantId: 't1',
+      leadId: null,
+      customerId: null,
+      passwordHash: hash,
+      tenant: { id: 't1', name: 'Namão', status: 'active' },
+    });
+    await service.studioLogin({
+      email: 'admin@namao.local',
+      password: 'password1',
+      rememberMe: false,
+    });
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 'a1', typ: 'staff' }),
+      { expiresIn: '12h' },
+    );
+  });
+
+  it('studioLogin ROOT amarra o tenant Namão', async () => {
+    const hash = await require('bcryptjs').hash('password1', 4);
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'root-1',
+      email: 'root@namao.local',
+      name: 'Root',
+      role: 'ROOT',
+      tenantId: null,
+      leadId: null,
+      customerId: null,
+      passwordHash: hash,
+      tenant: null,
+    });
+    const result = await service.studioLogin({
+      email: 'root@namao.local',
+      password: 'password1',
+    });
+    expect(result.user.role).toBe('ROOT');
+    expect(result.user.tenantId).toBe('namao_default_tenant');
+    expect(result.user.impersonatingTenantId).toBe('namao_default_tenant');
+    expect(result.user.tenantName).toBe('Namão');
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 'root-1',
+        role: 'ROOT',
+        tenantId: 'namao_default_tenant',
+        impersonatingTenantId: 'namao_default_tenant',
+      }),
+      { expiresIn: '30d' },
+    );
+  });
+
+  it('adminLogin aceita ROOT sem tenant', async () => {
+    const hash = await require('bcryptjs').hash('password1', 4);
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'root-1',
+      email: 'root@namao.local',
+      name: 'Root',
+      role: 'ROOT',
+      tenantId: null,
+      leadId: null,
+      customerId: null,
+      passwordHash: hash,
+      tenant: null,
+    });
+    const result = await service.adminLogin({
+      email: 'root@namao.local',
+      password: 'password1',
+    });
+    expect(result.user.role).toBe('ROOT');
+    expect(result.user.tenantId).toBeNull();
+    expect(result.user.impersonatingTenantId).toBeNull();
+    expect(activity.recordLogin).not.toHaveBeenCalled();
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 'root-1',
+        role: 'ROOT',
+        tenantId: null,
+      }),
+      { expiresIn: '30d' },
+    );
+  });
+
+  it('adminLogin recusa ADMIN e OPERATOR', async () => {
+    const hash = await require('bcryptjs').hash('password1', 4);
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'a1',
+      email: 'admin@namao.local',
+      name: 'Admin',
+      role: 'ADMIN',
+      tenantId: 't1',
+      passwordHash: hash,
+      tenant: { id: 't1', name: 'Namão', status: 'active' },
+    });
+    await expect(
+      service.adminLogin({
+        email: 'admin@namao.local',
+        password: 'password1',
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'o1',
+      email: 'op@namao.local',
+      name: 'Op',
+      role: 'OPERATOR',
+      tenantId: 't1',
+      passwordHash: hash,
+      tenant: { id: 't1', name: 'Namão', status: 'active' },
+    });
+    await expect(
+      service.adminLogin({
+        email: 'op@namao.local',
+        password: 'password1',
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('ensureStudioRoot cria o primeiro root', async () => {
     config.get.mockImplementation((key: string) => {
       if (key === 'STUDIO_ADMIN_EMAIL') return 'admin@namao.local';
       if (key === 'STUDIO_ADMIN_PASSWORD') return 'changeme123';
@@ -303,14 +440,36 @@ describe('AuthService', () => {
     });
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.create.mockResolvedValue({});
-    await service.ensureStudioAdmin();
+    await service.ensureStudioRoot();
     expect(prisma.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           email: 'admin@namao.local',
-          role: 'ADMIN',
+          role: 'ROOT',
+          tenantId: null,
         }),
       }),
     );
+  });
+
+  it('ensureStudioRoot promove ADMIN existente a ROOT sem tenant', async () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === 'STUDIO_ADMIN_EMAIL') return 'admin@namao.local';
+      if (key === 'STUDIO_ADMIN_PASSWORD') return 'changeme123';
+      return undefined;
+    });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'a1',
+      email: 'admin@namao.local',
+      role: 'ADMIN',
+      tenantId: 'namao_default_tenant',
+    });
+    prisma.user.update.mockResolvedValue({});
+    await service.ensureStudioRoot();
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'a1' },
+      data: { role: 'ROOT', tenantId: null },
+    });
+    expect(prisma.user.create).not.toHaveBeenCalled();
   });
 });

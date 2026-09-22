@@ -62,6 +62,22 @@ describe('Discovery Lead Enrichment (e2e)', () => {
     return request(app.getHttpServer()).get('/studio/users').expect(401);
   });
 
+  it('POST /auth/admin/login valida o body', () => {
+    return request(app.getHttpServer())
+      .post('/auth/admin/login')
+      .send({ email: 'nao-e-email' })
+      .expect(400);
+  });
+
+  it('POST /auth/admin/login sem credenciais válidas não devolve token', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/admin/login')
+      .send({ email: 'nobody@namao.local', password: 'password1' })
+      .expect(401);
+    expect(res.body.accessToken).toBeUndefined();
+    expect(res.headers['set-cookie']).toBeFalsy();
+  });
+
   it('POST /auth/studio/login valida o body', () => {
     return request(app.getHttpServer())
       .post('/auth/studio/login')

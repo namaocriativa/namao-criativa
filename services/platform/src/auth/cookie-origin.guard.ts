@@ -25,6 +25,7 @@ export class CookieOriginGuard implements CanActivate {
     assertCookieOrigin(req, inspected.source, {
       studioUrl: this.config.get<string>('NAMAO_STUDIO_URL'),
       publicUrl: this.config.get<string>('NAMAO_PUBLIC_URL'),
+      adminUrl: this.config.get<string>('NAMAO_ADMIN_URL'),
     });
     return true;
   }

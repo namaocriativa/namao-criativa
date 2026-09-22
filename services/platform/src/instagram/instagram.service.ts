@@ -9,8 +9,9 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import type { JwtUser } from '../auth/jwt.strategy';
+import { clientAccountToJwt } from '../auth/identity';
 import { isStudioRole } from '../auth/roles';
-import { InstagramGraphClient } from './instagram-graph.client';
+import { InstagramGraphClient, INSTAGRAM_OAUTH_SCOPES } from './instagram-graph.client';
 import { OwnerLookup } from '../owner/owner-lookup.service';
 import {
   jwtOwnerId,
@@ -104,6 +105,7 @@ export class InstagramService {
             username: account.username,
             accessToken: tokens.accessToken,
             tokenExpiresAt: tokens.expiresAt,
+            scopes: INSTAGRAM_OAUTH_SCOPES.join(','),
           },
         });
       } else {
@@ -115,7 +117,7 @@ export class InstagramService {
             username: account.username,
             accessToken: tokens.accessToken,
             tokenExpiresAt: tokens.expiresAt,
-            scopes: 'instagram_basic,pages_show_list',
+            scopes: INSTAGRAM_OAUTH_SCOPES.join(','),
           },
         });
       }
@@ -126,14 +128,7 @@ export class InstagramService {
         });
       }
 
-      await this.syncLead(ownerId, {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: 'CLIENT',
-        leadId: user.leadId,
-        customerId: user.customerId,
-      });
+      await this.syncLead(ownerId, clientAccountToJwt(user));
       return `${namao}/conectar.html?ig=ok`;
     } catch {
       return fail('graph_error');

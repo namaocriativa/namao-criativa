@@ -14,6 +14,7 @@
     "dev:local": "bash scripts/dev-local.sh",
     "dev:platform": "npm run start:dev -w @namao/platform",
     "dev:studio": "npm run dev -w @namao/studio",
+    "dev:admin": "npm run dev -w @namao/admin",
     "dev:website": "npm run dev -w @namao/website",
     "build": "npm run build -w @namao/landing-kit && npm run build -w @namao/platform && npm run build -w @namao/studio",
     "build:kit": "npm run build -w @namao/landing-kit",
@@ -33,7 +34,9 @@
     "cloud:studio": "npm run studio -w @namao/cloud",
     "cloud:studio:plan": "npm run studio:plan -w @namao/cloud",
     "cloud:pages": "npm run pages -w @namao/cloud",
-    "cloud:pages:plan": "npm run pages:plan -w @namao/cloud"
+    "cloud:pages:plan": "npm run pages:plan -w @namao/cloud",
+    "cloud:mail-dns": "npm run mail-dns -w @namao/cloud",
+    "cloud:mail-dns:plan": "npm run mail-dns:plan -w @namao/cloud"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

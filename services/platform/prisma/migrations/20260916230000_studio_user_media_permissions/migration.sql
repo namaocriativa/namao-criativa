@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "canAccessImages" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "User" ADD COLUMN "canAccessVideos" BOOLEAN NOT NULL DEFAULT false;

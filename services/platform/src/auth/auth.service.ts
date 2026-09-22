@@ -25,7 +25,12 @@ import {
   instagramProfileUrl,
   normalizeInstagram,
 } from './instagram';
-import { extractJwtFromRequest } from './jwt-cookie';
+import {
+  extractJwtFromRequest,
+  STUDIO_REMEMBER_EXPIRES_IN,
+  STUDIO_SESSION_EXPIRES_IN,
+  type StudioJwtExpiresIn,
+} from './jwt-cookie';
 import {
   CLIENT_ACCOUNT_SELECT,
   JWT_TYP,
@@ -33,7 +38,12 @@ import {
   staffToJwt,
 } from './identity';
 import { JwtUser } from './jwt.strategy';
-import { isStudioRole, USER_ROLE } from './roles';
+import { isStudioRole, isStudioRoot, isTenantStaffRole, USER_ROLE } from './roles';
+import {
+  DEFAULT_TENANT_SLUG,
+  TENANT_STATUS,
+} from '../tenant/tenant.constants';
+import { resolveDefaultTenantId } from '../tenant/tenant.util';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -48,7 +58,7 @@ export class AuthService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.ensureStudioAdmin();
+    await this.ensureStudioRoot();
   }
 
   async register(dto: RegisterDto) {
@@ -78,6 +88,8 @@ export class AuthService implements OnModuleInit {
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await this.prisma.$transaction(async (tx) => {
       const owner = invite ? invite.lead || invite.customer : null;
+      const tenantId =
+        invite?.tenantId || (await resolveDefaultTenantId(tx));
       const ownerId = invite
         ? invite.customerId || invite.leadId
         : (
@@ -87,6 +99,7 @@ export class AuthService implements OnModuleInit {
                 email,
                 instagram: instagramUrl,
                 fromPublicSignup: true,
+                tenantId,
               },
               select: { id: true },
             })
@@ -125,6 +138,7 @@ export class AuthService implements OnModuleInit {
           email,
           name,
           passwordHash,
+          tenantId,
           leadId: invite?.customerId ? null : ownerId,
           customerId: invite?.customerId || null,
         },
@@ -193,7 +207,10 @@ export class AuthService implements OnModuleInit {
 
   async studioLogin(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { tenant: { select: { id: true, name: true, status: true } } },
+    });
     if (!user) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
@@ -204,9 +221,57 @@ export class AuthService implements OnModuleInit {
     if (!isStudioRole(user.role)) {
       throw new ForbiddenException('Sem permissão para o studio');
     }
-    const issued = this.issue(staffToJwt(user));
+    if (isTenantStaffRole(user.role)) {
+      if (!user.tenantId || user.tenant?.status !== TENANT_STATUS.ACTIVE) {
+        throw new ForbiddenException('Conta desativada');
+      }
+    }
+    const jwtUser = isStudioRoot(user.role)
+      ? staffToJwt({
+          ...user,
+          ...(await this.defaultTenantSession()),
+        })
+      : staffToJwt(user);
+    const issued = this.issue(jwtUser, {
+      expiresIn:
+        dto.rememberMe === false
+          ? STUDIO_SESSION_EXPIRES_IN
+          : STUDIO_REMEMBER_EXPIRES_IN,
+    });
     await this.activity.recordLogin(issued.user.id);
     return issued;
+  }
+
+  async adminLogin(dto: LoginDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { tenant: { select: { id: true, name: true, status: true } } },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+    const ok = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!ok) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+    if (!isStudioRoot(user.role)) {
+      throw new ForbiddenException('Sem permissão para o admin');
+    }
+    return this.issue(
+      staffToJwt({
+        ...user,
+        tenantId: null,
+        impersonatingTenantId: null,
+        tenantName: null,
+      }),
+      {
+        expiresIn:
+          dto.rememberMe === false
+            ? STUDIO_SESSION_EXPIRES_IN
+            : STUDIO_REMEMBER_EXPIRES_IN,
+      },
+    );
   }
 
   async recordStudioLogout(req: Request) {
@@ -220,7 +285,8 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  async ensureStudioAdmin() {
+  async ensureStudioRoot() {
+    await resolveDefaultTenantId(this.prisma);
     const email = this.config.get<string>('STUDIO_ADMIN_EMAIL')?.trim().toLowerCase();
     const password = this.config.get<string>('STUDIO_ADMIN_PASSWORD')?.trim();
     if (!email || !password) return;
@@ -236,6 +302,17 @@ export class AuthService implements OnModuleInit {
         this.logger.warn(
           `STUDIO_ADMIN_EMAIL ${email} existe sem papel de studio; bootstrap ignorado`,
         );
+        return;
+      }
+      if (
+        existing.role !== USER_ROLE.ROOT ||
+        existing.tenantId !== null
+      ) {
+        await this.prisma.user.update({
+          where: { id: existing.id },
+          data: { role: USER_ROLE.ROOT, tenantId: null },
+        });
+        this.logger.log(`Usuário root do studio promovido: ${email}`);
       }
       return;
     }
@@ -243,12 +320,88 @@ export class AuthService implements OnModuleInit {
     await this.prisma.user.create({
       data: {
         email,
-        name: 'Admin',
+        name: 'Root',
         passwordHash,
-        role: USER_ROLE.ADMIN,
+        role: USER_ROLE.ROOT,
+        tenantId: null,
       },
     });
-    this.logger.log(`Usuário admin do studio criado: ${email}`);
+    this.logger.log(`Usuário root do studio criado: ${email}`);
+  }
+
+  issueStudioSession(
+    user: JwtUser,
+    options?: { expiresIn?: StudioJwtExpiresIn },
+  ) {
+    return this.issue(user, options);
+  }
+
+  private async defaultTenantSession() {
+    let tenant = await this.prisma.tenant.findUnique({
+      where: { slug: DEFAULT_TENANT_SLUG },
+      select: { id: true, name: true, status: true },
+    });
+    if (!tenant) {
+      await resolveDefaultTenantId(this.prisma);
+      tenant = await this.prisma.tenant.findUnique({
+        where: { slug: DEFAULT_TENANT_SLUG },
+        select: { id: true, name: true, status: true },
+      });
+    }
+    if (!tenant || tenant.status !== TENANT_STATUS.ACTIVE) {
+      throw new ForbiddenException('Conta desativada');
+    }
+    return {
+      tenantId: tenant.id,
+      impersonatingTenantId: tenant.id,
+      tenantName: tenant.name,
+      canAccessImages: true,
+      canAccessVideos: true,
+    };
+  }
+
+  impersonateTenant(
+    root: JwtUser,
+    tenant: { id: string; name: string; status: string },
+  ) {
+    if (!isStudioRoot(root.role)) {
+      throw new ForbiddenException('Apenas o root pode entrar em uma conta');
+    }
+    if (tenant.status !== TENANT_STATUS.ACTIVE) {
+      throw new ForbiddenException('Conta desativada');
+    }
+    return this.issue(
+      staffToJwt({
+        id: root.id,
+        email: root.email,
+        name: root.name,
+        role: USER_ROLE.ROOT,
+        tenantId: tenant.id,
+        impersonatingTenantId: tenant.id,
+        tenantName: tenant.name,
+        canAccessImages: true,
+        canAccessVideos: true,
+      }),
+      { expiresIn: STUDIO_REMEMBER_EXPIRES_IN },
+    );
+  }
+
+  stopImpersonation(root: JwtUser) {
+    if (!isStudioRoot(root.role)) {
+      throw new ForbiddenException('Apenas o root pode sair da conta');
+    }
+    return this.issue(
+      staffToJwt({
+        id: root.id,
+        email: root.email,
+        name: root.name,
+        role: USER_ROLE.ROOT,
+        tenantId: null,
+        impersonatingTenantId: null,
+        tenantName: null,
+      }),
+      { expiresIn: STUDIO_REMEMBER_EXPIRES_IN },
+    );
   }
 
   async me(user: JwtUser) {
@@ -328,13 +481,18 @@ export class AuthService implements OnModuleInit {
     );
   }
 
-  private issue(user: JwtUser) {
-    const accessToken = this.jwt.sign({
+  private issue(user: JwtUser, options?: { expiresIn?: StudioJwtExpiresIn }) {
+    const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       typ: user.typ || (isStudioRole(user.role) ? JWT_TYP.STAFF : JWT_TYP.CLIENT),
-    });
+      tenantId: user.tenantId ?? null,
+      impersonatingTenantId: user.impersonatingTenantId ?? null,
+    };
+    const accessToken = options?.expiresIn
+      ? this.jwt.sign(payload, { expiresIn: options.expiresIn })
+      : this.jwt.sign(payload);
     return { accessToken, user };
   }
 }

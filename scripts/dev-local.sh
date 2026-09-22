@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sobe Postgres, Redis, landing-kit, API, studio e website no host (sem Docker).
+# Sobe Postgres, Redis, landing-kit, API, studio e website na máquina.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -183,6 +183,7 @@ echo
 echo "dev-local: API      http://localhost:${PLATFORM_PORT}"
 echo "dev-local: Studio   http://localhost:5173"
 echo "dev-local: Website  http://localhost:5174"
+echo "dev-local: logs     [kit] [platform] [studio] [website] (Postgres/Redis em .local/log/)"
 echo "dev-local: Evolution mock (EVOLUTION_MOCK=1). Ctrl+C encerra os processos deste script."
 echo
 

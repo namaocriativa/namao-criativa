@@ -16,7 +16,7 @@ import { UpdateStudioUserDto } from './dto/update-studio-user.dto';
 import { StudioUsersService } from './studio-users.service';
 
 @Controller('studio/users')
-@Roles(USER_ROLE.ADMIN)
+@Roles(USER_ROLE.ADMIN, USER_ROLE.ROOT)
 export class StudioUsersController {
   constructor(private readonly users: StudioUsersService) {}
 

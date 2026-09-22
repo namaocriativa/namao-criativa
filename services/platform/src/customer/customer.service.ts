@@ -15,6 +15,7 @@ import {
 import { PROFILE_DETAIL_INCLUDE, PROFILE_LIST_INCLUDE, withPortalUsers } from '../owner/owner.util';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
+import { assertSameTenant, tenantWhere } from '../tenant/tenant.util';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
@@ -31,7 +32,7 @@ export class CustomerService {
 
   async findAll(actor: JwtUser) {
     const customers = await this.prisma.customer.findMany({
-      where: this.access.visibleWhere(actor),
+      where: { AND: [tenantWhere(), this.access.visibleWhere(actor)] },
       orderBy: { updatedAt: 'desc' },
       include: PROFILE_LIST_INCLUDE,
       omit: { generateConfig: true },
@@ -47,6 +48,7 @@ export class CustomerService {
     if (!customer) {
       throw new NotFoundException(`Customer ${id} not found`);
     }
+    assertSameTenant(customer, `Customer ${id} not found`);
     if (actor) {
       return withPortalUsers(this.access.present(actor, customer));
     }
@@ -56,11 +58,12 @@ export class CustomerService {
   async deleteById(id: string) {
     const existing = await this.prisma.customer.findUnique({
       where: { id },
-      select: { id: true, name: true },
+      select: { id: true, name: true, tenantId: true },
     });
     if (!existing) {
       throw new NotFoundException(`Customer ${id} not found`);
     }
+    assertSameTenant(existing, `Customer ${id} not found`);
     await this.prisma.customer.delete({ where: { id } });
     await this.storageService.removeLeadDir(id);
     return { id: existing.id, name: existing.name, deleted: true };

@@ -34,13 +34,30 @@ describe('studio-lead-access.util', () => {
     expect(canAccessRecord(operator, shared)).toBe(true);
     expect(canAccessRecord(operator, unassigned)).toBe(false);
     expect(canAccessRecord(other, owned)).toBe(false);
-  });
-
-  it('só admin ou criador gerenciam shares', () => {
     expect(canManageShares(admin, null)).toBe(true);
     expect(canManageShares(operator, 'op-1')).toBe(true);
     expect(canManageShares(operator, 'op-2')).toBe(false);
     expect(canManageShares(operator, null)).toBe(false);
+  });
+
+  it('root impersonando vê tudo como admin', () => {
+    const root = { id: 'root-1', role: USER_ROLE.ROOT, tenantId: 't1' };
+    expect(visibleWhere(root)).toEqual({});
+    expect(canAccessRecord(root, { createdByUserId: null, studioShares: [] })).toBe(
+      true,
+    );
+    expect(canManageShares(root, null)).toBe(true);
+  });
+
+  it('bloqueia registro de outro tenant', () => {
+    const adminT1 = { id: 'admin-1', role: USER_ROLE.ADMIN, tenantId: 't1' };
+    expect(
+      canAccessRecord(adminT1, {
+        tenantId: 't2',
+        createdByUserId: null,
+        studioShares: [],
+      }),
+    ).toBe(false);
   });
 
   it('present omite criador para operador e marca compartilhado', () => {

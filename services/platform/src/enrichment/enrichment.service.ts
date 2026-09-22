@@ -23,6 +23,7 @@ import { LeadMergerService } from './lead-merger.service';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 import { STUDIO_CREATOR_SELECT } from '../owner/owner.util';
+import { requireTenantId, tenantWhere } from '../tenant/tenant.util';
 
 @Injectable()
 export class EnrichmentService {
@@ -126,6 +127,7 @@ export class EnrichmentService {
         reviewCount: initial.reviewCount ?? null,
         country: 'BR',
         createdByUserId: actor.id,
+        tenantId: requireTenantId(),
       },
     });
 
@@ -181,6 +183,7 @@ export class EnrichmentService {
     const placeKey = namePlaceDedupeKey(input);
 
     const candidates = await this.prisma.lead.findMany({
+      where: tenantWhere(),
       select: {
         id: true,
         name: true,

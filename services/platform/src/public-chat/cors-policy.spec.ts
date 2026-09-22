@@ -10,6 +10,7 @@ describe('cors-policy', () => {
     expect(isPreviewOrigin(undefined)).toBe(true);
     expect(isPreviewOrigin('http://localhost:3000')).toBe(true);
     expect(isPreviewOrigin('http://localhost:5173')).toBe(true);
+    expect(isPreviewOrigin('http://localhost:5175')).toBe(true);
     expect(isPreviewOrigin('http://localhost:4000')).toBe(true);
     expect(isPreviewOrigin('http://127.0.0.1:4000')).toBe(true);
   });
@@ -24,6 +25,18 @@ describe('cors-policy', () => {
     expect(
       originAllowedForLead('http://localhost:3000', 'https://foo.vercel.app'),
     ).toBe(true);
+  });
+
+  it('inclui NAMAO_ADMIN_URL nas origens estáticas', () => {
+    const prev = process.env.NAMAO_ADMIN_URL;
+    process.env.NAMAO_ADMIN_URL = 'https://admin.example.com';
+    try {
+      expect(staticCorsOrigins()).toContain('https://admin.example.com');
+      expect(isPreviewOrigin('https://admin.example.com')).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.NAMAO_ADMIN_URL;
+      else process.env.NAMAO_ADMIN_URL = prev;
+    }
   });
 
   it('inclui NAMAO_STUDIO_URL nas origens estáticas', () => {

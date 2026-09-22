@@ -1,6 +1,6 @@
 import { api } from "./api";
 import type { AgencyPackage, PackageImage } from "./types";
-import { hrefFor, navigate, type AppRoute } from "./router";
+import { hrefFor, navigate, titleForRoute, type AppRoute } from "./router";
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -19,16 +19,26 @@ function imageSrc(img: PackageImage): string {
   return `/${path}`;
 }
 
-function formatPrice(pkg: AgencyPackage): string {
-  if (pkg.price == null || Number.isNaN(pkg.price)) return "Sob consulta";
+function formatMoney(
+  value: number | null | undefined,
+  currency?: string | null,
+): string | null {
+  if (value == null || Number.isNaN(value)) return null;
   try {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
-      currency: pkg.currency || "BRL",
-    }).format(pkg.price);
+      currency: currency || "BRL",
+    }).format(value);
   } catch {
-    return `${pkg.currency || "BRL"} ${pkg.price}`;
+    return `${currency || "BRL"} ${value}`;
   }
+}
+
+function formatPrice(pkg: AgencyPackage): string {
+  const full = formatMoney(pkg.price, pkg.currency);
+  const promo = formatMoney(pkg.promoPrice, pkg.currency);
+  if (full && promo) return `de ${full} por ${promo}`;
+  return full || "Sob consulta";
 }
 
 function statusLabel(status: string | undefined): string {
@@ -93,10 +103,14 @@ export function initPackagesTab(): {
   const mediaGrid = requireEl<HTMLElement>("package-media-grid");
   const mediaEmpty = requireEl<HTMLElement>("package-media-empty");
   const mediaStatus = requireEl<HTMLElement>("package-media-status");
+  const offerForm = requireEl<HTMLFormElement>("package-offer-form");
+  const offerStatus = requireEl<HTMLElement>("package-offer-status");
+  const offerSaveBtn = requireEl<HTMLButtonElement>("package-offer-save-btn");
 
   let current: AgencyPackage | null = null;
   let busy = false;
   let mediaBusy = false;
+  let offerBusy = false;
 
   function setListStatus(message: string, isError = false) {
     listStatus.textContent = message;
@@ -113,43 +127,42 @@ export function initPackagesTab(): {
     mediaStatus.classList.toggle("error", isError);
   }
 
+  function setOfferStatus(message: string, isError = false) {
+    offerStatus.textContent = message;
+    offerStatus.classList.toggle("error", isError);
+  }
+
   function fillForm(pkg: AgencyPackage) {
     formField<HTMLInputElement>(form, "name").value = pkg.name || "";
     formField<HTMLSelectElement>(form, "status").value =
       pkg.status === "active" ? "active" : "draft";
     formField<HTMLInputElement>(form, "price").value =
       pkg.price != null ? String(pkg.price) : "";
+    formField<HTMLInputElement>(form, "promoPrice").value =
+      pkg.promoPrice != null ? String(pkg.promoPrice) : "";
     formField<HTMLInputElement>(form, "currency").value = pkg.currency || "BRL";
-    formField<HTMLInputElement>(form, "sortOrder").value = String(
-      pkg.sortOrder ?? 0,
-    );
     formField<HTMLInputElement>(form, "summary").value = pkg.summary || "";
     formField<HTMLTextAreaElement>(form, "description").value =
       pkg.description || "";
     formField<HTMLTextAreaElement>(form, "benefits").value = benefitsToText(
       pkg.benefits,
     );
-    formField<HTMLTextAreaElement>(form, "whatsappMessage").value =
-      pkg.whatsappMessage || "";
-    formField<HTMLInputElement>(form, "emailSubject").value =
-      pkg.emailSubject || "";
-    formField<HTMLTextAreaElement>(form, "emailBody").value =
-      pkg.emailBody || "";
   }
 
   function readFormPayload() {
     const priceRaw = formField<HTMLInputElement>(form, "price").value.trim();
-    const sortRaw = formField<HTMLInputElement>(form, "sortOrder").value.trim();
+    const promoRaw = formField<HTMLInputElement>(form, "promoPrice").value.trim();
     const price =
       priceRaw === "" ? null : Number(priceRaw.replace(",", "."));
-    const sortOrder = sortRaw === "" ? 0 : Number(sortRaw);
+    const promoPrice =
+      promoRaw === "" ? null : Number(promoRaw.replace(",", "."));
     return {
       name: formField<HTMLInputElement>(form, "name").value.trim(),
       status: formField<HTMLSelectElement>(form, "status").value,
       price: Number.isFinite(price as number) ? price : null,
+      promoPrice: Number.isFinite(promoPrice as number) ? promoPrice : null,
       currency:
         formField<HTMLInputElement>(form, "currency").value.trim() || "BRL",
-      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
       summary:
         formField<HTMLInputElement>(form, "summary").value.trim() || null,
       description:
@@ -158,13 +171,6 @@ export function initPackagesTab(): {
       benefits: textToBenefits(
         formField<HTMLTextAreaElement>(form, "benefits").value,
       ),
-      whatsappMessage:
-        formField<HTMLTextAreaElement>(form, "whatsappMessage").value.trim() ||
-        null,
-      emailSubject:
-        formField<HTMLInputElement>(form, "emailSubject").value.trim() || null,
-      emailBody:
-        formField<HTMLTextAreaElement>(form, "emailBody").value.trim() || null,
     };
   }
 
@@ -195,7 +201,7 @@ export function initPackagesTab(): {
     fillForm(pkg);
     mediaSection.hidden = false;
     renderMedia(pkg);
-    document.title = `${pkg.name || "Pacote"} · Lead Discovery Enrichment`;
+    document.title = titleForRoute({ name: "package", id: pkg.id }, pkg.name);
   }
 
   function renderList(items: AgencyPackage[]) {
@@ -234,6 +240,7 @@ export function initPackagesTab(): {
 
   async function loadList() {
     setListStatus("Carregando pacotes…");
+    void loadOfferTemplate();
     try {
       const res = await api("/packages");
       if (!res.ok) {
@@ -404,7 +411,65 @@ export function initPackagesTab(): {
     }
   }
 
+  async function loadOfferTemplate() {
+    setOfferStatus("Carregando template…");
+    try {
+      const res = await api("/packages/offer-template");
+      if (!res.ok) {
+        throw new Error(await readError(res, "Falha ao carregar template"));
+      }
+      const data = (await res.json()) as {
+        emailSubject?: string;
+        emailBody?: string;
+        whatsappMessage?: string;
+      };
+      formField<HTMLInputElement>(offerForm, "emailSubject").value =
+        data.emailSubject || "";
+      formField<HTMLTextAreaElement>(offerForm, "emailBody").value =
+        data.emailBody || "";
+      formField<HTMLTextAreaElement>(offerForm, "whatsappMessage").value =
+        data.whatsappMessage || "";
+      setOfferStatus("");
+    } catch (error) {
+      setOfferStatus(errorMessage(error, "Falha ao carregar template"), true);
+    }
+  }
+
+  async function saveOfferTemplate(event: Event) {
+    event.preventDefault();
+    if (offerBusy) return;
+    offerBusy = true;
+    offerSaveBtn.disabled = true;
+    setOfferStatus("Salvando template…");
+    try {
+      const res = await api("/packages/offer-template", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailSubject: formField<HTMLInputElement>(offerForm, "emailSubject")
+            .value,
+          emailBody: formField<HTMLTextAreaElement>(offerForm, "emailBody")
+            .value,
+          whatsappMessage: formField<HTMLTextAreaElement>(
+            offerForm,
+            "whatsappMessage",
+          ).value,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(await readError(res, "Falha ao salvar template"));
+      }
+      setOfferStatus("Template salvo");
+    } catch (error) {
+      setOfferStatus(errorMessage(error, "Falha ao salvar template"), true);
+    } finally {
+      offerBusy = false;
+      offerSaveBtn.disabled = false;
+    }
+  }
+
   newBtn.addEventListener("click", () => void createPackage());
+  offerForm.addEventListener("submit", (event) => void saveOfferTemplate(event));
   form.addEventListener("submit", (event) => void savePackage(event));
   deleteBtn.addEventListener("click", () => {
     if (current?.id) void deletePackage(current.id, true);

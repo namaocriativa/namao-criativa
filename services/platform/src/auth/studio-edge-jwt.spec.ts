@@ -1,6 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 
-const STUDIO_ROLES = new Set(['ADMIN', 'OPERATOR']);
+const STUDIO_ROLES = new Set(['ROOT', 'ADMIN', 'OPERATOR']);
 
 function b64urlToBytes(value: string): Uint8Array {
   const pad = '='.repeat((4 - (value.length % 4)) % 4);
@@ -51,6 +51,16 @@ describe('studio JWT na borda (HS256)', () => {
   const jwt = new JwtService({
     secret,
     signOptions: { expiresIn: '7d' },
+  });
+
+  it('aceita token ROOT emitido pelo Nest', async () => {
+    const token = jwt.sign({
+      sub: 'u0',
+      email: 'root@namao.local',
+      role: 'ROOT',
+    });
+    const payload = await verifyStudioJwt(token, secret);
+    expect(payload?.role).toBe('ROOT');
   });
 
   it('aceita token ADMIN emitido pelo Nest', async () => {

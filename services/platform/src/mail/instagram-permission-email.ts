@@ -1,3 +1,5 @@
+import { mailFooterHtml, mailFooterText } from './mail-branding';
+
 export function instagramPermissionEmailHtml(params: {
   name: string;
   actionUrl: string;
@@ -51,7 +53,7 @@ export function instagramPermissionEmailHtml(params: {
             </tr>
             <tr>
               <td style="padding:22px 8px 0;text-align:center;font-size:12px;color:#8c8c8c;">
-                Namão Criativa — presença digital com inteligência.
+                ${mailFooterHtml()}
               </td>
             </tr>
           </table>
@@ -79,7 +81,7 @@ export function instagramPermissionEmailText(params: {
     '',
     params.actionUrl,
     '',
-    'Namão Criativa',
+    mailFooterText(),
   ].join('\n');
 }
 

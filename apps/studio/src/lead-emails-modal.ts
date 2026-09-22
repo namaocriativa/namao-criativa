@@ -1,6 +1,20 @@
 import { api } from "./api";
+import { profileApi, type EntityKind } from "./profile-api";
 
-type EmailKind = "site-introduction" | "instagram-permission" | "credentials";
+type EmailKind =
+  | "site-introduction"
+  | "instagram-permission"
+  | "credentials"
+  | "package-offer";
+
+type OfferPackage = {
+  id: string;
+  name: string;
+  summary?: string | null;
+  price?: number | null;
+  promoPrice?: number | null;
+  currency?: string | null;
+};
 
 type EmailListItem = {
   id: EmailKind;
@@ -10,6 +24,7 @@ type EmailListItem = {
   to: string | null;
   available: boolean;
   unavailableReason: string | null;
+  packages?: OfferPackage[];
 };
 
 type EmailPreview = {
@@ -21,6 +36,7 @@ type EmailPreview = {
   html: string;
   notice?: string | null;
   canSend?: boolean;
+  packageId?: string;
 };
 
 type SendResult = {
@@ -55,7 +71,24 @@ function escapeHtml(value: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
-import { profileApi, type EntityKind } from "./profile-api";
+function formatOfferPrice(pkg: OfferPackage): string {
+  const currency = pkg.currency || "BRL";
+  const money = (value: number | null | undefined) => {
+    if (value == null || Number.isNaN(value)) return null;
+    try {
+      return new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency,
+      }).format(value);
+    } catch {
+      return `${currency} ${value}`;
+    }
+  };
+  const full = money(pkg.price);
+  const promo = money(pkg.promoPrice);
+  if (full && promo) return `de ${full} por ${promo}`;
+  return full || "Sob consulta";
+}
 
 export function initLeadEmailsModal(
   host: HTMLElement,
@@ -67,10 +100,11 @@ export function initLeadEmailsModal(
   let leadId: string | null = null;
   let apiKind: EntityKind = "lead";
   let busy = false;
-  let view: "list" | "preview" = "list";
+  let view: "list" | "packages" | "preview" = "list";
   let items: EmailListItem[] = [];
   let preview: EmailPreview | null = null;
   let sent = false;
+  let selectedPackageId: string | null = null;
 
   host.innerHTML = `
     <div class="site-wizard-modal lead-emails-modal" hidden>
@@ -152,17 +186,64 @@ export function initLeadEmailsModal(
     listEl.querySelectorAll<HTMLButtonElement>("[data-emails-kind]").forEach((btn) => {
       btn.disabled = next;
     });
+    listEl.querySelectorAll<HTMLButtonElement>("[data-emails-package]").forEach((btn) => {
+      btn.disabled = next;
+    });
   }
 
   function showList() {
     view = "list";
     preview = null;
     sent = false;
+    selectedPackageId = null;
     titleEl.textContent = "E-mails";
     listEl.hidden = false;
     previewEl.hidden = true;
     frameEl.srcdoc = "";
     sendBtn.disabled = true;
+  }
+
+  function offerItem() {
+    return items.find((item) => item.id === "package-offer") || null;
+  }
+
+  function showPackagePicker() {
+    const offer = offerItem();
+    const packages = offer?.packages || [];
+    view = "packages";
+    preview = null;
+    sent = false;
+    titleEl.textContent = "Escolher pacote";
+    listEl.hidden = false;
+    previewEl.hidden = true;
+    frameEl.srcdoc = "";
+    sendBtn.disabled = true;
+    if (!packages.length) {
+      listEl.innerHTML = `<p class="lead-emails-empty">Nenhum pacote ativo cadastrado.</p>`;
+      return;
+    }
+    listEl.innerHTML =
+      `<p class="lead-emails-empty">Selecione o pacote para montar a proposta.</p>` +
+      packages
+        .map((pkg) => {
+          const summary = escapeHtml(pkg.summary || "Sem resumo");
+          const price = escapeHtml(formatOfferPrice(pkg));
+          return `
+          <button
+            type="button"
+            class="lead-emails-item"
+            data-emails-package="${escapeHtml(pkg.id)}"
+          >
+            <strong>${escapeHtml(pkg.name)}</strong>
+            <span>${summary}</span>
+            <em>${price}</em>
+          </button>
+        `;
+        })
+        .join("") +
+      `<div class="lead-emails-actions" style="margin-top:0.85rem">
+        <button type="button" class="secondary" data-emails-packages-back>Voltar</button>
+      </div>`;
   }
 
   function renderList(loading = false) {
@@ -245,13 +326,21 @@ export function initLeadEmailsModal(
     }
   }
 
-  async function openPreview(kind: EmailKind) {
+  async function openPreview(kind: EmailKind, packageId?: string) {
     if (!leadId || busy) return;
     setBusy(true);
     setStatus("Carregando prévia…");
     try {
+      const query =
+        kind === "package-offer" && packageId
+          ? `?packageId=${encodeURIComponent(packageId)}`
+          : "";
       const res = await api(
-        profileApi(apiKind, leadId, `/emails/${encodeURIComponent(kind)}/preview`),
+        profileApi(
+          apiKind,
+          leadId,
+          `/emails/${encodeURIComponent(kind)}/preview${query}`,
+        ),
       );
       const data = (await res.json().catch(() => ({}))) as EmailPreview & {
         message?: string | string[];
@@ -274,7 +363,13 @@ export function initLeadEmailsModal(
     try {
       const res = await api(
         profileApi(apiKind, leadId, `/emails/${encodeURIComponent(preview.id)}`),
-        { method: "POST" },
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            packageId: preview.packageId || selectedPackageId || undefined,
+          }),
+        },
       );
       const data = (await res.json().catch(() => ({}))) as SendResult;
       if (!res.ok) {
@@ -311,6 +406,7 @@ export function initLeadEmailsModal(
     items = [];
     preview = null;
     sent = false;
+    selectedPackageId = null;
     frameEl.srcdoc = "";
   }
 
@@ -320,6 +416,7 @@ export function initLeadEmailsModal(
     items = [];
     preview = null;
     sent = false;
+    selectedPackageId = null;
     renderList(true);
     showList();
     setStatus("");
@@ -334,6 +431,19 @@ export function initLeadEmailsModal(
       close();
       return;
     }
+    if (target?.closest("[data-emails-packages-back]")) {
+      showList();
+      setStatus("");
+      void loadList();
+      return;
+    }
+    const packageId = target?.closest<HTMLElement>("[data-emails-package]")
+      ?.dataset.emailsPackage;
+    if (packageId) {
+      selectedPackageId = packageId;
+      void openPreview("package-offer", packageId);
+      return;
+    }
     const kind = target?.closest<HTMLElement>("[data-emails-kind]")?.dataset
       .emailsKind;
     if (
@@ -342,13 +452,27 @@ export function initLeadEmailsModal(
       kind === "credentials"
     ) {
       void openPreview(kind);
+      return;
+    }
+    if (kind === "package-offer") {
+      const offer = offerItem();
+      if (!offer?.available) {
+        setStatus(offer?.unavailableReason || "Pacote indisponível.", true);
+        return;
+      }
+      showPackagePicker();
+      setStatus("");
     }
   });
 
   backBtn.addEventListener("click", () => {
     if (busy) return;
-    showList();
     setStatus("");
+    if (view === "preview" && preview?.id === "package-offer") {
+      showPackagePicker();
+      return;
+    }
+    showList();
     void loadList();
   });
   sendBtn.addEventListener("click", () => {
@@ -356,9 +480,15 @@ export function initLeadEmailsModal(
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || modal.hidden || busy) return;
-    if (view === "preview") {
+    if (view === "preview" && preview?.id === "package-offer") {
+      showPackagePicker();
+      setStatus("");
+      return;
+    }
+    if (view === "preview" || view === "packages") {
       showList();
       setStatus("");
+      if (view === "list") void loadList();
       return;
     }
     close();

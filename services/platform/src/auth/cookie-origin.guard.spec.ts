@@ -40,6 +40,26 @@ describe('CookieOriginGuard', () => {
     ).toBe(true);
   });
 
+  it('em rota protegida aceita cookie do admin vindo do admin', () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    config.get.mockImplementation((key: string) => {
+      if (key === 'NAMAO_STUDIO_URL') return 'https://studio.namaocriativa.com.br';
+      if (key === 'NAMAO_ADMIN_URL') return 'https://admin.namaocriativa.com.br';
+      return 'https://namaocriativa.com.br';
+    });
+    expect(
+      guard.canActivate(
+        mockContext({
+          method: 'GET',
+          headers: {
+            origin: 'https://admin.namaocriativa.com.br',
+            cookie: 'namao_admin_token=admin-token',
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
+
   it('em rota protegida rejeita cookie do studio vindo do website', () => {
     reflector.getAllAndOverride.mockReturnValue(false);
     config.get.mockImplementation((key: string) =>

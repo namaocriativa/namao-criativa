@@ -2,6 +2,7 @@ import { createCloudflareClientFromEnv } from './cloudflare-client.js';
 import { createClientFromEnv, type CoolifyClient } from './coolify-client.js';
 import { loadEnv, loadStackConfig, log, requireSecret } from './config.js';
 import { resolveCoolifyPublicIp } from './coolify-public-ip.js';
+import { ensureMailDns, isMailDnsDenied } from './mail-dns.js';
 import {
   ensureAddressRecord,
   parseHostname,
@@ -99,6 +100,7 @@ export async function runApply(opts: { dryRun: boolean }) {
       domain: stack.runtime.domain,
       ip: runtimeIp,
     });
+    await attachMailDns(stack.website.domain);
     log('apply', 'state.json written');
   }
 
@@ -156,6 +158,26 @@ async function attachRuntimePublicDns(opts: {
     log(
       'runtime',
       `WARN: DNS ${hostname}: ${err instanceof Error ? err.message : err}`,
+    );
+  }
+}
+
+async function attachMailDns(apex: string): Promise<void> {
+  if (!parseHostname(apex)) return;
+  try {
+    const cf = createCloudflareClientFromEnv();
+    await ensureMailDns({ client: cf, apex });
+  } catch (err) {
+    if (isMailDnsDenied(err)) {
+      log(
+        'mail-dns',
+        'WARN: token sem Zone.DNS Edit — rode npm run cloud:mail-dns depois',
+      );
+      return;
+    }
+    log(
+      'mail-dns',
+      `WARN: ${err instanceof Error ? err.message : err}`,
     );
   }
 }

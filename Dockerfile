@@ -1,3 +1,4 @@
+# Imagem de produção da API (Coolify / GHCR). Desenvolvimento local: `npm run dev:local`.
 FROM node:22-bookworm-slim AS base
 
 WORKDIR /app
@@ -19,14 +20,7 @@ RUN npm ci --ignore-scripts
 COPY services/platform ./services/platform
 COPY packages/landing-kit ./packages/landing-kit
 
-RUN chmod +x services/platform/docker-entrypoint.dev.sh \
-  && npx prisma generate --schema=services/platform/prisma/schema.prisma
-
-FROM base AS development
-ENV NODE_ENV=development
-ENV PORT=3000
-EXPOSE 3000
-CMD ["sh", "/app/services/platform/docker-entrypoint.dev.sh"]
+RUN npx prisma generate --schema=services/platform/prisma/schema.prisma
 
 FROM base AS production
 RUN npm run build -w @namao/landing-kit \

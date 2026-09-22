@@ -1,4 +1,5 @@
 import {
+  ADMIN_PAGES_PROJECT,
   CLIENT_PAGES_PROJECT,
   DEFAULT_STUDIO_ORIGIN,
   STUDIO_PAGES_PROJECT,
@@ -11,9 +12,11 @@ import {
 export const PREVIEW_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://localhost:5175',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
   'http://127.0.0.1:3000',
 ];
 
@@ -40,9 +43,11 @@ export function staticCorsOrigins(
   const configured = withWwwAliases([
     ...parseOriginList(process.env.NAMAO_PUBLIC_URL),
     ...parseOriginList(process.env.NAMAO_STUDIO_URL),
+    ...parseOriginList(process.env.NAMAO_ADMIN_URL),
     DEFAULT_STUDIO_ORIGIN,
     pagesProjectOrigin(STUDIO_PAGES_PROJECT),
     pagesProjectOrigin(CLIENT_PAGES_PROJECT),
+    pagesProjectOrigin(ADMIN_PAGES_PROJECT),
   ]);
   if (!allowLoopbackCors(nodeEnv)) return configured.filter(Boolean);
   return [...PREVIEW_ORIGINS, ...configured].filter(Boolean);
@@ -57,7 +62,8 @@ export function isPreviewOrigin(
   if (staticCorsOrigins(nodeEnv).includes(normalized)) return true;
   if (
     isPagesProjectOrigin(normalized, STUDIO_PAGES_PROJECT) ||
-    isPagesProjectOrigin(normalized, CLIENT_PAGES_PROJECT)
+    isPagesProjectOrigin(normalized, CLIENT_PAGES_PROJECT) ||
+    isPagesProjectOrigin(normalized, ADMIN_PAGES_PROJECT)
   ) {
     return true;
   }

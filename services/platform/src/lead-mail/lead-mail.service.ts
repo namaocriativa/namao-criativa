@@ -29,11 +29,19 @@ import { LeadActivityService } from '../lead-activity/lead-activity.service';
 import { OwnerLookup } from '../owner/owner-lookup.service';
 import { ownerWhere } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
+import {
+  packageOfferEmailHtml,
+  packageOfferEmailText,
+} from '../mail/package-offer-email';
+import { PackagesService } from '../packages/packages.service';
+import { renderOfferTemplate } from '../packages/offer-template';
 
 export const LEAD_EMAIL_KINDS = [
   'site-introduction',
   'instagram-permission',
   'credentials',
+  'package-offer',
 ] as const;
 
 export type LeadEmailKind = (typeof LEAD_EMAIL_KINDS)[number];
@@ -58,6 +66,12 @@ const TEMPLATES: Record<
     description: 'Envia o login e uma nova senha para o lead.',
     subject: 'Seu acesso à Namão Criativa',
   },
+  'package-offer': {
+    title: 'Enviar pacote',
+    description:
+      'Envia a proposta comercial usando um pacote ativo como conteúdo.',
+    subject: 'Proposta comercial — Namão Criativa',
+  },
 };
 
 @Injectable()
@@ -69,6 +83,8 @@ export class LeadMailService {
     private readonly accounts: LeadAccountService,
     private readonly activity: LeadActivityService,
     private readonly owners: OwnerLookup,
+    private readonly packages: PackagesService,
+    private readonly mailer: MailService,
   ) {}
 
   async list(leadId: string) {
@@ -77,6 +93,12 @@ export class LeadMailService {
     const igConnected = lead.instagramConnections.length > 0;
     const cred = await this.credentialsRecipient(lead);
     const siteUrl = lead.publishedOrigin?.trim() || null;
+    const activePackages = await this.packages.findActive();
+    const offerReason = to
+      ? activePackages.length
+        ? null
+        : 'Nenhum pacote ativo cadastrado.'
+      : 'Lead sem e-mail válido para envio.';
 
     return {
       items: [
@@ -113,14 +135,26 @@ export class LeadMailService {
             ? null
             : 'Este login não tem e-mail válido para envio.',
         },
+        {
+          id: 'package-offer' as const,
+          ...TEMPLATES['package-offer'],
+          to,
+          available: Boolean(to) && activePackages.length > 0,
+          unavailableReason: offerReason,
+          packages: activePackages,
+        },
       ],
     };
   }
 
-  async preview(leadId: string, kind: string) {
+  async preview(leadId: string, kind: string, packageId?: string) {
     const emailKind = this.parseKind(kind);
     const lead = await this.requireLead(leadId);
     const logoUrl = publicLogoUrl(this.config.get<string>('NAMAO_PUBLIC_URL'));
+
+    if (emailKind === 'package-offer') {
+      return this.previewPackageOffer(lead, logoUrl, packageId);
+    }
 
     if (emailKind === 'site-introduction') {
       return this.previewSiteIntroduction(lead, logoUrl);
@@ -194,8 +228,11 @@ export class LeadMailService {
     };
   }
 
-  async send(leadId: string, kind: string) {
+  async send(leadId: string, kind: string, packageId?: string) {
     const emailKind = this.parseKind(kind);
+    if (emailKind === 'package-offer') {
+      return this.sendPackageOffer(leadId, packageId);
+    }
     const result =
       emailKind === 'site-introduction'
         ? await this.invites.sendSiteIntroduction(leadId)
@@ -284,6 +321,87 @@ export class LeadMailService {
       }),
       notice: notices.join(' ') || null,
     };
+  }
+
+  private async previewPackageOffer(
+    lead: {
+      name: string;
+      email: string | null;
+      clientAccounts: Array<{ email: string }>;
+    },
+    logoUrl: string,
+    packageId?: string,
+  ) {
+    const pkg = await this.packages.requireActive(packageId || '');
+    const template = await this.packages.getOfferTemplate();
+    const rendered = renderOfferTemplate(template, lead.name, {
+      name: pkg.name,
+      summary: pkg.summary,
+      description: pkg.description,
+      benefits: pkg.benefits,
+      price: pkg.price,
+      promoPrice: pkg.promoPrice,
+      currency: pkg.currency,
+    });
+    const to = this.instagramRecipient(lead);
+    return {
+      id: 'package-offer' as const,
+      ...TEMPLATES['package-offer'],
+      subject: rendered.subject,
+      to: to || '—',
+      canSend: Boolean(to),
+      html: packageOfferEmailHtml({
+        heading: pkg.name,
+        body: rendered.emailBody,
+        logoUrl,
+      }),
+      text: packageOfferEmailText({ body: rendered.emailBody }),
+      notice: to
+        ? null
+        : 'Lead sem e-mail válido para envio. Atualize o e-mail do lead.',
+      packageId: pkg.id,
+    };
+  }
+
+  private async sendPackageOffer(leadId: string, packageId?: string) {
+    const lead = await this.requireLead(leadId);
+    const to = this.instagramRecipient(lead);
+    if (!to) {
+      throw new BadRequestException(
+        'Lead sem e-mail válido para envio. Atualize o e-mail do lead.',
+      );
+    }
+    const pkg = await this.packages.requireActive(packageId || '');
+    const template = await this.packages.getOfferTemplate();
+    const rendered = renderOfferTemplate(template, lead.name, {
+      name: pkg.name,
+      summary: pkg.summary,
+      description: pkg.description,
+      benefits: pkg.benefits,
+      price: pkg.price,
+      promoPrice: pkg.promoPrice,
+      currency: pkg.currency,
+    });
+    const logoUrl = publicLogoUrl(this.config.get<string>('NAMAO_PUBLIC_URL'));
+    await this.mailer.sendPackageOffer({
+      to,
+      subject: rendered.subject,
+      html: packageOfferEmailHtml({
+        heading: pkg.name,
+        body: rendered.emailBody,
+        logoUrl,
+      }),
+      text: packageOfferEmailText({ body: rendered.emailBody }),
+    });
+    await this.activity.record({
+      leadId,
+      channel: 'email',
+      kind: 'package-offer',
+      title: `E-mail enviado: ${TEMPLATES['package-offer'].title}`,
+      summary: `Enviado para ${to} · ${pkg.name}`,
+      payload: { to, kind: 'package-offer', packageId: pkg.id },
+    });
+    return { sent: true as const, to, packageId: pkg.id };
   }
 
   private parseKind(kind: string): LeadEmailKind {

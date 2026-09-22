@@ -5,4 +5,8 @@ export class SendLeadWhatsAppDto {
   @IsString()
   @MaxLength(4000)
   text?: string;
+
+  @IsOptional()
+  @IsString()
+  packageId?: string;
 }

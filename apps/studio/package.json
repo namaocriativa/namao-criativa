@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "npx tsx --test functions/*.spec.ts"
+    "test": "npx tsx --test functions/*.spec.ts src/*.spec.ts"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.12",

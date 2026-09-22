@@ -12,6 +12,9 @@ describe('LeadAccountService', () => {
     lead: {
       findUnique: jest.fn(),
     },
+    customer: {
+      findUnique: jest.fn(),
+    },
   };
   const mail = {
     sendCredentials: jest.fn(),
@@ -66,6 +69,7 @@ describe('LeadAccountService', () => {
   it('cria ClientAccount com e-mail do lead', async () => {
     prisma.clientAccount.findFirst.mockResolvedValue(null);
     prisma.clientAccount.findUnique.mockResolvedValue(null);
+    prisma.lead.findUnique.mockResolvedValue({ tenantId: 't1' });
     prisma.clientAccount.create.mockResolvedValue({
       id: 'u2',
       email: 'ana@loja.com',
@@ -86,6 +90,7 @@ describe('LeadAccountService', () => {
           email: 'ana@loja.com',
           leadId: 'lead-1',
           customerId: null,
+          tenantId: 't1',
         }),
       }),
     );

@@ -22,7 +22,7 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     label: 'Porta da API',
     required: false,
     secret: false,
-    hint: 'No host: PORT. No Docker: PLATFORM_PORT no .env da raiz (default 4000).',
+    hint: 'Porta do Nest. Dev local: 4000 (PORT e PLATFORM_PORT no .env da raiz).',
   },
   {
     key: 'JWT_SECRET',
@@ -54,7 +54,7 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     label: 'Crawl4AI URL',
     required: false,
     secret: false,
-    hint: 'http://localhost:11235 se o crawler estiver no Docker.',
+    hint: 'Opcional. API HTTP do Crawl4AI. Vazio = Python local (npm run crawler:setup).',
   },
   {
     key: 'CRAWL4AI_API_TOKEN',
@@ -153,6 +153,14 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     hint: 'CORS/cookie do studio. pages.dev do projeto entra automaticamente. Default local: http://localhost:5173',
   },
   {
+    key: 'NAMAO_ADMIN_URL',
+    group: 'Site',
+    label: 'URL do admin',
+    required: false,
+    secret: false,
+    hint: 'CORS/cookie do Namão Admin. Default local: http://localhost:5175',
+  },
+  {
     key: 'STUDIO_ADMIN_EMAIL',
     group: 'Studio',
     label: 'E-mail do admin do studio',
@@ -190,7 +198,7 @@ export const PLATFORM_ENV_CATALOG: EnvCatalogEntry[] = [
     label: 'Remetente Resend',
     required: false,
     secret: false,
-    hint: 'Namão Criativa <noreply@seudominio.com>',
+    hint: 'Namão Criativa <contato@namaocriativa.com.br>',
   },
   {
     key: 'META_APP_ID',

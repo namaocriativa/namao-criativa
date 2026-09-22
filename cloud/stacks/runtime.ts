@@ -2,6 +2,12 @@ import type { CoolifyClient } from '../lib/coolify-client.js';
 import { upsertAppEnvs } from '../lib/app-envs.js';
 import type { StackConfig } from '../lib/config.js';
 import { log } from '../lib/config.js';
+import {
+  ensurePersistentVolume,
+  hasPersistentMount,
+  RUNTIME_STORAGE_MOUNT,
+  RUNTIME_STORAGE_NAME,
+} from '../lib/coolify-storage.js';
 import type { CloudState } from '../lib/state.js';
 import { requireJwtSecret } from '../lib/jwt-secret.js';
 
@@ -67,6 +73,17 @@ export function buildRuntimeEnvs(opts: {
   return envs;
 }
 
+async function ensureRuntimeStorageVolume(
+  client: CoolifyClient,
+  appUuid: string,
+): Promise<void> {
+  await ensurePersistentVolume(client, appUuid, {
+    name: RUNTIME_STORAGE_NAME,
+    mountPath: RUNTIME_STORAGE_MOUNT,
+    step: 'runtime',
+  });
+}
+
 export async function applyRuntime(opts: {
   client: CoolifyClient;
   stack: StackConfig;
@@ -96,9 +113,21 @@ export async function applyRuntime(opts: {
         `/applications/${state.runtime_application_uuid}`,
         patch,
       );
+      await ensureRuntimeStorageVolume(
+        client,
+        state.runtime_application_uuid,
+      );
       log('runtime', 'envs + image settings updated');
     } else {
       log('runtime', 'would update envs + image settings');
+      const storages = await client.get(
+        `/applications/${state.runtime_application_uuid}/storages`,
+      );
+      if (hasPersistentMount(storages, RUNTIME_STORAGE_MOUNT)) {
+        log('runtime', `volume ${RUNTIME_STORAGE_MOUNT} already attached`);
+      } else {
+        log('runtime', `would attach volume ${RUNTIME_STORAGE_MOUNT}`);
+      }
     }
     return state;
   }
@@ -128,6 +157,7 @@ export async function applyRuntime(opts: {
       'runtime',
       `would CREATE application ${stack.runtime.name} from ${stack.runtime.image_name}:${stack.runtime.image_tag}`,
     );
+    log('runtime', `would attach volume ${RUNTIME_STORAGE_MOUNT}`);
     return state;
   }
 
@@ -141,6 +171,7 @@ export async function applyRuntime(opts: {
   state.runtime_application_uuid = created.uuid;
   log('runtime', `created uuid=${created.uuid}`);
   await upsertAppEnvs(client, created.uuid, envs);
-  log('runtime', 'envs set');
+  await ensureRuntimeStorageVolume(client, created.uuid);
+  log('runtime', 'envs + volume set');
   return state;
 }

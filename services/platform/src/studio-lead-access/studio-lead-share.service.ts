@@ -3,7 +3,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import type { JwtUser } from '../auth/jwt.strategy';
-import { isStudioAdmin, isStudioRole, STUDIO_ROLES } from '../auth/roles';
+import { isTenantAdmin, isTenantStaffRole, USER_ROLE } from '../auth/roles';
 import { ownerCreateData, ownerWhere } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudioLeadAccessService } from './studio-lead-access.service';
@@ -43,14 +43,15 @@ export class StudioLeadShareService {
     const candidates = canManage
       ? await this.prisma.user.findMany({
           where: {
-            role: { in: [...STUDIO_ROLES] },
+            tenantId: user.tenantId || undefined,
+            role: { in: [USER_ROLE.ADMIN, USER_ROLE.OPERATOR] },
             ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
           },
           select: USER_PUBLIC_SELECT,
           orderBy: { name: 'asc' },
         })
       : [];
-    const createdBy = isStudioAdmin(user.role)
+    const createdBy = isTenantAdmin(user)
       ? record.createdByUserId
         ? await this.prisma.user.findUnique({
             where: { id: record.createdByUserId },
@@ -60,7 +61,7 @@ export class StudioLeadShareService {
       : undefined;
     return {
       canManage,
-      ...(isStudioAdmin(user.role) ? { createdBy } : {}),
+      ...(isTenantAdmin(user) ? { createdBy } : {}),
       shares: shares.map((row) => ({
         id: row.user.id,
         name: row.user.name,
@@ -81,9 +82,9 @@ export class StudioLeadShareService {
     }
     const target = await this.prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { id: true, role: true },
+      select: { id: true, role: true, tenantId: true },
     });
-    if (!target || !isStudioRole(target.role)) {
+    if (!target || !isTenantStaffRole(target.role) || target.tenantId !== user.tenantId) {
       throw new BadRequestException('Usuário inválido');
     }
     const existing = await this.prisma.studioLeadShare.findFirst({

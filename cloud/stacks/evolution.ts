@@ -6,15 +6,13 @@ import {
   applicationExists,
   findApplicationByName,
 } from '../lib/coolify-database.js';
+import { ensurePersistentVolume } from '../lib/coolify-storage.js';
 import type { CloudState } from '../lib/state.js';
 import { resolveEvolutionDatabaseUrl } from './postgres.js';
 import { resolveRedisUrl } from './redis.js';
 
 type AppCreated = { uuid?: string; fqdn?: string };
 type AppDetail = { uuid?: string; fqdn?: string };
-type Storages = {
-  persistent_storages?: Array<{ uuid?: string; mount_path?: string }>;
-};
 
 const INSTANCES_MOUNT = '/evolution/instances';
 
@@ -22,17 +20,11 @@ async function ensureInstancesVolume(
   client: CoolifyClient,
   appUuid: string,
 ): Promise<void> {
-  const storages = await client.get<Storages>(
-    `/applications/${appUuid}/storages`,
-  );
-  const mounts = storages?.persistent_storages || [];
-  if (mounts.some((s) => s.mount_path === INSTANCES_MOUNT)) return;
-  await client.post(`/applications/${appUuid}/storages`, {
-    type: 'persistent',
+  await ensurePersistentVolume(client, appUuid, {
     name: 'evolution-instances',
-    mount_path: INSTANCES_MOUNT,
+    mountPath: INSTANCES_MOUNT,
+    step: 'evolution',
   });
-  log('evolution', `volume ${INSTANCES_MOUNT} attached`);
 }
 
 async function readFqdn(

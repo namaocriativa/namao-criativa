@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import type { JwtUser } from '../auth/jwt.strategy';
 import type { OwnerKind } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { optionalTenantId } from '../tenant/tenant-context';
 import {
   canAccessRecord,
   canManageShares,
@@ -12,6 +13,7 @@ import {
 
 const ACCESS_SELECT = {
   id: true,
+  tenantId: true,
   createdByUserId: true,
   studioShares: { select: { userId: true } },
 } as const;
@@ -19,6 +21,7 @@ const ACCESS_SELECT = {
 export type StudioProfileAccess = {
   kind: OwnerKind;
   id: string;
+  tenantId: string;
   createdByUserId: string | null;
   studioShares: { userId: string }[];
 };
@@ -40,12 +43,20 @@ export class StudioLeadAccessService {
       where: { id: profileId },
       select: ACCESS_SELECT,
     });
-    if (lead) return { kind: 'lead', ...lead };
+    if (lead) {
+      const tenantId = optionalTenantId();
+      if (tenantId && lead.tenantId !== tenantId) return null;
+      return { kind: 'lead', ...lead };
+    }
     const customer = await this.prisma.customer.findUnique({
       where: { id: profileId },
       select: ACCESS_SELECT,
     });
-    if (customer) return { kind: 'customer', ...customer };
+    if (customer) {
+      const tenantId = optionalTenantId();
+      if (tenantId && customer.tenantId !== tenantId) return null;
+      return { kind: 'customer', ...customer };
+    }
     return null;
   }
 

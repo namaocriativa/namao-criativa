@@ -11,7 +11,12 @@ import {
   UPLOAD_MIME_TYPES,
 } from '../storage/storage.service';
 import { CreatePackageDto } from './dto/create-package.dto';
+import { UpdateOfferTemplateDto } from './dto/update-offer-template.dto';
 import { UpdatePackageDto } from './dto/update-package.dto';
+import {
+  DEFAULT_OFFER_TEMPLATE,
+} from './offer-template';
+import { assertSameTenant, requireTenantId, tenantWhere } from '../tenant/tenant.util';
 
 export type PackageUploadFile = {
   buffer?: Buffer;
@@ -24,6 +29,18 @@ export type PackageUploadFile = {
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIME = new Set<string>(UPLOAD_MIME_TYPES);
 
+const ACTIVE_PACKAGE_SELECT = {
+  id: true,
+  name: true,
+  summary: true,
+  description: true,
+  price: true,
+  promoPrice: true,
+  currency: true,
+  benefits: true,
+  status: true,
+} as const;
+
 @Injectable()
 export class PackagesService {
   constructor(
@@ -33,6 +50,7 @@ export class PackagesService {
 
   async findAll() {
     return this.prisma.package.findMany({
+      where: tenantWhere(),
       orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
       include: {
         images: {
@@ -41,6 +59,14 @@ export class PackagesService {
         },
         _count: { select: { images: true } },
       },
+    });
+  }
+
+  async findActive() {
+    return this.prisma.package.findMany({
+      where: tenantWhere({ status: 'active' }),
+      orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
+      select: ACTIVE_PACKAGE_SELECT,
     });
   }
 
@@ -57,27 +83,42 @@ export class PackagesService {
     if (!pkg) {
       throw new NotFoundException(`Pacote ${id} não encontrado`);
     }
+    return assertSameTenant(pkg, `Pacote ${id} não encontrado`);
+  }
 
+  async requireActive(id: string) {
+    if (!id?.trim()) {
+      throw new BadRequestException(
+        'Selecione um pacote para enviar a proposta.',
+      );
+    }
+    const pkg = await this.findById(id.trim());
+    if (pkg.status !== 'active') {
+      throw new BadRequestException(
+        'Selecione um pacote ativo para enviar a proposta.',
+      );
+    }
     return pkg;
   }
 
   async create(dto: CreatePackageDto) {
+    this.assertPromoPrice(dto.price ?? null, dto.promoPrice ?? null);
+    const sortOrder = await this.nextSortOrder();
     return this.prisma.package.create({
       data: {
+        tenantId: requireTenantId(),
         name: dto.name.trim(),
         summary: dto.summary?.trim() || null,
         description: dto.description?.trim() || null,
         price: dto.price ?? null,
+        promoPrice: dto.promoPrice ?? null,
         currency: dto.currency?.trim() || 'BRL',
         benefits:
           dto.benefits !== undefined
             ? this.normalizeBenefits(dto.benefits)
             : [],
-        whatsappMessage: dto.whatsappMessage?.trim() || null,
-        emailSubject: dto.emailSubject?.trim() || null,
-        emailBody: dto.emailBody?.trim() || null,
         status: dto.status || 'draft',
-        sortOrder: dto.sortOrder ?? 0,
+        sortOrder,
       },
       include: {
         images: true,
@@ -86,7 +127,11 @@ export class PackagesService {
   }
 
   async update(id: string, dto: UpdatePackageDto) {
-    await this.findById(id);
+    const existing = await this.findById(id);
+    const nextPrice = dto.price !== undefined ? dto.price : existing.price;
+    const nextPromo =
+      dto.promoPrice !== undefined ? dto.promoPrice : existing.promoPrice;
+    this.assertPromoPrice(nextPrice, nextPromo);
 
     const data: Prisma.PackageUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
@@ -97,23 +142,14 @@ export class PackagesService {
       data.description = dto.description?.trim() || null;
     }
     if (dto.price !== undefined) data.price = dto.price;
+    if (dto.promoPrice !== undefined) data.promoPrice = dto.promoPrice;
     if (dto.currency !== undefined) {
       data.currency = dto.currency.trim() || 'BRL';
     }
     if (dto.benefits !== undefined) {
       data.benefits = this.normalizeBenefits(dto.benefits);
     }
-    if (dto.whatsappMessage !== undefined) {
-      data.whatsappMessage = dto.whatsappMessage?.trim() || null;
-    }
-    if (dto.emailSubject !== undefined) {
-      data.emailSubject = dto.emailSubject?.trim() || null;
-    }
-    if (dto.emailBody !== undefined) {
-      data.emailBody = dto.emailBody?.trim() || null;
-    }
     if (dto.status !== undefined) data.status = dto.status;
-    if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
 
     return this.prisma.package.update({
       where: { id },
@@ -129,17 +165,49 @@ export class PackagesService {
   async deleteById(id: string) {
     const existing = await this.prisma.package.findUnique({
       where: { id },
-      select: { id: true, name: true },
+      select: { id: true, name: true, tenantId: true },
     });
 
     if (!existing) {
       throw new NotFoundException(`Pacote ${id} não encontrado`);
     }
+    assertSameTenant(existing, `Pacote ${id} não encontrado`);
 
     await this.prisma.package.delete({ where: { id } });
     await this.storageService.removePackageDir(id);
 
     return { id: existing.id, name: existing.name, deleted: true };
+  }
+
+  async getOfferTemplate() {
+    const tenantId = requireTenantId();
+    return this.prisma.offerTemplate.upsert({
+      where: { tenantId },
+      update: {},
+      create: {
+        tenantId,
+        ...DEFAULT_OFFER_TEMPLATE,
+      },
+    });
+  }
+
+  async updateOfferTemplate(dto: UpdateOfferTemplateDto) {
+    const current = await this.getOfferTemplate();
+    return this.prisma.offerTemplate.update({
+      where: { id: current.id },
+      data: {
+        emailSubject:
+          dto.emailSubject !== undefined
+            ? dto.emailSubject.trim()
+            : current.emailSubject,
+        emailBody:
+          dto.emailBody !== undefined ? dto.emailBody.trim() : current.emailBody,
+        whatsappMessage:
+          dto.whatsappMessage !== undefined
+            ? dto.whatsappMessage.trim()
+            : current.whatsappMessage,
+      },
+    });
   }
 
   async addImages(packageId: string, files: PackageUploadFile[]) {
@@ -201,6 +269,31 @@ export class PackagesService {
     await this.storageService.removeImageFile(image.localPath);
     await this.prisma.packageImage.delete({ where: { id: image.id } });
     return this.findById(packageId);
+  }
+
+  assertPromoPrice(
+    price: number | null | undefined,
+    promoPrice: number | null | undefined,
+  ) {
+    if (promoPrice == null) return;
+    if (price == null || !Number.isFinite(Number(price))) {
+      throw new BadRequestException(
+        'Preço promocional exige um preço cheio.',
+      );
+    }
+    if (!(Number(promoPrice) < Number(price))) {
+      throw new BadRequestException(
+        'Preço promocional deve ser menor que o preço.',
+      );
+    }
+  }
+
+  private async nextSortOrder() {
+    const last = await this.prisma.package.aggregate({
+      where: tenantWhere(),
+      _max: { sortOrder: true },
+    });
+    return (last._max.sortOrder ?? -1) + 1;
   }
 
   private normalizeBenefits(

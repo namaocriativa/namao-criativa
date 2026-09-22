@@ -2,14 +2,21 @@ import { ForbiddenException } from '@nestjs/common';
 import {
   allowedOriginsForCookie,
   assertCookieOrigin,
+  cookieSourceForOrigin,
   requestOrigin,
 } from './cookie-origin';
-import { CLIENT_TOKEN_COOKIE, STUDIO_TOKEN_COOKIE } from './roles';
+import {
+  ADMIN_TOKEN_COOKIE,
+  CLIENT_TOKEN_COOKIE,
+  STUDIO_TOKEN_COOKIE,
+} from './roles';
 import {
   authCookieOptions,
   extractJwtFromRequest,
   inspectJwtFromRequest,
   readCookie,
+  THIRTY_DAYS_MS,
+  WEEK_MS,
 } from './jwt-cookie';
 
 describe('jwt-cookie', () => {
@@ -48,6 +55,40 @@ describe('jwt-cookie', () => {
     });
   });
 
+  it('Origin do admin não usa o cookie do studio', () => {
+    const inspected = inspectJwtFromRequest({
+      headers: {
+        origin: 'http://localhost:5175',
+        cookie: `${STUDIO_TOKEN_COOKIE}=studio-token; ${ADMIN_TOKEN_COOKIE}=admin-token`,
+      },
+    });
+    expect(inspected).toEqual({
+      token: 'admin-token',
+      source: 'admin-cookie',
+    });
+    expect(
+      inspectJwtFromRequest({
+        headers: {
+          origin: 'http://localhost:5175',
+          cookie: `${STUDIO_TOKEN_COOKIE}=studio-token`,
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it('Origin do studio não usa o cookie do admin', () => {
+    const inspected = inspectJwtFromRequest({
+      headers: {
+        origin: 'http://localhost:5173',
+        cookie: `${STUDIO_TOKEN_COOKIE}=studio-token; ${ADMIN_TOKEN_COOKIE}=admin-token`,
+      },
+    });
+    expect(inspected).toEqual({
+      token: 'studio-token',
+      source: 'studio-cookie',
+    });
+  });
+
   it('marca Secure com X-Forwarded-Proto https', () => {
     const options = authCookieOptions({
       headers: { 'x-forwarded-proto': 'https, http' },
@@ -55,6 +96,17 @@ describe('jwt-cookie', () => {
     expect(options.httpOnly).toBe(true);
     expect(options.secure).toBe(true);
     expect(options.sameSite).toBe('lax');
+    expect(options.maxAge).toBe(WEEK_MS);
+  });
+
+  it('cookie persistente quando rememberMe é true', () => {
+    const options = authCookieOptions({ headers: {} }, { rememberMe: true });
+    expect(options.maxAge).toBe(THIRTY_DAYS_MS);
+  });
+
+  it('cookie de sessão quando rememberMe é false', () => {
+    const options = authCookieOptions({ headers: {} }, { rememberMe: false });
+    expect(options.maxAge).toBeUndefined();
   });
 });
 
@@ -63,6 +115,22 @@ describe('cookie-origin', () => {
     studioUrl: 'https://studio.namaocriativa.com.br',
     publicUrl: 'https://namaocriativa.com.br',
   };
+
+  it('lista origens do admin', () => {
+    expect(
+      allowedOriginsForCookie('admin-cookie', {
+        adminUrl: 'https://admin.namaocriativa.com.br',
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        'https://admin.namaocriativa.com.br',
+        'https://namao-admin.pages.dev',
+        'http://localhost:5175',
+      ]),
+    );
+    expect(cookieSourceForOrigin('http://localhost:5175')).toBe('admin-cookie');
+    expect(cookieSourceForOrigin('http://localhost:5173')).toBe('studio-cookie');
+  });
 
   it('lista origens do studio', () => {
     expect(allowedOriginsForCookie('studio-cookie', studioEnv)).toEqual(

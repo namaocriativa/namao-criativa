@@ -1,3 +1,5 @@
+import { mailFooterHtml, mailFooterText } from './mail-branding';
+
 export function credentialsEmailHtml(params: {
   name: string;
   email: string;
@@ -59,7 +61,7 @@ export function credentialsEmailHtml(params: {
             </tr>
             <tr>
               <td style="padding:22px 8px 0;text-align:center;font-size:12px;color:#8c8c8c;">
-                Namão Criativa — presença digital com inteligência.
+                ${mailFooterHtml()}
               </td>
             </tr>
           </table>
@@ -85,7 +87,7 @@ export function credentialsEmailText(params: {
     '',
     `Entrar: ${params.loginUrl}`,
     '',
-    'Namão Criativa',
+    mailFooterText(),
   ].join('\n');
 }
 

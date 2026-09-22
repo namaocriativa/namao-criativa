@@ -7,7 +7,7 @@ Provisiona via [API do Coolify](https://coolify.io/docs/api-reference/api/author
 | `namao-postgres` | Coolify Database (PostgreSQL) | `postgres:16-alpine` — API (`public`) + Evolution (`evolution_api`) |
 | `namao-redis` | Coolify Database (Redis) | `redis:7-alpine` — API db0 + Evolution db1 |
 | `namao-evolution` | Coolify Application (Docker image) | `evoapicloud/evolution-api:v2.3.7` |
-| `namao-api` | Coolify Application (Docker image) | `@namao/platform` — API unificada |
+| `namao-api` | Coolify Application (Docker image) | `@namao/platform` — API unificada. Volume persistente `/app/services/platform/storage` |
 | `namao-website` | Cloudflare Pages | `@namao/website` — site público |
 | `namao-studio` | Cloudflare Pages | `@namao/studio` — painel interno (JWT) |
 
@@ -15,11 +15,10 @@ Provisiona via [API do Coolify](https://coolify.io/docs/api-reference/api/author
 
 ```text
 cloud/
-  compose/          # referência local (dev); produção não usa compose
   config/           # stack.example.json (copie para stack.json)
   lib/              # cliente HTTP Coolify/Cloudflare + state
   stacks/           # postgres, redis, evolution, runtime, website-pages, studio-pages
-  scripts/          # bootstrap | plan | apply | deploy | website | studio
+  scripts/          # bootstrap | plan | apply | deploy | website | studio | mail-dns
 ```
 
 ## Pré-requisitos
@@ -252,13 +251,24 @@ npx wrangler pages deploy apps/studio/dist --project-name=namao-studio
 | `GA4_PROPERTY_ID` | não | dashboard de estatísticas do cliente |
 | `GA4_SERVICE_ACCOUNT_JSON` | não | service account com Viewer na propriedade GA4 |
 | `RESEND_API_KEY` | não | convites do studio e e-mails de acesso |
-| `RESEND_FROM` | não | remetente verificado no Resend |
+| `RESEND_FROM` | não | remetente verificado no Resend (`Namão Criativa <contato@…>`) |
+
+DNS do Resend na zona Cloudflare (DKIM `resend._domainkey`, CNAME `send`/`rsend` **DNS-only**, SPF `include:_spf.resend.com`, DMARC se ainda não existir):
+
+```bash
+npm run cloud:mail-dns:plan
+npm run cloud:mail-dns
+```
+
+`send` e `rsend` não podem ficar com proxy laranja — o Resend quebra a verificação.
 
 Health check Coolify: `GET /health` na porta `3000`.
 
+Volume persistente `/app/services/platform/storage` (imagens, vídeos, gerações do studio). O `apply` anexa o mount se ainda não existir; o container só passa a usá-lo após um deploy da `namao-api`. Sem esse volume, redeploy apaga os arquivos.
+
 ## Evolution API
 
-Application Docker image `evoapicloud/evolution-api:v2.3.7` (sem compose). Redis em `CACHE_REDIS_URI` db `/1` + prefixo `evolution`. Volume persistente `/evolution/instances`.
+Application Docker image `evoapicloud/evolution-api:v2.3.7`. Redis em `CACHE_REDIS_URI` db `/1` + prefixo `evolution`. Volume persistente `/evolution/instances`.
 
 Após o `apply`, configure o **platform** local/futuro:
 

@@ -57,6 +57,32 @@ services/platform/storage/leads/**
 !services/platform/storage/leads/.gitkeep
 !services/platform/storage/.gitkeep
 
+# Image / video studio generated assets
+services/platform/storage/image-projects/**
+!services/platform/storage/image-projects/.gitkeep
+services/platform/storage/video-projects/**
+!services/platform/storage/video-projects/.gitkeep
+
+# Character identity assets
+services/platform/storage/characters/**
+!services/platform/storage/characters/.gitkeep
+
+# Movie storyboard clips
+services/platform/storage/movies/**
+!services/platform/storage/movies/.gitkeep
+
+# Start-end interpolation clips
+services/platform/storage/inicio-fim/**
+!services/platform/storage/inicio-fim/.gitkeep
+
+# UGC Skills product ads
+services/platform/storage/ugc-skills/**
+!services/platform/storage/ugc-skills/.gitkeep
+
+# Content calendar media
+services/platform/storage/calendar/**
+!services/platform/storage/calendar/.gitkeep
+
 # Landing projects — versionar fontes de exemplo; nunca deps/build
 leads/*/node_modules/
 leads/*/dist/
@@ -68,7 +94,7 @@ leads/*/.scaffold-ok
 .venv
 services/platform/crawler/.venv
 
-# Dev local sem Docker (Postgres/Redis isolados)
+# Dev local (Postgres/Redis isolados)
 .local/
 
 # temp directory

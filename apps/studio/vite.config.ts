@@ -17,29 +17,33 @@ const kitSrc = path.resolve(rootDir, '../../packages/landing-kit/src');
 const api = resolveLocalApiUrl(path.resolve(rootDir, '../..'));
 
 function namaoLogoPlugin(): Plugin {
-  const logoFile = path.resolve(rootDir, '../website/public/logo.png');
+  const logoFile = path.resolve(rootDir, '../website/public/logo-mark.png');
+  const logoPaths = new Set(['/logo.png', '/logo-mark.png']);
+  const serveLogo: Plugin['configureServer'] = (server) => {
+    server.middlewares.use((req, res, next) => {
+      const url = req.url?.split('?')[0];
+      if (!url || !logoPaths.has(url) || req.method !== 'GET') {
+        next();
+        return;
+      }
+      if (!existsSync(logoFile)) {
+        res.statusCode = 404;
+        res.end('logo not found');
+        return;
+      }
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'no-cache');
+      createReadStream(logoFile).pipe(res);
+    });
+  };
   return {
     name: 'namao-logo',
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const url = req.url?.split('?')[0];
-        if (url !== '/logo.png' || req.method !== 'GET') {
-          next();
-          return;
-        }
-        if (!existsSync(logoFile)) {
-          res.statusCode = 404;
-          res.end('logo not found');
-          return;
-        }
-        res.setHeader('Content-Type', 'image/png');
-        res.setHeader('Cache-Control', 'no-cache');
-        createReadStream(logoFile).pipe(res);
-      });
-    },
+    configureServer: serveLogo,
+    configurePreviewServer: serveLogo,
     writeBundle(output) {
       if (!output.dir || !existsSync(logoFile)) return;
       copyFileSync(logoFile, path.join(output.dir, 'logo.png'));
+      copyFileSync(logoFile, path.join(output.dir, 'logo-mark.png'));
     },
   };
 }
@@ -123,6 +127,8 @@ function loginPagePlugin(): Plugin {
 function apiProxy(): ProxyOptions {
   return {
     target: api,
+    timeout: 600_000,
+    proxyTimeout: 600_000,
     bypass(req) {
       if (req.headers.accept?.includes('text/html')) {
         return '/index.html';
@@ -132,6 +138,7 @@ function apiProxy(): ProxyOptions {
 }
 
 export default defineConfig({
+  clearScreen: false,
   appType: 'spa',
   plugins: [
     loginPagePlugin(),
@@ -168,6 +175,13 @@ export default defineConfig({
       '/lead-discovery': apiProxy(),
       '/enrichment': apiProxy(),
       '/packages': apiProxy(),
+      '/calendar': apiProxy(),
+      '/public': apiProxy(),
+      '/image-projects': apiProxy(),
+      '/image-models': apiProxy(),
+      '/video-projects': apiProxy(),
+      '/video-models': apiProxy(),
+      '/creative': apiProxy(),
       '/locations': apiProxy(),
       '/storage': apiProxy(),
       '/landing': apiProxy(),

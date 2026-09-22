@@ -30,7 +30,7 @@ const CSS = `[${ROOT_ATTR}] {
   display: block;
   height: 100%;
   width: 100%;
-  background: var(--ui-sp-color, #c4b59a);
+  background: var(--ui-sp-color, #f2f2f2);
   transform: scaleX(0);
   transform-origin: left center;
   will-change: transform;
@@ -145,15 +145,15 @@ export const scrollProgressBar: UiComponentDefinition = {
       kind: "color",
       label: "Cor da barra",
       description: "Cor de preenchimento do progresso.",
-      default: "#c4b59a",
+      default: "#f2f2f2",
     },
     cssVariable: {
       kind: "text",
       label: "CSS var do tema",
       description:
-        "Nome da CSS var usada como cor, com a cor literal como fallback (ex.: --bone). Vazio usa apenas a cor literal.",
-      default: "--bone",
-      placeholder: "--bone",
+        "Nome da CSS var usada como cor, com a cor literal como fallback (ex.: --fg). Vazio usa apenas a cor literal.",
+      default: "--fg",
+      placeholder: "--fg",
     },
     trackColor: {
       kind: "text",

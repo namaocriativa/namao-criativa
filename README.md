@@ -10,9 +10,9 @@ Monorepo para **descobrir leads** em uma região, **enriquecê-los** com dados e
 - Prisma + PostgreSQL
 - Imagens em `services/platform/storage/leads/{leadId}/images`
 - Landings geradas em `leads/<slug>/` (independentes, fora dos workspaces)
-- Crawl4AI para enrichment quando o lead já tem website (`services/platform/crawler/` ou Docker opcional)
+- Crawl4AI para enrichment quando o lead já tem website (`services/platform/crawler/`)
 
-O caminho recomendado no host é `npm run dev:local` (Postgres, Redis, API, studio e website, sem Docker). Alternativa: Docker sobe Postgres, Redis, Crawl4AI e a API Nest (watch), e o Vite do studio continua no host. As portas (4000 e 5433) evitam conflito com stacks na 3000/5432.
+O desenvolvimento roda direto na máquina: `npm run dev:local` sobe Postgres, Redis, API, studio e website. As portas (4000 e 5433) evitam conflito com stacks na 3000/5432.
 
 ## Estrutura
 
@@ -30,12 +30,12 @@ packages/
   landing-kit/         # componentes + PageSpec
 cloud/                 # IaC Coolify + Cloudflare Pages — ver cloud/README.md
 leads/                 # projetos Vite gerados (Root Directory na Vercel)
-docker-compose.yml     # Postgres + Redis + Crawl4AI + API Nest (watch)
+Dockerfile             # imagem de produção da API (GHCR / Coolify)
 ```
 
 ## Setup
 
-### Dev local sem Docker (recomendado)
+### Dev local
 
 Postgres e Redis sobem como processos nativos (Homebrew), isolados em `.local/` nas portas **5433** e **6379** — a 5432 do host fica livre. A API, o studio e o website rodam com hot reload. Evolution **não** sobe: o script exporta `EVOLUTION_MOCK=1` e o envio de WhatsApp é fake.
 
@@ -50,30 +50,14 @@ npm run dev:local
 - Studio (Vite): `http://localhost:5173`
 - Website (Vite): `http://localhost:5174`
 
-Não misture `npm run dev:local` com `docker compose up` nas mesmas portas (4000, 5433, 6379).
-
-`npm run dev` continua disponível (só platform + studio no host; Postgres/Redis você sobe à parte).
-
-### Docker
-
-```bash
-npm install
-cp services/platform/.env.example services/platform/.env
-docker compose up -d --build
-npm run dev:studio
-```
-
-- Studio (Vite em `apps/studio/`): `http://localhost:5173` — login JWT, proxy `/leads`, `/config`, `/studio`, etc. → API (`PLATFORM_PORT`, default 4000)
-- API (NestJS no Docker): `http://localhost:${PLATFORM_PORT:-4000}` — discovery, landing, chat Gemini, dashboard, com hot reload de `services/platform/src`
-
-O Compose publica a API em **4000** e o Postgres em **5433** no host (o Nest continua em 3000 *dentro* do container). No `.env` da raiz:
+No `.env` da raiz (studio/website leem `PLATFORM_PORT`):
 
 ```bash
 PLATFORM_PORT=4000
 POSTGRES_PORT=5433
 ```
 
-Studio e website falam com `http://localhost:4000`. API Nest no host, sem o serviço `platform` do Compose: `PORT=4000` em `services/platform/.env`.
+`npm run dev` continua disponível (só platform + studio; Postgres/Redis você sobe à parte).
 
 ### Variáveis de ambiente
 
@@ -81,13 +65,13 @@ Arquivo: `services/platform/.env`
 
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
-| `DATABASE_URL` | Sim | Postgres, ex.: `postgresql://namao:namao@localhost:5433/namao` (Docker publica 5433 no host) |
-| `PORT` | Não | Porta do Nest no **host** (sem Docker). Default: `3000` |
-| `PLATFORM_PORT` | Não | Porta no **host** com Docker (`4000:3000`). Definir no `.env` da **raiz**. Default: `4000` |
+| `DATABASE_URL` | Sim | Postgres, ex.: `postgresql://namao:namao@localhost:5433/namao` (`dev:local` usa 5433) |
+| `PORT` | Não | Porta do Nest. Default local: `4000` (`npm run dev:local` exporta isso) |
+| `PLATFORM_PORT` | Não | Porta da API lida pelo studio/website no `.env` da **raiz**. Default: `4000` |
 | `REDIS_URL` | Não | Cache de discovery e rate limit. Default local: `redis://localhost:6379` |
 | `GOOGLE_PLACES_API_KEY` | Não | Se definida, discovery/enrich usam Google Places; senão, Overpass/OSM + Nominatim |
-| `CRAWL4AI_URL` | Não | API Docker do Crawl4AI, ex.: `http://localhost:11235`. Se vazia, usa o script Python local |
-| `CRAWL4AI_API_TOKEN` | Não | Bearer token se o servidor Docker exigir JWT |
+| `CRAWL4AI_URL` | Não | API HTTP opcional do Crawl4AI. Se vazia, usa o script Python local |
+| `CRAWL4AI_API_TOKEN` | Não | Bearer token se a API HTTP do Crawl4AI exigir JWT |
 | `CRAWL4AI_PYTHON` | Não | Python do venv do crawler. Default: `services/platform/crawler/.venv/bin/python` |
 | `GEMINI_API_KEY` | Sim para gerar/chat | Google AI Studio |
 | `PUBLIC_CHAT_API_ORIGIN` | Sim em LP publicada | URL absoluta da API injetada no widget. Dev: `http://localhost:4000` |
@@ -110,13 +94,7 @@ Arquivo: `services/platform/.env`
 
 ### Redis (cache de discovery)
 
-`npm run dev:local` já sobe um Redis nativo em `127.0.0.1:6379` (dados em `.local/redis`). No Docker, o Redis já entra em `docker compose up`. Se a API Nest estiver no host sem o `dev:local`:
-
-```bash
-docker compose up -d redis
-```
-
-No `services/platform/.env`:
+`npm run dev:local` já sobe um Redis nativo em `127.0.0.1:6379` (dados em `.local/redis`). Se a API Nest estiver no host sem o `dev:local`, instale Redis (`brew install redis`) e aponte no `services/platform/.env`:
 
 ```bash
 REDIS_URL=redis://localhost:6379
@@ -142,22 +120,8 @@ O dashboard chama `GET /dashboard/analytics?range=7d|28d|90d` (JWT). Sem `publis
 
 Quando o lead já tem `website`, o enrichment usa o [Crawl4AI](https://github.com/unclecode/crawl4ai) (Playwright) na homepage e em páginas de contato/sobre/serviços. Se o crawler não estiver disponível, cai no parser HTTP + Cheerio.
 
-**Opção A — Python local**
-
 ```bash
 npm run crawler:setup
-```
-
-**Opção B — Docker**
-
-```bash
-docker compose up -d crawl4ai
-```
-
-No `services/platform/.env`:
-
-```bash
-CRAWL4AI_URL=http://localhost:11235
 ```
 
 ### Gemini (geração de landing)
@@ -299,7 +263,7 @@ Falhas de um provider não interrompem o enrichment.
 
 | Script | Descrição |
 |--------|-----------|
-| `npm run dev:local` | Postgres + Redis + kit + API + studio + website (sem Docker, hot reload) |
+| `npm run dev:local` | Postgres + Redis + kit + API + studio + website (hot reload) |
 | `npm run dev` | Sobe platform + studio |
 | `npm run dev:platform` | Só a API |
 | `npm run dev:studio` | Só o studio Vite |

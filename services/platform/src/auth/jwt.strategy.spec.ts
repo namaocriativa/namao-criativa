@@ -6,6 +6,7 @@ describe('JwtStrategy', () => {
   const prisma = {
     user: { findUnique: jest.fn() },
     clientAccount: { findUnique: jest.fn() },
+    tenant: { findUnique: jest.fn() },
   };
   const config = { get: jest.fn().mockReturnValue('test-jwt-secret-value') };
   const strategy = new JwtStrategy(config as never, prisma as never);
@@ -15,6 +16,10 @@ describe('JwtStrategy', () => {
     email: 'admin@namao.local',
     name: 'Admin',
     role: USER_ROLE.ADMIN,
+    tenantId: 't1',
+    canAccessImages: false,
+    canAccessVideos: false,
+    tenant: { id: 't1', name: 'Namão', status: 'active' },
   };
   const account = {
     id: 'client-1',
@@ -31,13 +36,23 @@ describe('JwtStrategy', () => {
   });
 
   it('resolve staff pela tabela User', async () => {
-    const user = await strategy.validate(
-      { headers: {} } as never,
-      { sub: 'staff-1', email: staff.email, role: USER_ROLE.ADMIN, typ: JWT_TYP.STAFF },
-    );
-    expect(user).toEqual({
-      ...staff,
+    const user = await strategy.validate({ headers: {} } as never, {
+      sub: 'staff-1',
+      email: staff.email,
+      role: USER_ROLE.ADMIN,
       typ: JWT_TYP.STAFF,
+    });
+    expect(user).toEqual({
+      id: staff.id,
+      email: staff.email,
+      name: staff.name,
+      role: USER_ROLE.ADMIN,
+      canAccessImages: false,
+      canAccessVideos: false,
+      typ: JWT_TYP.STAFF,
+      tenantId: 't1',
+      impersonatingTenantId: null,
+      tenantName: 'Namão',
       leadId: null,
       customerId: null,
     });
@@ -45,19 +60,17 @@ describe('JwtStrategy', () => {
   });
 
   it('resolve portal pela tabela ClientAccount', async () => {
-    const user = await strategy.validate(
-      { headers: {} } as never,
-      {
-        sub: 'client-1',
-        email: account.email,
-        role: USER_ROLE.CLIENT,
-        typ: JWT_TYP.CLIENT,
-      },
-    );
+    const user = await strategy.validate({ headers: {} } as never, {
+      sub: 'client-1',
+      email: account.email,
+      role: USER_ROLE.CLIENT,
+      typ: JWT_TYP.CLIENT,
+    });
     expect(user).toEqual({
       ...account,
       role: USER_ROLE.CLIENT,
       typ: JWT_TYP.CLIENT,
+      tenantId: null,
     });
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
@@ -65,7 +78,12 @@ describe('JwtStrategy', () => {
   it('não aceita staff no cookie do site', async () => {
     const user = await strategy.validate(
       { headers: { cookie: 'namao_client_token=abc.def.ghi' } } as never,
-      { sub: 'staff-1', email: staff.email, role: USER_ROLE.ADMIN, typ: JWT_TYP.STAFF },
+      {
+        sub: 'staff-1',
+        email: staff.email,
+        role: USER_ROLE.ADMIN,
+        typ: JWT_TYP.STAFF,
+      },
     );
     expect(user).toBeNull();
   });
@@ -73,6 +91,28 @@ describe('JwtStrategy', () => {
   it('não aceita portal no cookie do studio', async () => {
     const user = await strategy.validate(
       { headers: { cookie: 'namao_studio_token=abc.def.ghi' } } as never,
+      {
+        sub: 'client-1',
+        email: account.email,
+        role: USER_ROLE.CLIENT,
+        typ: JWT_TYP.CLIENT,
+      },
+    );
+    expect(user).toBeNull();
+  });
+
+  it('infere staff pelo cookie do admin sem typ', async () => {
+    const user = await strategy.validate(
+      { headers: { cookie: 'namao_admin_token=abc.def.ghi' } } as never,
+      { sub: 'staff-1', email: staff.email, role: USER_ROLE.ADMIN },
+    );
+    expect(user?.typ).toBe(JWT_TYP.STAFF);
+    expect(prisma.user.findUnique).toHaveBeenCalled();
+  });
+
+  it('não aceita portal no cookie do admin', async () => {
+    const user = await strategy.validate(
+      { headers: { cookie: 'namao_admin_token=abc.def.ghi' } } as never,
       {
         sub: 'client-1',
         email: account.email,
@@ -99,5 +139,55 @@ describe('JwtStrategy', () => {
     );
     expect(user?.typ).toBe(JWT_TYP.CLIENT);
     expect(prisma.clientAccount.findUnique).toHaveBeenCalled();
+  });
+
+  it('carrega permissões de imagens e vídeos do staff', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...staff,
+      role: USER_ROLE.OPERATOR,
+      canAccessImages: true,
+      canAccessVideos: false,
+    });
+    const user = await strategy.validate({ headers: {} } as never, {
+      sub: 'staff-1',
+      email: staff.email,
+      role: USER_ROLE.OPERATOR,
+      typ: JWT_TYP.STAFF,
+    });
+    expect(user).toMatchObject({
+      role: USER_ROLE.OPERATOR,
+      canAccessImages: true,
+      canAccessVideos: false,
+      tenantId: 't1',
+    });
+  });
+
+  it('ROOT impersona tenant ativo', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...staff,
+      role: USER_ROLE.ROOT,
+      tenantId: null,
+      tenant: null,
+    });
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 't2',
+      name: 'Agência',
+      status: 'active',
+    });
+    const user = await strategy.validate({ headers: {} } as never, {
+      sub: 'staff-1',
+      email: staff.email,
+      role: USER_ROLE.ROOT,
+      typ: JWT_TYP.STAFF,
+      impersonatingTenantId: 't2',
+    });
+    expect(user).toMatchObject({
+      role: USER_ROLE.ROOT,
+      tenantId: 't2',
+      impersonatingTenantId: 't2',
+      tenantName: 'Agência',
+      canAccessImages: true,
+      canAccessVideos: true,
+    });
   });
 });

@@ -9,6 +9,7 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const api = resolveLocalApiUrl(path.resolve(rootDir, '../..'));
 
 export default defineConfig({
+  clearScreen: false,
   root: '.',
   publicDir: 'public',
   plugins: [namaoSeoPlugin()],

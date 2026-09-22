@@ -7,6 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                  User[]
+  leads                  Lead[]
+  customers              Customer[]
+  clientAccounts         ClientAccount[]
+  invites                Invite[]
+  inviteRequests         InviteRequest[]
+  packages               Package[]
+  offerTemplates         OfferTemplate[]
+  appSettings            AppSetting[]
+  imageProjects          ImageProject[]
+  videoProjects          VideoProject[]
+  creativeCharacters     CreativeCharacter[]
+  creativeMovies         CreativeMovie[]
+  creativeStartEndClips  CreativeStartEndClip[]
+  creativeUgcClips       CreativeUgcClip[]
+  calendarPosts          ContentCalendarPost[]
+
+  @@index([status])
+}
+
 model Lead {
   id          String   @id @default(cuid())
   name        String
@@ -40,10 +68,12 @@ model Lead {
   vercelProjectId     String?
   vercelDeploymentId  String?
   fromPublicSignup    Boolean  @default(false)
+  tenantId            String
   createdByUserId     String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdBy User? @relation("LeadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   images  LeadImage[]
   sources LeadSource[]
@@ -56,9 +86,11 @@ model Lead {
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
   studioShares StudioLeadShare[]
+  calendarPosts ContentCalendarPost[]
 
   @@index([fromPublicSignup])
   @@index([createdByUserId])
+  @@index([tenantId])
 }
 
 model Customer {
@@ -94,11 +126,13 @@ model Customer {
   vercelProjectId     String?
   vercelDeploymentId  String?
   fromPublicSignup    Boolean  @default(false)
+  tenantId            String
   createdByUserId     String?
   convertedAt DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdBy User? @relation("CustomerCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   images  LeadImage[]
   sources LeadSource[]
@@ -111,9 +145,11 @@ model Customer {
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
   studioShares StudioLeadShare[]
+  calendarPosts ContentCalendarPost[]
 
   @@index([fromPublicSignup])
   @@index([createdByUserId])
+  @@index([tenantId])
 }
 
 model LeadActivity {
@@ -240,20 +276,34 @@ model LandingGeneration {
   @@index([category])
 }
 
-/// Staff do Studio (`ADMIN` | `OPERATOR`). Login do portal é `ClientAccount`.
+/// Staff do Studio (`ROOT` | `ADMIN` | `OPERATOR`). Login do portal é `ClientAccount`.
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  role         String   @default("OPERATOR")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
+  role            String   @default("OPERATOR")
+  tenantId        String?
+  canAccessImages Boolean  @default(false)
+  canAccessVideos Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  studioActivities StudioUserActivity[]
-  createdLeads     Lead[]               @relation("LeadCreatedBy")
-  createdCustomers Customer[]           @relation("CustomerCreatedBy")
-  studioLeadShares StudioLeadShare[]
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  studioActivities     StudioUserActivity[]
+  createdLeads         Lead[]               @relation("LeadCreatedBy")
+  createdCustomers     Customer[]           @relation("CustomerCreatedBy")
+  studioLeadShares     StudioLeadShare[]
+  createdImageProjects     ImageProject[]        @relation("ImageProjectCreatedBy")
+  createdVideoProjects     VideoProject[]        @relation("VideoProjectCreatedBy")
+  createdCreativeCharacters CreativeCharacter[]  @relation("CreativeCharacterCreatedBy")
+  createdCreativeMovies     CreativeMovie[]      @relation("CreativeMovieCreatedBy")
+  createdStartEndClips      CreativeStartEndClip[] @relation("CreativeStartEndClipCreatedBy")
+  createdUgcClips           CreativeUgcClip[]      @relation("CreativeUgcClipCreatedBy")
+  createdCalendarPosts      ContentCalendarPost[] @relation("ContentCalendarPostCreatedBy")
+
+  @@index([tenantId])
 }
 
 model ClientAccount {
@@ -261,11 +311,13 @@ model ClientAccount {
   email        String   @unique
   passwordHash String
   name         String
+  tenantId     String
   leadId       String?
   customerId   String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   lead                 Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
   customer             Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
   instagramConnections InstagramConnection[]
@@ -273,6 +325,7 @@ model ClientAccount {
 
   @@index([leadId])
   @@index([customerId])
+  @@index([tenantId])
 }
 
 model StudioLeadShare {
@@ -312,6 +365,7 @@ model StudioUserActivity {
 model Invite {
   id         String   @id @default(cuid())
   token      String   @unique
+  tenantId   String
   leadId     String?
   customerId String?
   phone      String?
@@ -320,11 +374,13 @@ model Invite {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@index([customerId])
+  @@index([tenantId])
 }
 
 model InstagramConnection {
@@ -389,22 +445,35 @@ model LeadImage {
 }
 
 model Package {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  summary     String?
+  description String?
+  price       Float?
+  promoPrice  Float?
+  currency    String   @default("BRL")
+  benefits    Json?
+  status      String   @default("draft")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  images PackageImage[]
+
+  @@index([tenantId])
+}
+
+model OfferTemplate {
   id              String   @id @default(cuid())
-  name            String
-  summary         String?
-  description     String?
-  price           Float?
-  currency        String   @default("BRL")
-  benefits        Json?
-  whatsappMessage String?
-  emailSubject    String?
-  emailBody       String?
-  status          String   @default("draft")
-  sortOrder       Int      @default(0)
-  createdAt       DateTime @default(now())
+  tenantId        String   @unique
+  emailSubject    String
+  emailBody       String
+  whatsappMessage String
   updatedAt       DateTime @updatedAt
 
-  images PackageImage[]
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 }
 
 model PackageImage {
@@ -423,12 +492,20 @@ model PackageImage {
 }
 
 model AppSetting {
-  key   String @id
-  value String
+  id       String @id @default(cuid())
+  tenantId String
+  key      String
+  value    String
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
 }
 
 model InviteRequest {
   id        String   @id @default(cuid())
+  tenantId  String
   name      String
   email     String
   instagram String
@@ -436,5 +513,350 @@ model InviteRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
   @@index([email])
+  @@index([tenantId])
+}
+
+model CreativeCharacter {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  appearance      String
+  personality     String   @default("")
+  identityPrompt  String   @default("")
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy User?                    @relation("CreativeCharacterCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  assets     CreativeCharacterAsset[]
+  movieShots CreativeMovieShot[]
+  movieCast  CreativeMovieShotCast[]
+  ugcClips   CreativeUgcClip[]
+
+  @@index([createdByUserId])
+  @@index([updatedAt])
+  @@index([tenantId])
+}
+
+model CreativeCharacterAsset {
+  id          String   @id @default(cuid())
+  characterId String
+  kind        String
+  localPath   String
+  filename    String
+  mimeType    String?
+  createdAt   DateTime @default(now())
+
+  character CreativeCharacter @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([characterId, createdAt])
+  @@index([kind])
+}
+
+model CreativeMovie {
+  id              String   @id @default(cuid())
+  tenantId        String
+  title           String
+  aspectRatio     String   @default("16:9")
+  duration        String   @default("8s")
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy User?               @relation("CreativeMovieCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  shots     CreativeMovieShot[]
+
+  @@index([createdByUserId])
+  @@index([updatedAt])
+  @@index([tenantId])
+}
+
+model CreativeMovieShot {
+  id          String   @id @default(cuid())
+  movieId     String
+  characterId String
+  sortOrder   Int      @default(0)
+  scene       String
+  action      String
+  dialogue    String   @default("")
+  status      String   @default("draft")
+  error       String   @default("")
+  localPath   String   @default("")
+  filename    String   @default("")
+  mimeType    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  movie     CreativeMovie          @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  character CreativeCharacter      @relation(fields: [characterId], references: [id], onDelete: Restrict)
+  cast      CreativeMovieShotCast[]
+
+  @@index([movieId, sortOrder])
+  @@index([characterId])
+}
+
+model CreativeMovieShotCast {
+  shotId      String
+  characterId String
+  sortOrder   Int    @default(0)
+
+  shot      CreativeMovieShot @relation(fields: [shotId], references: [id], onDelete: Cascade)
+  character CreativeCharacter @relation(fields: [characterId], references: [id], onDelete: Restrict)
+
+  @@id([shotId, characterId])
+  @@index([characterId])
+  @@index([shotId, sortOrder])
+}
+
+model CreativeStartEndClip {
+  id              String   @id @default(cuid())
+  tenantId        String
+  prompt          String   @default("")
+  duration        String   @default("5s")
+  aspectRatio     String   @default("16:9")
+  resolution      String   @default("720p")
+  status          String   @default("draft")
+  error           String   @default("")
+  firstFramePath  String   @default("")
+  firstFrameName  String   @default("")
+  firstFrameMime  String?
+  lastFramePath   String   @default("")
+  lastFrameName   String   @default("")
+  lastFrameMime   String?
+  localPath       String   @default("")
+  filename        String   @default("")
+  mimeType        String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy User? @relation("CreativeStartEndClipCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId])
+  @@index([updatedAt])
+  @@index([tenantId])
+}
+
+model CreativeUgcClip {
+  id              String   @id @default(cuid())
+  tenantId        String
+  characterId     String
+  prompt          String   @default("")
+  duration        String   @default("8s")
+  aspectRatio     String   @default("9:16")
+  resolution      String   @default("720p")
+  status          String   @default("draft")
+  error           String   @default("")
+  firstFramePath  String   @default("")
+  firstFrameName  String   @default("")
+  firstFrameMime  String?
+  productPath     String   @default("")
+  productName     String   @default("")
+  productMime     String?
+  localPath       String   @default("")
+  filename        String   @default("")
+  mimeType        String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  character CreativeCharacter @relation(fields: [characterId], references: [id], onDelete: Restrict)
+  createdBy User?             @relation("CreativeUgcClipCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId])
+  @@index([characterId])
+  @@index([updatedAt])
+  @@index([tenantId])
+}
+
+model ImageProject {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  createdByUserId String?
+  settings        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy User?          @relation("ImageProjectCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  messages  ImageMessage[]
+  assets    ImageAsset[]
+
+  @@index([createdByUserId])
+  @@index([updatedAt])
+  @@index([tenantId])
+}
+
+model ImageMessage {
+  id          String   @id @default(cuid())
+  projectId   String
+  role        String
+  kind        String   @default("generation")
+  status      String?
+  text        String?
+  thoughts    String?
+  model       String?
+  settings    Json?
+  usage       Json?
+  toolName    String?
+  toolPayload Json?
+  createdAt   DateTime @default(now())
+
+  project ImageProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets  ImageAsset[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, kind])
+}
+
+model ImageAsset {
+  id        String   @id @default(cuid())
+  projectId String
+  messageId String?
+  kind      String
+  localPath String
+  filename  String
+  mimeType  String?
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  project ImageProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  message ImageMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([messageId])
+  @@index([kind])
+}
+
+model VideoProject {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  createdByUserId String?
+  settings        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy User?          @relation("VideoProjectCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  messages  VideoMessage[]
+  assets    VideoAsset[]
+
+  @@index([createdByUserId])
+  @@index([updatedAt])
+  @@index([tenantId])
+}
+
+model VideoMessage {
+  id                    String   @id @default(cuid())
+  projectId             String
+  role                  String
+  kind                  String   @default("generation")
+  status                String?
+  text                  String?
+  thoughts              String?
+  model                 String?
+  settings              Json?
+  usage                 Json?
+  toolName              String?
+  toolPayload           Json?
+  providerInteractionId String?
+  createdAt             DateTime @default(now())
+
+  project VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets  VideoAsset[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, kind])
+}
+
+model VideoAsset {
+  id        String   @id @default(cuid())
+  projectId String
+  messageId String?
+  kind      String
+  localPath String
+  filename  String
+  mimeType  String?
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  project VideoProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  message VideoMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([messageId])
+  @@index([kind])
+}
+
+model ContentCalendarPost {
+  id              String   @id @default(cuid())
+  tenantId        String
+  title           String
+  caption         String   @default("")
+  scheduledAt     DateTime
+  status          String   @default("draft")
+  leadId          String?
+  customerId      String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lead      Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  createdBy User?     @relation("ContentCalendarPostCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  targets   ContentCalendarTarget[]
+  assets    ContentCalendarAsset[]
+
+  @@index([scheduledAt, status])
+  @@index([status])
+  @@index([leadId])
+  @@index([customerId])
+  @@index([createdByUserId])
+  @@index([tenantId])
+}
+
+model ContentCalendarTarget {
+  id          String    @id @default(cuid())
+  postId      String
+  platform    String
+  status      String    @default("pending")
+  error       String    @default("")
+  externalId  String    @default("")
+  permalink   String    @default("")
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  post ContentCalendarPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, platform])
+  @@index([status])
+}
+
+model ContentCalendarAsset {
+  id        String   @id @default(cuid())
+  postId    String
+  kind      String
+  localPath String
+  filename  String
+  mimeType  String?
+  source    String   @default("upload")
+  sourceId  String   @default("")
+  createdAt DateTime @default(now())
+
+  post ContentCalendarPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
 }

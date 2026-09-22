@@ -6,11 +6,29 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Lead Discovery Enrichment</title>
+    <meta name="theme-color" content="#050505" />
+    <title>Namão Studio</title>
+    <script>
+      try {
+        var theme = localStorage.getItem("namao_studio_theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.setAttribute("data-theme", theme);
+          document.documentElement.style.colorScheme = theme;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute(
+              "content",
+              theme === "light" ? "#f4f4f2" : "#050505",
+            );
+          }
+        }
+      } catch (e) {}
+    </script>
+    <link rel="icon" href="/logo-mark.png" type="image/png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Figtree:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -19,66 +37,102 @@
     <header class="topbar">
       <div class="topbar-inner">
         <a href="/leads" class="brand-link">
+          <img
+            class="brand-logo"
+            src="/logo-mark.png"
+            alt=""
+            width="40"
+            height="40"
+            decoding="async"
+          />
           <h1 class="brand">
-            <span class="brand-short">LDE</span>
-            <span class="brand-full">Lead Discovery Enrichment</span>
+            <span class="brand-short">Namão</span>
+            <span class="brand-full">Namão Studio</span>
           </h1>
         </a>
-        <nav class="nav-tabs" aria-label="Seções">
-          <a href="/leads" data-route="leads" class="active">Leads</a>
-          <a href="/customers" data-route="customers">Customers</a>
-          <a href="/discovery" data-route="discovery">Discovery</a>
-          <a href="/enrichment" data-route="enrichment">Enrichment</a>
-          <a href="/packages" data-route="packages">Pacotes</a>
-          <a href="/ui-lib" data-route="ui-lib">UI Lib</a>
-          <a href="/config" data-route="config">Config</a>
-          <a href="/users" data-route="users" data-admin-only hidden>Usuários</a>
-        </nav>
-        <button type="button" class="topbar-logout" id="studio-logout-btn">
-          Sair
-        </button>
+        <div class="topbar-actions">
+          <button
+            type="button"
+            class="topbar-theme"
+            id="studio-theme-btn"
+            aria-pressed="false"
+            aria-label="Ativar tema claro"
+          >
+            Claro
+          </button>
+          <button type="button" class="topbar-logout" id="studio-logout-btn">
+            Sair
+          </button>
+        </div>
       </div>
     </header>
 
     <aside class="app-sidebar" aria-label="Navegação">
       <nav class="side-nav">
-        <a href="/leads" data-route="leads" class="active">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          Leads
-        </a>
-        <a href="/customers" data-route="customers">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20.5v-8.2M12 20.5v-12M17 20.5V8.3M4.5 20.5h15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M7 12.3c1.4-1.6 3.2-2.6 5-2.6s3.6 1 5 2.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          Customers
-        </a>
-        <a href="/discovery" data-route="discovery">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 16.5 20 20.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          Discovery
-        </a>
-        <a href="/enrichment" data-route="enrichment">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v17M5.5 9.5 12 3.5l6.5 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Enrichment
-        </a>
-        <a href="/packages" data-route="packages">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 8.2 12 4.5l7.5 3.7v7.6L12 19.5l-7.5-3.7V8.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 12.2V19.5M4.5 8.2 12 12.2l7.5-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Pacotes
-        </a>
-        <a href="/ui-lib" data-route="ui-lib">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
-          UI Library
-        </a>
-        <a href="/config" data-route="config">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 4.5v1.8M12 17.7V19.5M4.5 12h1.8M17.7 12H19.5M6.4 6.4l1.3 1.3M16.3 16.3l1.3 1.3M17.6 6.4l-1.3 1.3M7.7 16.3l-1.3 1.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          Configurações
-        </a>
-        <a href="/users" data-route="users" data-admin-only hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c.6-3 2.6-4.7 5-4.7s4.4 1.7 5 4.7M16.2 8.2a2.4 2.4 0 1 1 0 4.2M19.5 19.2c-.4-2.2-1.7-3.5-3.4-3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          Usuários
-        </a>
+        <div class="side-nav-group" data-tenant-chrome aria-labelledby="nav-label-captar">
+          <p class="side-nav-label" id="nav-label-captar">Captar</p>
+          <div class="side-nav-items">
+            <a href="/discovery" data-route="discovery">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 16.5 20 20.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Descobrir
+            </a>
+            <a href="/enrichment" data-route="enrichment">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v17M5.5 9.5 12 3.5l6.5 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Enriquecer
+            </a>
+          </div>
+        </div>
+        <div class="side-nav-group" data-tenant-chrome aria-labelledby="nav-label-carteira">
+          <p class="side-nav-label" id="nav-label-carteira">Carteira</p>
+          <div class="side-nav-items">
+            <a href="/leads" data-route="leads" class="active">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Leads
+            </a>
+            <a href="/customers" data-route="customers">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20.5v-8.2M12 20.5v-12M17 20.5V8.3M4.5 20.5h15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M7 12.3c1.4-1.6 3.2-2.6 5-2.6s3.6 1 5 2.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Clientes
+            </a>
+          </div>
+        </div>
+        <div class="side-nav-group" data-tenant-chrome aria-labelledby="nav-label-producao">
+          <p class="side-nav-label" id="nav-label-producao">Produção</p>
+          <div class="side-nav-items">
+            <a href="/criativo" data-route="criativo" data-feature="creative" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5 14.2 4.8M9.2 19.5 18.5 4.8M4.5 14.8h15M4.5 9.2h15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Criativo
+            </a>
+            <a href="/packages" data-route="packages">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 8.2 12 4.5l7.5 3.7v7.6L12 19.5l-7.5-3.7V8.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 12.2V19.5M4.5 8.2 12 12.2l7.5-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Pacotes
+            </a>
+            <a href="/calendario" data-route="calendar">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 4v3.5M16 4v3.5M4 10.5h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M8.5 14h.01M12 14h.01M15.5 14h.01M8.5 17h.01M12 17h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+              Calendário
+            </a>
+          </div>
+        </div>
+        <div class="side-nav-group side-nav-group--end">
+          <div class="side-nav-items">
+            <a href="/users" data-route="users" data-admin-only data-tenant-chrome hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c.6-3 2.6-4.7 5-4.7s4.4 1.7 5 4.7M16.2 8.2a2.4 2.4 0 1 1 0 4.2M19.5 19.2c-.4-2.2-1.7-3.5-3.4-3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Equipe
+            </a>
+            <a href="/config" data-route="config" data-tenant-chrome>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 4.5v1.8M12 17.7V19.5M4.5 12h1.8M17.7 12H19.5M6.4 6.4l1.3 1.3M16.3 16.3l1.3 1.3M17.6 6.4l-1.3 1.3M7.7 16.3l-1.3 1.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Configurações
+            </a>
+            <a href="/ui-lib" data-route="ui-lib" data-admin-only data-tenant-chrome hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+              Componentes
+            </a>
+          </div>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <div class="sidebar-card">
           <strong id="studio-user-name">Studio</strong>
-          <p id="studio-user-role">Sessão autenticada via JWT.</p>
+          <p id="studio-user-role">Operador</p>
         </div>
       </div>
     </aside>
@@ -107,7 +161,7 @@
             <select id="leads-origin-filter">
               <option value="">Todas</option>
               <option value="signup">Cadastro Namão</option>
-              <option value="discovery">Discovery</option>
+              <option value="discovery">Descobrir</option>
             </select>
           </label>
           <button type="button" class="secondary" id="refresh-leads-btn">
@@ -119,7 +173,7 @@
       </section>
 
       <section id="tab-customers" class="tab-panel">
-        <h2>Customers</h2>
+        <h2>Clientes</h2>
         <div class="leads-toolbar">
           <label class="leads-search">
             Buscar por nome
@@ -145,7 +199,7 @@
       </section>
 
       <section id="tab-discovery" class="tab-panel">
-        <h2>Discovery</h2>
+        <h2>Descobrir</h2>
         <form id="discovery-form" autocomplete="off">
           <label class="field-combo">
             Cidade
@@ -274,7 +328,7 @@
       </section>
 
       <section id="tab-enrichment" class="tab-panel">
-        <h2>Enrichment</h2>
+        <h2>Enriquecer</h2>
         <form id="enrich-form" autocomplete="off">
           <label>
             Nome
@@ -323,14 +377,85 @@
           <div>
             <h2>Pacotes</h2>
             <p class="prompt-hint">
-              Pacotes de venda da agência. Cadastre ofertas, benefícios e mídias
-              para usar depois em WhatsApp e e-mail com leads.
+              Pacotes de venda da agência. Cadastre a oferta aqui; o texto de
+              e-mail e WhatsApp fica no template abaixo e usa o pacote no envio.
             </p>
           </div>
           <button type="button" id="packages-new-btn">Novo pacote</button>
         </div>
         <div class="status" id="packages-status"></div>
         <ul class="results" id="packages-list"></ul>
+
+        <section class="app-card package-offer-template" id="package-offer-template">
+          <h3>Template da proposta</h3>
+          <p class="prompt-hint">
+            Um texto para todos os pacotes. No envio você escolhe o pacote e
+            vê o preview. Placeholders:
+            <code>{{lead.name}}</code>,
+            <code>{{package.name}}</code>,
+            <code>{{package.summary}}</code>,
+            <code>{{package.description}}</code>,
+            <code>{{package.benefits}}</code>,
+            <code>{{package.price}}</code>,
+            <code>{{package.promoPrice}}</code>,
+            <code>{{package.priceLine}}</code>.
+          </p>
+          <form id="package-offer-form" class="package-form">
+            <div class="package-form-grid">
+              <label class="package-form-span">
+                Assunto do e-mail
+                <input name="emailSubject" maxlength="300" required />
+              </label>
+              <label class="package-form-span">
+                Corpo do e-mail
+                <textarea name="emailBody" rows="8" required></textarea>
+              </label>
+              <label class="package-form-span">
+                Mensagem WhatsApp
+                <textarea name="whatsappMessage" rows="8" required></textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="submit" id="package-offer-save-btn">Salvar template</button>
+            </div>
+          </form>
+          <p class="status" id="package-offer-status"></p>
+        </section>
+      </section>
+
+      <section id="tab-calendar" class="tab-panel">
+        <div class="cal-header">
+          <div>
+            <h2>Calendário</h2>
+            <p class="prompt-hint">
+              Planeje posts para Instagram, YouTube e TikTok. O Instagram
+              publica sozinho se o cliente autorizou o Graph; as outras redes
+              abrem o app na hora.
+            </p>
+          </div>
+          <button type="button" id="cal-new-btn">Novo post</button>
+        </div>
+        <div class="status" id="cal-status"></div>
+        <p class="cal-automation" id="cal-automation"></p>
+        <div class="cal-layout">
+          <div class="cal-month-wrap">
+            <div class="cal-month-bar">
+              <button type="button" id="cal-prev-btn" aria-label="Mês anterior">
+                ←
+              </button>
+              <h3 id="cal-month-label">Mês</h3>
+              <button type="button" id="cal-next-btn" aria-label="Próximo mês">
+                →
+              </button>
+            </div>
+            <div class="cal-weekdays" aria-hidden="true">
+              <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span>
+              <span>Sex</span><span>Sáb</span><span>Dom</span>
+            </div>
+            <div class="cal-grid" id="cal-grid"></div>
+          </div>
+          <aside class="cal-side" id="cal-side"></aside>
+        </div>
       </section>
 
       <section id="tab-package-detail" class="tab-panel">
@@ -370,12 +495,12 @@
               <input name="price" type="number" min="0" step="0.01" placeholder="0,00" />
             </label>
             <label>
-              Moeda
-              <input name="currency" maxlength="8" value="BRL" />
+              Preço promocional
+              <input name="promoPrice" type="number" min="0" step="0.01" placeholder="Opcional" />
             </label>
             <label>
-              Ordem
-              <input name="sortOrder" type="number" step="1" value="0" />
+              Moeda
+              <input name="currency" maxlength="8" value="BRL" />
             </label>
             <label class="package-form-span">
               Resumo
@@ -392,22 +517,6 @@
                 rows="4"
                 placeholder="Um benefício por linha"
               ></textarea>
-            </label>
-            <label class="package-form-span">
-              Mensagem WhatsApp
-              <textarea
-                name="whatsappMessage"
-                rows="3"
-                placeholder="Template pronto para enviar no WhatsApp"
-              ></textarea>
-            </label>
-            <label class="package-form-span">
-              Assunto do e-mail
-              <input name="emailSubject" maxlength="300" />
-            </label>
-            <label class="package-form-span">
-              Corpo do e-mail
-              <textarea name="emailBody" rows="4" placeholder="Template do e-mail promocional"></textarea>
             </label>
           </div>
           <div class="actions">
@@ -441,8 +550,473 @@
         </section>
       </section>
 
+      <section id="tab-imagens" class="tab-panel">
+        <div class="packages-header">
+          <div>
+            <a href="/criativo" class="imagens-studio-back">Studio Criativo</a>
+            <h2>Imagem livre</h2>
+            <p class="prompt-hint">
+              Playground de geração de imagem do Studio Criativo. Crie um
+              projeto e use Nano Banana Pro ou outros modelos.
+            </p>
+          </div>
+          <button type="button" id="imagens-new-btn">Novo projeto</button>
+        </div>
+        <div class="status" id="imagens-status"></div>
+        <ul class="results" id="imagens-list"></ul>
+      </section>
+
+      <section id="tab-imagens-studio" class="tab-panel imagens-studio">
+        <header class="imagens-studio-top">
+          <nav class="imagens-studio-kinds" id="imagens-studio-kinds" aria-label="Modalidade"></nav>
+          <input
+            id="imagens-project-name"
+            class="imagens-studio-title"
+            maxlength="200"
+            aria-label="Nome da conversa"
+            placeholder="Nova conversa"
+          />
+          <p class="status imagens-studio-top-status" id="imagens-studio-status"></p>
+          <button type="button" class="imagens-studio-icon-btn" id="imagens-settings-toggle" aria-expanded="false">
+            Settings
+          </button>
+          <button type="button" class="danger imagens-studio-delete" id="imagens-project-delete">
+            Excluir
+          </button>
+        </header>
+        <div class="imagens-studio-body">
+          <nav class="imagens-studio-rail" aria-label="Conversas">
+            <div class="imagens-studio-skills" id="imagens-studio-skills"></div>
+            <input
+              type="search"
+              id="imagens-conversation-search"
+              class="imagens-conversation-search"
+              placeholder="Buscar conversas"
+            />
+            <button type="button" id="imagens-new-conversation">Nova conversa</button>
+            <ul class="imagens-conversation-list" id="imagens-conversation-list"></ul>
+          </nav>
+
+          <div
+            class="imagens-studio-center imagens-chat"
+            data-imagens-pane="playground"
+            id="imagens-chat-pane"
+          >
+            <div class="imagens-thread" id="imagens-thread"></div>
+            <form class="imagens-composer imagens-composer--chat" id="imagens-composer">
+              <div class="imagens-composer-refs" id="imagens-composer-refs"></div>
+              <textarea
+                id="imagens-prompt"
+                rows="1"
+                placeholder="Pergunte qualquer coisa"
+              ></textarea>
+              <p class="imagens-composer-footnote">
+                Enter envia · Shift+Enter quebra linha · Arraste ou cole uma imagem
+              </p>
+            </form>
+            <p class="imagens-drop-overlay" id="imagens-drop-overlay" aria-hidden="true">
+              Solte a imagem para anexar
+            </p>
+          </div>
+
+          <div class="imagens-studio-center" data-imagens-pane="skill" hidden>
+            <div class="imagens-skill-form" id="imagens-skill-form"></div>
+            <p class="status" id="imagens-skill-status"></p>
+          </div>
+
+          <div class="imagens-studio-center" data-imagens-pane="history" hidden>
+            <ul class="imagens-history-list" id="imagens-history-list"></ul>
+            <p class="imagens-empty" id="imagens-history-empty">
+              Nenhuma geração ainda.
+            </p>
+          </div>
+
+          <div class="imagens-studio-center" data-imagens-pane="gallery" hidden>
+            <ul class="imagens-gallery-grid" id="imagens-gallery-grid"></ul>
+            <p class="imagens-empty" id="imagens-gallery-empty">
+              Nenhuma imagem na library ainda.
+            </p>
+          </div>
+
+          <aside class="imagens-studio-settings" id="imagens-settings" aria-label="Settings">
+            <div
+              class="imagens-studio-settings-switch"
+              role="tablist"
+              aria-label="Settings"
+            >
+              <button
+                type="button"
+                class="active"
+                role="tab"
+                id="imagens-settings-tab-run"
+                data-settings-tab="run"
+                aria-selected="true"
+                aria-controls="imagens-settings-run"
+              >
+                Run settings
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="imagens-settings-tab-llm"
+                data-settings-tab="llm"
+                aria-selected="false"
+                aria-controls="imagens-settings-llm"
+              >
+                LLM settings
+              </button>
+            </div>
+            <div
+              class="imagens-studio-settings-pane"
+              id="imagens-settings-run"
+              data-settings-pane="run"
+              role="tabpanel"
+              aria-labelledby="imagens-settings-tab-run"
+            >
+              <label>
+                Model
+                <select id="imagens-model"></select>
+              </label>
+              <p class="imagens-model-desc" id="imagens-model-desc"></p>
+              <label>
+                Aspect ratio
+                <select id="imagens-aspect"></select>
+              </label>
+              <label>
+                Resolution
+                <select id="imagens-resolution"></select>
+              </label>
+              <label id="imagens-person-generation-wrap">
+                Person generation
+                <select id="imagens-person-generation"></select>
+              </label>
+              <label id="imagens-thinking-wrap">
+                Thinking level
+                <select id="imagens-thinking"></select>
+              </label>
+              <label class="imagens-toggle" id="imagens-include-thoughts-wrap">
+                <span>Show thinking</span>
+                <input type="checkbox" id="imagens-include-thoughts" />
+              </label>
+              <div class="imagens-tools">
+                <p>Tools</p>
+                <label class="imagens-toggle">
+                  <span>Google Search</span>
+                  <input type="checkbox" id="imagens-google-search" />
+                </label>
+                <label class="imagens-toggle" id="imagens-image-search-wrap">
+                  <span>Google Image Search</span>
+                  <input type="checkbox" id="imagens-image-search" />
+                </label>
+              </div>
+            </div>
+            <div
+              class="imagens-studio-settings-pane"
+              id="imagens-settings-llm"
+              data-settings-pane="llm"
+              role="tabpanel"
+              aria-labelledby="imagens-settings-tab-llm"
+              hidden
+            >
+              <p class="imagens-model-desc">
+                Modelo do chat da conversa. A geração de imagem usa as Run
+                settings.
+              </p>
+              <label>
+                Chat model
+                <select id="imagens-llm-model" aria-label="Modelo do chat"></select>
+              </label>
+              <p class="config-model-tags" id="imagens-llm-tags" hidden></p>
+              <input
+                id="imagens-llm-model-custom"
+                type="text"
+                hidden
+                placeholder="modelo personalizado"
+                autocomplete="off"
+                aria-label="Modelo personalizado do chat"
+              />
+              <label>
+                System instructions
+                <textarea
+                  id="imagens-system"
+                  rows="4"
+                  placeholder="Optional tone and style instructions for the model"
+                ></textarea>
+              </label>
+              <label class="imagens-slider-label">
+                <span>Temperature</span>
+                <span id="imagens-temperature-value">1</span>
+              </label>
+              <input
+                id="imagens-temperature"
+                type="range"
+                min="0"
+                max="2"
+                step="0.05"
+                value="1"
+              />
+              <p class="status" id="imagens-llm-status"></p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="tab-videos" class="tab-panel">
+        <div class="packages-header">
+          <div>
+            <a href="/criativo/video" class="imagens-studio-back">Studio Criativo</a>
+            <h2>Vídeo livre</h2>
+            <p class="prompt-hint">
+              Playground de geração de vídeo com Gemini Omni 1.1 Flash. Use
+              imagens do Studio Criativo como quadro inicial.
+            </p>
+          </div>
+          <button type="button" id="videos-new-btn">Novo projeto</button>
+        </div>
+        <div class="status" id="videos-status"></div>
+        <ul class="results" id="videos-list"></ul>
+      </section>
+
+      <section id="tab-videos-studio" class="tab-panel imagens-studio">
+        <header class="imagens-studio-top">
+          <nav class="imagens-studio-kinds" id="videos-studio-kinds" aria-label="Modalidade"></nav>
+          <input
+            id="videos-project-name"
+            class="imagens-studio-title"
+            maxlength="200"
+            aria-label="Nome da conversa"
+            placeholder="Nova conversa"
+          />
+          <p class="status imagens-studio-top-status" id="videos-studio-status"></p>
+          <button type="button" class="imagens-studio-icon-btn" id="videos-settings-toggle" aria-expanded="false">
+            Settings
+          </button>
+          <button type="button" class="danger imagens-studio-delete" id="videos-project-delete">
+            Excluir
+          </button>
+        </header>
+        <div class="imagens-studio-body">
+          <nav class="imagens-studio-rail" aria-label="Conversas">
+            <div class="imagens-studio-skills" id="videos-studio-skills"></div>
+            <button type="button" id="videos-new-conversation">Nova conversa</button>
+            <input
+              type="search"
+              id="videos-conversation-search"
+              class="imagens-conversation-search"
+              placeholder="Buscar conversas"
+            />
+            <ul class="imagens-conversation-list" id="videos-conversation-list"></ul>
+          </nav>
+
+          <div class="imagens-studio-center" data-videos-pane="playground">
+            <div class="imagens-thread" id="videos-thread"></div>
+            <form class="imagens-composer" id="videos-composer">
+              <div class="imagens-composer-refs" id="videos-composer-refs"></div>
+              <textarea
+                id="videos-prompt"
+                rows="2"
+                placeholder="Pergunte ou descreva o vídeo. A geração só sai depois da confirmação."
+              ></textarea>
+              <div class="imagens-composer-bar">
+                <button type="button" class="videos-text-btn" id="videos-pick-first">
+                  Usar imagem
+                </button>
+                <button type="button" class="videos-text-btn" id="videos-pick-last">
+                  Quadro final
+                </button>
+                <label class="imagens-attach">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    id="videos-frame-input"
+                  />
+                  Enviar
+                </label>
+                <span class="imagens-composer-hint" id="videos-model-chip">Gemini Omni 1.1 Flash</span>
+                <button type="submit" id="videos-run-btn">Enviar</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="imagens-studio-center" data-videos-pane="skill" hidden>
+            <div class="imagens-skill-form" id="videos-skill-form"></div>
+            <p class="status" id="videos-skill-status"></p>
+          </div>
+
+          <div class="imagens-studio-center" data-videos-pane="history" hidden>
+            <ul class="imagens-history-list" id="videos-history-list"></ul>
+            <p class="imagens-empty" id="videos-history-empty">
+              Nenhuma geração ainda. Use o Playground para começar.
+            </p>
+          </div>
+
+          <div class="imagens-studio-center" data-videos-pane="gallery" hidden>
+            <ul class="imagens-gallery-grid" id="videos-gallery-grid"></ul>
+            <p class="imagens-empty" id="videos-gallery-empty">
+              Nenhum vídeo na library ainda.
+            </p>
+          </div>
+
+          <aside class="imagens-studio-settings" id="videos-settings" aria-label="Settings">
+            <div
+              class="imagens-studio-settings-switch"
+              role="tablist"
+              aria-label="Settings"
+            >
+              <button
+                type="button"
+                class="active"
+                role="tab"
+                id="videos-settings-tab-run"
+                data-settings-tab="run"
+                aria-selected="true"
+                aria-controls="videos-settings-run"
+              >
+                Run settings
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="videos-settings-tab-llm"
+                data-settings-tab="llm"
+                aria-selected="false"
+                aria-controls="videos-settings-llm"
+              >
+                LLM settings
+              </button>
+            </div>
+            <div
+              class="imagens-studio-settings-pane"
+              id="videos-settings-run"
+              data-settings-pane="run"
+              role="tabpanel"
+              aria-labelledby="videos-settings-tab-run"
+            >
+              <label>
+                Model
+                <select id="videos-model"></select>
+              </label>
+              <p class="imagens-model-desc" id="videos-model-desc"></p>
+              <label>
+                Aspect ratio
+                <select id="videos-aspect"></select>
+              </label>
+              <label>
+                Video duration
+                <select id="videos-duration"></select>
+              </label>
+              <label>
+                Resolution
+                <select id="videos-resolution"></select>
+              </label>
+              <label id="videos-thinking-wrap">
+                Thinking level
+                <select id="videos-thinking"></select>
+              </label>
+              <p class="videos-run-cost" id="videos-run-cost"></p>
+              <p class="videos-run-cost-note" id="videos-run-cost-note" hidden></p>
+            </div>
+            <div
+              class="imagens-studio-settings-pane"
+              id="videos-settings-llm"
+              data-settings-pane="llm"
+              role="tabpanel"
+              aria-labelledby="videos-settings-tab-llm"
+              hidden
+            >
+              <p class="imagens-model-desc">
+                Modelo do chat da conversa. A geração de vídeo usa as Run
+                settings.
+              </p>
+              <label>
+                Chat model
+                <select id="videos-llm-model" aria-label="Modelo do chat"></select>
+              </label>
+              <p class="config-model-tags" id="videos-llm-tags" hidden></p>
+              <input
+                id="videos-llm-model-custom"
+                type="text"
+                hidden
+                placeholder="modelo personalizado"
+                autocomplete="off"
+                aria-label="Modelo personalizado do chat"
+              />
+              <p class="status" id="videos-llm-status"></p>
+            </div>
+          </aside>
+        </div>
+        <div id="videos-image-picker" class="videos-picker" hidden>
+          <div class="videos-picker-dialog" role="dialog" aria-labelledby="videos-picker-title">
+            <header>
+              <h3 id="videos-picker-title">Usar imagem do studio</h3>
+              <button type="button" id="videos-picker-close">Fechar</button>
+            </header>
+            <p class="status" id="videos-picker-status"></p>
+            <div id="videos-picker-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-criativo-gallery" class="tab-panel imagens-studio">
+        <header class="imagens-studio-top">
+          <nav class="imagens-studio-kinds" id="gallery-studio-kinds" aria-label="Modalidade"></nav>
+          <h2 class="imagens-studio-title" id="gallery-title">Galeria</h2>
+          <p class="status imagens-studio-top-status" id="gallery-status"></p>
+        </header>
+        <div class="criativo-gallery-body">
+          <div class="criativo-gallery-toolbar">
+            <div
+              class="imagens-studio-kinds"
+              id="gallery-type-switch"
+              role="group"
+              aria-label="Tipo de mídia"
+            ></div>
+            <div
+              class="imagens-studio-kinds"
+              id="gallery-group-switch"
+              role="group"
+              aria-label="Organizar"
+            ></div>
+            <input
+              type="search"
+              id="gallery-search"
+              class="criativo-gallery-search"
+              placeholder="Buscar conversa"
+              aria-label="Buscar conversa"
+            />
+          </div>
+          <div class="criativo-gallery-scroll">
+            <div id="gallery-groups"></div>
+            <p class="imagens-empty" id="gallery-empty" hidden>
+              Nenhuma mídia gerada ainda.
+            </p>
+          </div>
+        </div>
+        <div class="criativo-gallery-lightbox" id="gallery-lightbox" hidden>
+          <button
+            type="button"
+            class="criativo-gallery-lightbox-backdrop"
+            data-gallery-close
+            aria-label="Fechar"
+          ></button>
+          <div
+            class="criativo-gallery-lightbox-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gallery-lightbox-title"
+          >
+            <header>
+              <p id="gallery-lightbox-title"></p>
+              <button type="button" data-gallery-close>Fechar</button>
+            </header>
+            <div class="criativo-gallery-lightbox-media" id="gallery-lightbox-media"></div>
+            <div class="criativo-gallery-lightbox-actions" id="gallery-lightbox-actions"></div>
+          </div>
+        </div>
+      </section>
+
       <section id="tab-ui-lib" class="tab-panel">
-        <h2>UI Lib</h2>
+        <h2>Componentes</h2>
         <p class="prompt-hint">
           Escolha uma categoria no menu e um componente para ver o preview ao
           vivo. Abaixo, overlays vanilla que podem ser injetados na página
@@ -452,9 +1026,9 @@
       </section>
 
       <section id="tab-config" class="tab-panel">
-        <h2>Config</h2>
+        <h2>Configurações</h2>
         <p class="prompt-hint">
-          O LLM só entra na geração de landing. Discovery e Enrichment não usam
+          O LLM só entra na geração de landing. Descobrir e Enriquecer não usam
           IA. Escolha o modelo Gemini por papel — a chave fica só no
           <code>.env</code> (<code>GEMINI_API_KEY</code>). Abaixo, o status de
           cada variável de <code>services/platform/.env</code> (valores secretos
@@ -580,11 +1154,11 @@
       </section>
 
       <section id="tab-users" class="tab-panel">
-        <h2>Usuários do studio</h2>
+        <h2>Equipe</h2>
         <p class="prompt-hint">
           Só o admin convida operadores. A senha é gerada e enviada por e-mail.
-          Papel Admin se define depois na ficha da pessoa. Contas de clientes do
-          website não aparecem aqui.
+          Papel Admin e o acesso a Imagens e Vídeos se definem na ficha da
+          pessoa. Contas de clientes do website não aparecem aqui.
         </p>
         <p class="status" id="users-status">Carregando…</p>
         <form id="users-create-form" class="users-create app-card">
@@ -604,7 +1178,7 @@
       <section id="tab-user-detail" class="tab-panel">
         <p>
           <a href="/users" class="back-link" id="user-back-btn">
-            ← Voltar aos usuários
+            ← Voltar à equipe
           </a>
         </p>
         <div class="packages-header">
@@ -630,6 +1204,20 @@
               <option value="ADMIN">Admin</option>
             </select>
           </label>
+          <fieldset class="users-permissions">
+            <legend>Acesso</legend>
+            <p class="prompt-hint" id="user-permissions-hint">
+              Libere as abas que esta pessoa pode usar.
+            </p>
+            <label class="users-permission">
+              <input type="checkbox" id="user-permission-images" />
+              Imagens
+            </label>
+            <label class="users-permission">
+              <input type="checkbox" id="user-permission-videos" />
+              Vídeos
+            </label>
+          </fieldset>
         </div>
         <div class="app-card users-activity-card">
           <h3>Histórico de ações</h3>

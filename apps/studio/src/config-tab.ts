@@ -1,6 +1,14 @@
 import { api } from "./api";
-
-type LlmRole = "plan" | "code" | "vision" | "chat";
+import {
+  CUSTOM_VALUE,
+  GEMINI_CATALOG,
+  escapeAttr,
+  findChoice,
+  isRecommended,
+  tagsFor,
+  type LlmRole,
+  type ModelChoice,
+} from "./llm-catalog";
 
 type RoleConfig = {
   model: string;
@@ -46,31 +54,7 @@ type LlmConfigPayload = {
   env?: EnvStatusPayload;
 };
 
-type ModelChoice = {
-  id: string;
-  tags?: string[];
-  roles?: LlmRole[];
-};
-
 const ROLES: LlmRole[] = ["plan", "code", "vision", "chat"];
-const CUSTOM_VALUE = "__custom__";
-
-const GEMINI_CATALOG: ModelChoice[] = [
-  {
-    id: "gemini-2.5-flash",
-    tags: ["recomendado", "rápido", "visão"],
-  },
-  {
-    id: "gemini-2.5-pro",
-    tags: ["qualidade"],
-    roles: ["plan", "code", "chat"],
-  },
-  { id: "gemini-2.5-flash-lite", tags: ["barato", "rápido"] },
-  { id: "gemini-2.0-flash", tags: ["estável"] },
-  { id: "gemini-2.0-flash-lite", tags: ["barato"] },
-  { id: "gemini-1.5-flash" },
-  { id: "gemini-1.5-pro" },
-];
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -81,23 +65,6 @@ function el<T extends HTMLElement>(id: string): T {
 function setStatus(node: HTMLElement, message: string, isError = false) {
   node.textContent = message;
   node.classList.toggle("error", isError);
-}
-
-function isRecommended(choice: ModelChoice, role: LlmRole): boolean {
-  if (!choice.tags?.includes("recomendado")) return false;
-  return !choice.roles || choice.roles.includes(role);
-}
-
-function tagsFor(choice: ModelChoice | undefined, role: LlmRole): string[] {
-  if (!choice?.tags?.length) return [];
-  if (choice.roles && !choice.roles.includes(role)) {
-    return choice.tags.filter((tag) => tag !== "recomendado");
-  }
-  return choice.tags;
-}
-
-function findChoice(model: string): ModelChoice | undefined {
-  return GEMINI_CATALOG.find((item) => item.id === model);
 }
 
 export function initConfigTab(options?: { onSaved?: () => void }) {
@@ -336,15 +303,9 @@ export function initConfigTab(options?: { onSaved?: () => void }) {
     const route = (event as CustomEvent<{ name?: string }>).detail;
     if (route?.name === "config") void load();
   });
+  window.addEventListener("app:llm-saved", () => void load());
 
   void load();
-}
-
-function escapeAttr(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;");
 }
 
 function envCardHtml(

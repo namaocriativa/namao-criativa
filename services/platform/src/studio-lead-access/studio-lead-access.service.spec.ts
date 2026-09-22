@@ -12,6 +12,7 @@ function actor(
     email: `${id}@n.co`,
     name: id,
     role,
+    tenantId: 't1',
     leadId: null,
     customerId: null,
   };

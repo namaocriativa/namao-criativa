@@ -6,13 +6,64 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Entrar · Studio</title>
+    <meta name="theme-color" content="#050505" />
+    <title>Entrar · Namão Studio</title>
+    <script>
+      try {
+        var theme = localStorage.getItem("namao_studio_theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.setAttribute("data-theme", theme);
+          document.documentElement.style.colorScheme = theme;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute(
+              "content",
+              theme === "light" ? "#f4f4f2" : "#050505",
+            );
+          }
+        }
+      } catch (e) {}
+    </script>
+    <link rel="icon" href="/logo-mark.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Figtree:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body class="auth-screen">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a href="/login" class="brand-link">
+          <img
+            class="brand-logo"
+            src="/logo-mark.png"
+            alt=""
+            width="40"
+            height="40"
+            decoding="async"
+          />
+          <h1 class="brand">
+            <span class="brand-short">Namão</span>
+            <span class="brand-full">Namão Studio</span>
+          </h1>
+        </a>
+        <button
+          type="button"
+          class="topbar-theme"
+          id="studio-theme-btn"
+          aria-pressed="false"
+          aria-label="Ativar tema claro"
+        >
+          Claro
+        </button>
+      </div>
+    </header>
     <main class="auth-card">
-      <p class="auth-kicker">Studio interno</p>
+      <p class="auth-kicker">Acesso interno</p>
       <h1>Entrar</h1>
-      <p class="auth-hint">Acesso só para operadores e administradores.</p>
+      <p class="auth-hint">Só para operadores e administradores.</p>
       <form id="login-form">
         <label>
           E-mail
@@ -27,6 +78,15 @@
             minlength="8"
             autocomplete="current-password"
           />
+        </label>
+        <label class="auth-remember">
+          <input
+            type="checkbox"
+            id="login-remember"
+            name="rememberMe"
+            checked
+          />
+          Manter-me conectado
         </label>
         <button type="submit">Entrar</button>
       </form>

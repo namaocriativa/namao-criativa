@@ -35,7 +35,7 @@ export type Crawl4aiCrawlResult = {
   ok: boolean;
   pages: Crawl4aiPage[];
   error?: string;
-  via: 'docker' | 'python';
+  via: 'http' | 'python';
 };
 
 @Injectable()
@@ -45,9 +45,9 @@ export class Crawl4aiClient {
   constructor(private readonly config: ConfigService) {}
 
   async crawl(url: string, maxPages = 6): Promise<Crawl4aiCrawlResult | null> {
-    const dockerUrl = this.config.get<string>('CRAWL4AI_URL')?.trim();
-    if (dockerUrl) {
-      return this.crawlViaDocker(dockerUrl.replace(/\/$/, ''), url, maxPages);
+    const httpUrl = this.config.get<string>('CRAWL4AI_URL')?.trim();
+    if (httpUrl) {
+      return this.crawlViaHttp(httpUrl.replace(/\/$/, ''), url, maxPages);
     }
     return this.crawlViaPython(url, maxPages);
   }
@@ -56,18 +56,18 @@ export class Crawl4aiClient {
    * Fetches a single URL through the real browser and returns its raw HTML,
    * preserving external links. Useful for pages (e.g. search engines) that
    * block plain HTTP clients with anti-bot protections. Returns null when the
-   * Docker service isn't configured.
+   * HTTP API isn't configured.
    */
   async fetchPageHtml(url: string): Promise<string | null> {
-    const dockerUrl = this.config.get<string>('CRAWL4AI_URL')?.trim();
-    if (!dockerUrl) {
+    const httpUrl = this.config.get<string>('CRAWL4AI_URL')?.trim();
+    if (!httpUrl) {
       return null;
     }
 
     const token = this.config.get<string>('CRAWL4AI_API_TOKEN')?.trim();
     try {
       const { data } = await axios.post(
-        `${dockerUrl.replace(/\/$/, '')}/crawl`,
+        `${httpUrl.replace(/\/$/, '')}/crawl`,
         {
           urls: [url],
           browser_config: {
@@ -108,24 +108,24 @@ export class Crawl4aiClient {
     }
   }
 
-  private async crawlViaDocker(
+  private async crawlViaHttp(
     baseUrl: string,
     url: string,
     maxPages: number,
   ): Promise<Crawl4aiCrawlResult | null> {
     try {
-      const home = await this.dockerCrawl(baseUrl, [url]);
+      const home = await this.httpCrawl(baseUrl, [url]);
       const homepage = home[0];
       if (!homepage?.success && !homepage?.html) {
         this.logger.warn(
-          `Crawl4AI Docker failed for ${url}: ${homepage?.error ?? 'sem HTML'}`,
+          `Crawl4AI HTTP failed for ${url}: ${homepage?.error ?? 'sem HTML'}`,
         );
         return null;
       }
 
       const extra = this.pickRelevantLinks(homepage, url, Math.max(0, maxPages - 1));
       const extraPages =
-        extra.length > 0 ? await this.dockerCrawl(baseUrl, extra) : [];
+        extra.length > 0 ? await this.httpCrawl(baseUrl, extra) : [];
 
       const pages = [homepage, ...extraPages].filter(
         (page) => page.html || page.markdown,
@@ -133,16 +133,16 @@ export class Crawl4aiClient {
       if (!pages.length) {
         return null;
       }
-      return { ok: true, pages, via: 'docker' };
+      return { ok: true, pages, via: 'http' };
     } catch (error) {
       this.logger.warn(
-        `Crawl4AI Docker indisponível: ${(error as Error).message}`,
+        `Crawl4AI HTTP indisponível: ${(error as Error).message}`,
       );
       return null;
     }
   }
 
-  private async dockerCrawl(
+  private async httpCrawl(
     baseUrl: string,
     urls: string[],
   ): Promise<Crawl4aiPage[]> {
@@ -183,11 +183,11 @@ export class Crawl4aiClient {
         ? data
         : [];
     return rawResults.map((item: Record<string, unknown>) =>
-      this.normalizeDockerPage(item),
+      this.normalizeHttpPage(item),
     );
   }
 
-  private normalizeDockerPage(item: Record<string, unknown>): Crawl4aiPage {
+  private normalizeHttpPage(item: Record<string, unknown>): Crawl4aiPage {
     const markdown = item.markdown;
     let rawMd: string | null = null;
     let fitMd: string | null = null;

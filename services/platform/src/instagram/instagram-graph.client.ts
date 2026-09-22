@@ -2,12 +2,25 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
+export const INSTAGRAM_OAUTH_SCOPES = [
+  'instagram_basic',
+  'pages_show_list',
+  'pages_read_engagement',
+  'instagram_manage_insights',
+  'instagram_content_publish',
+] as const;
+
 export type IgMediaItem = {
   id: string;
   mediaType: string;
   url: string;
   permalink?: string;
   caption?: string;
+};
+
+export type IgContainerStatus = {
+  statusCode: string;
+  status?: string;
 };
 
 @Injectable()
@@ -45,12 +58,7 @@ export class InstagramGraphClient {
       redirect_uri: this.redirectUri,
       state,
       response_type: 'code',
-      scope: [
-        'instagram_basic',
-        'pages_show_list',
-        'pages_read_engagement',
-        'instagram_manage_insights',
-      ].join(','),
+      scope: INSTAGRAM_OAUTH_SCOPES.join(','),
     });
     return `https://www.facebook.com/${this.version}/dialog/oauth?${params.toString()}`;
   }
@@ -168,5 +176,115 @@ export class InstagramGraphClient {
       });
     }
     return items;
+  }
+
+  async createMediaContainer(opts: {
+    igUserId: string;
+    accessToken: string;
+    caption: string;
+    imageUrl?: string;
+    videoUrl?: string;
+  }): Promise<string> {
+    const params: Record<string, string> = {
+      caption: opts.caption,
+      access_token: opts.accessToken,
+    };
+    if (opts.videoUrl) {
+      params.media_type = 'REELS';
+      params.video_url = opts.videoUrl;
+      params.share_to_feed = 'true';
+    } else if (opts.imageUrl) {
+      params.image_url = opts.imageUrl;
+    } else {
+      throw new Error('Mídia obrigatória para publicar no Instagram');
+    }
+    try {
+      const res = await axios.post(
+        `https://graph.facebook.com/${this.version}/${opts.igUserId}/media`,
+        null,
+        { params, timeout: 30000 },
+      );
+      const id = String(res.data?.id || '');
+      if (!id) throw new Error('Instagram não criou o container');
+      return id;
+    } catch (error) {
+      throw new Error(this.graphError(error, 'Falha ao criar mídia no Instagram'));
+    }
+  }
+
+  async getContainerStatus(opts: {
+    creationId: string;
+    accessToken: string;
+  }): Promise<IgContainerStatus> {
+    try {
+      const res = await axios.get(
+        `https://graph.facebook.com/${this.version}/${opts.creationId}`,
+        {
+          params: {
+            fields: 'status_code,status',
+            access_token: opts.accessToken,
+          },
+          timeout: 15000,
+        },
+      );
+      return {
+        statusCode: String(res.data?.status_code || ''),
+        status: res.data?.status ? String(res.data.status) : undefined,
+      };
+    } catch (error) {
+      throw new Error(
+        this.graphError(error, 'Falha ao consultar o container do Instagram'),
+      );
+    }
+  }
+
+  async publishContainer(opts: {
+    igUserId: string;
+    accessToken: string;
+    creationId: string;
+  }): Promise<{ id: string; permalink?: string }> {
+    try {
+      const res = await axios.post(
+        `https://graph.facebook.com/${this.version}/${opts.igUserId}/media_publish`,
+        null,
+        {
+          params: {
+            creation_id: opts.creationId,
+            access_token: opts.accessToken,
+          },
+          timeout: 30000,
+        },
+      );
+      const id = String(res.data?.id || '');
+      if (!id) throw new Error('Instagram não publicou a mídia');
+      let permalink: string | undefined;
+      try {
+        const media = await axios.get(
+          `https://graph.facebook.com/${this.version}/${id}`,
+          {
+            params: {
+              fields: 'permalink',
+              access_token: opts.accessToken,
+            },
+            timeout: 15000,
+          },
+        );
+        if (media.data?.permalink) permalink = String(media.data.permalink);
+      } catch {
+        // permalink is optional
+      }
+      return { id, permalink };
+    } catch (error) {
+      throw new Error(this.graphError(error, 'Falha ao publicar no Instagram'));
+    }
+  }
+
+  private graphError(error: unknown, fallback: string): string {
+    if (axios.isAxiosError(error)) {
+      const message = error.response?.data?.error?.message;
+      if (typeof message === 'string' && message.trim()) return message;
+      if (error.message) return error.message;
+    }
+    return error instanceof Error ? error.message : fallback;
   }
 }

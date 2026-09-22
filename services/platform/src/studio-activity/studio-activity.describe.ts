@@ -8,11 +8,14 @@ const EMAIL_KIND_LABELS: Record<string, string> = {
   credentials: 'acesso ao painel',
   'site-introduction': 'apresentação do site',
   'instagram-permission': 'permissão do Instagram',
+  'package-offer': 'proposta de pacote',
 };
 
 const WHATSAPP_KIND_LABELS: Record<string, string> = {
   'site-introduction': 'apresentação do site',
   'instagram-permission': 'permissão do Instagram',
+  credentials: 'acesso ao painel',
+  'package-offer': 'proposta de pacote',
 };
 
 type Rule = {
@@ -212,6 +215,435 @@ const RULES: Rule[] = [
     }),
   },
   {
+    method: 'POST',
+    pattern: /^\/calendar\/posts$/,
+    describe: () => ({
+      kind: 'calendar.post.create',
+      title: 'Criou post no calendário',
+      summary: 'Novo conteúdo agendado',
+    }),
+  },
+  {
+    method: 'PATCH',
+    pattern: /^\/calendar\/posts\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'calendar.post.update',
+      title: 'Atualizou post do calendário',
+      summary: `Post ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/calendar\/posts\/([^/]+)\/assets\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'calendar.asset.delete',
+      title: 'Removeu mídia do calendário',
+      summary: `Post ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/calendar\/posts\/([^/]+)\/assets\/from-studio$/,
+    describe: (match) => ({
+      kind: 'calendar.asset.studio',
+      title: 'Anexou mídia do studio ao calendário',
+      summary: `Post ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/calendar\/posts\/([^/]+)\/assets$/,
+    describe: (match) => ({
+      kind: 'calendar.asset.upload',
+      title: 'Enviou mídia ao calendário',
+      summary: `Post ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/calendar\/posts\/([^/]+)\/schedule$/,
+    describe: (match) => ({
+      kind: 'calendar.post.schedule',
+      title: 'Agendou post',
+      summary: `Post ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/calendar\/posts\/([^/]+)\/publish$/,
+    describe: (match) => ({
+      kind: 'calendar.post.publish',
+      title: 'Publicou post do calendário',
+      summary: `Post ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/calendar\/posts\/([^/]+)\/targets\/([^/]+)\/mark-published$/,
+    describe: (match) => ({
+      kind: 'calendar.target.published',
+      title: 'Marcou plataforma como publicada',
+      summary: `Post ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/calendar\/posts\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'calendar.post.delete',
+      title: 'Excluiu post do calendário',
+      summary: `Post ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/llm\/turns$/,
+    describe: () => ({
+      kind: 'creative.llm.turn',
+      title: 'Enviou mensagem no Studio Criativo',
+      summary: 'Turno do chat livre',
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/llm\/conversations$/,
+    describe: () => ({
+      kind: 'creative.llm.conversation',
+      title: 'Criou conversa no Studio Criativo',
+      summary: 'Nova conversa',
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/llm\/conversations\/([^/]+)\/turns$/,
+    describe: (match) => ({
+      kind: 'creative.llm.turn',
+      title: 'Enviou mensagem no Studio Criativo',
+      summary: `Conversa ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/llm\/tools\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.llm.tool',
+      title: 'Executou tool do Studio Criativo',
+      summary: match[1],
+    }),
+  },
+  {
+    method: 'PATCH',
+    pattern: /^\/creative\/llm\/conversations\/([^/]+)\/proposals\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.llm.proposal-edit',
+      title: 'Editou proposta de geração',
+      summary: `Conversa ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/llm\/conversations\/([^/]+)\/proposals\/([^/]+)\/confirm$/,
+    describe: (match) => ({
+      kind: 'creative.llm.confirm',
+      title: 'Confirmou geração no Studio Criativo',
+      summary: `Conversa ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/llm\/conversations\/([^/]+)\/proposals\/([^/]+)\/cancel$/,
+    describe: (match) => ({
+      kind: 'creative.llm.cancel',
+      title: 'Cancelou proposta de geração',
+      summary: `Conversa ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/features\/([^/]+)\/generate$/,
+    describe: (match) => ({
+      kind:
+        match[1] === 'flyer-venda-landing'
+          ? 'creative.flyer-venda.generate'
+          : 'creative.feature.generate',
+      title:
+        match[1] === 'flyer-venda-landing'
+          ? 'Gerou flyer de venda'
+          : `Gerou ${match[1]}`,
+      summary: `Feature ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/characters$/,
+    describe: () => ({
+      kind: 'creative.character.create',
+      title: 'Criou personagem',
+      summary: 'Nova identidade no Studio Criativo',
+    }),
+  },
+  {
+    method: 'PATCH',
+    pattern: /^\/creative\/characters\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.character.update',
+      title: 'Atualizou personagem',
+      summary: `Personagem ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/creative\/characters\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.character.delete',
+      title: 'Excluiu personagem',
+      summary: `Personagem ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/characters\/([^/]+)\/photos$/,
+    describe: (match) => ({
+      kind: 'creative.character.photo',
+      title: 'Gerou foto do personagem',
+      summary: `Personagem ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/characters\/([^/]+)\/videos$/,
+    describe: (match) => ({
+      kind: 'creative.character.video',
+      title: 'Gerou vídeo do personagem',
+      summary: `Personagem ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/movies$/,
+    describe: () => ({
+      kind: 'creative.movie.create',
+      title: 'Criou filme',
+      summary: 'Novo storyboard no Studio Criativo',
+    }),
+  },
+  {
+    method: 'PATCH',
+    pattern: /^\/creative\/movies\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.movie.update',
+      title: 'Atualizou filme',
+      summary: `Filme ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/creative\/movies\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.movie.delete',
+      title: 'Excluiu filme',
+      summary: `Filme ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/movies\/([^/]+)\/shots$/,
+    describe: (match) => ({
+      kind: 'creative.movie.shot.create',
+      title: 'Adicionou take',
+      summary: `Filme ${match[1]}`,
+    }),
+  },
+  {
+    method: 'PATCH',
+    pattern: /^\/creative\/movies\/([^/]+)\/shots\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.movie.shot.update',
+      title: 'Atualizou take',
+      summary: `Filme ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/creative\/movies\/([^/]+)\/shots\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.movie.shot.delete',
+      title: 'Removeu take',
+      summary: `Filme ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/movies\/([^/]+)\/shots\/([^/]+)\/generate$/,
+    describe: (match) => ({
+      kind: 'creative.movie.shot.generate',
+      title: 'Gerou take do filme',
+      summary: `Filme ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/inicio-fim$/,
+    describe: () => ({
+      kind: 'creative.start-end.create',
+      title: 'Gerou clipe início e fim',
+      summary: 'Novo clipe no Studio Criativo',
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/creative\/inicio-fim\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.start-end.delete',
+      title: 'Excluiu clipe início e fim',
+      summary: `Clipe ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/inicio-fim\/([^/]+)\/generate$/,
+    describe: (match) => ({
+      kind: 'creative.start-end.generate',
+      title: 'Gerou clipe início e fim',
+      summary: `Clipe ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/ugc-skills$/,
+    describe: () => ({
+      kind: 'creative.ugc.create',
+      title: 'Gerou clipe UGC Skills',
+      summary: 'Novo anúncio no Studio Criativo',
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/creative\/ugc-skills\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'creative.ugc.delete',
+      title: 'Excluiu clipe UGC Skills',
+      summary: `Clipe ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/creative\/ugc-skills\/([^/]+)\/generate$/,
+    describe: (match) => ({
+      kind: 'creative.ugc.generate',
+      title: 'Gerou clipe UGC Skills',
+      summary: `Clipe ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/image-projects$/,
+    describe: () => ({
+      kind: 'image-project.create',
+      title: 'Criou projeto de imagens',
+      summary: 'Novo projeto no studio de imagens',
+    }),
+  },
+  {
+    method: 'PATCH',
+    pattern: /^\/image-projects\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'image-project.update',
+      title: 'Atualizou projeto de imagens',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/image-projects\/([^/]+)\/assets\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'image-project.asset-delete',
+      title: 'Removeu imagem do projeto',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/image-projects\/([^/]+)\/references$/,
+    describe: (match) => ({
+      kind: 'image-project.reference',
+      title: 'Adicionou referência ao projeto',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/image-projects\/([^/]+)\/generate$/,
+    describe: (match) => ({
+      kind: 'image-project.generate',
+      title: 'Gerou imagem',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/image-projects\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'image-project.delete',
+      title: 'Excluiu projeto de imagens',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/video-projects$/,
+    describe: () => ({
+      kind: 'video-project.create',
+      title: 'Criou projeto de vídeos',
+      summary: 'Novo projeto no studio de vídeos',
+    }),
+  },
+  {
+    method: 'PATCH',
+    pattern: /^\/video-projects\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'video-project.update',
+      title: 'Atualizou projeto de vídeos',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/video-projects\/([^/]+)\/assets\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'video-project.asset-delete',
+      title: 'Removeu arquivo do projeto de vídeos',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/video-projects\/([^/]+)\/frames$/,
+    describe: (match) => ({
+      kind: 'video-project.frame',
+      title: 'Adicionou quadro ao projeto de vídeos',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/video-projects\/([^/]+)\/generate$/,
+    describe: (match) => ({
+      kind: 'video-project.generate',
+      title: 'Gerou vídeo',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/video-projects\/([^/]+)$/,
+    describe: (match) => ({
+      kind: 'video-project.delete',
+      title: 'Excluiu projeto de vídeos',
+      summary: `Projeto ${match[1]}`,
+    }),
+  },
+  {
     method: 'PUT',
     pattern: /^\/config\/llm$/,
     describe: () => ({
@@ -390,6 +822,8 @@ export function shouldSkipStudioActivityPath(path: string): boolean {
   return (
     p === '/auth/studio/login' ||
     p === '/auth/studio/logout' ||
+    p === '/auth/admin/login' ||
+    p === '/auth/admin/logout' ||
     p === '/auth/login' ||
     p === '/auth/logout' ||
     p === '/auth/register'

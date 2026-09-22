@@ -4,6 +4,7 @@ import { join } from 'path';
 import { StudioActivityModule } from './studio-activity/studio-activity.module';
 import { StudioLeadAccessModule } from './studio-lead-access/studio-lead-access.module';
 import { StudioUsersModule } from './studio-users/studio-users.module';
+import { TenantModule } from './tenant/tenant.module';
 import { EnrichmentModule } from './enrichment/enrichment.module';
 import { CustomerModule } from './customer/customer.module';
 import { LeadModule } from './lead/lead.module';
@@ -25,6 +26,10 @@ import { HealthController } from './health.controller';
 import { InviteRequestsModule } from './invite-requests/invite-requests.module';
 import { PublicChatModule } from './public-chat/public-chat.module';
 import { NamaoChatModule } from './namao-chat/namao-chat.module';
+import { ImageStudioModule } from './image-studio/image-studio.module';
+import { VideoStudioModule } from './video-studio/video-studio.module';
+import { CreativeStudioModule } from './creative-studio/creative-studio.module';
+import { CalendarModule } from './calendar/calendar.module';
 
 @Module({
   imports: [
@@ -51,10 +56,15 @@ import { NamaoChatModule } from './namao-chat/namao-chat.module';
     PackagesModule,
     PublicChatModule,
     NamaoChatModule,
+    ImageStudioModule,
+    VideoStudioModule,
+    CreativeStudioModule,
+    CalendarModule,
     InviteRequestsModule,
     DashboardModule,
     StudioActivityModule,
     StudioUsersModule,
+    TenantModule,
   ],
   controllers: [HealthController],
 })

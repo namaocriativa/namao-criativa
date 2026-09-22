@@ -65,6 +65,7 @@ export class LeadAccountService {
         email,
         name: lead.name.trim() || 'Cliente',
         passwordHash,
+        tenantId: await this.ownerTenantId(lead.id),
         ...ownerCreateData(kind, lead.id),
       },
       select: CLIENT_ACCOUNT_SELECT,
@@ -127,6 +128,20 @@ export class LeadAccountService {
       throw new NotFoundException(`Lead ${leadId} not found`);
     }
     return { id: profile.id, name: profile.name, email: profile.email };
+  }
+
+  private async ownerTenantId(id: string): Promise<string> {
+    const lead = await this.prisma.lead.findUnique({
+      where: { id },
+      select: { tenantId: true },
+    });
+    if (lead) return lead.tenantId;
+    const customer = await this.prisma.customer.findUnique({
+      where: { id },
+      select: { tenantId: true },
+    });
+    if (customer) return customer.tenantId;
+    throw new NotFoundException(`Lead ${id} not found`);
   }
 
   private async resolveLoginEmail(lead: LeadAccountSeed): Promise<string> {

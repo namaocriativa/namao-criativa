@@ -59,15 +59,17 @@ export class InvitesService {
       name: true,
       phone: true,
       whatsapp: true,
+      tenantId: true,
     });
     const kind = await this.owners.requireKind(lead.id);
 
     const phone = dto.phone?.trim() || lead.whatsapp || lead.phone || null;
     const token = randomBytes(24).toString('hex');
     const invite = await this.prisma.invite.create({
-      data: {
-        token,
-        ...ownerCreateData(kind, lead.id),
+        data: {
+          token,
+          tenantId: lead.tenantId,
+          ...ownerCreateData(kind, lead.id),
         phone,
         status: 'PENDING',
         expiresAt: new Date(Date.now() + INVITE_TTL_MS),
@@ -171,6 +173,7 @@ export class InvitesService {
       email: true,
       phone: true,
       whatsapp: true,
+      tenantId: true,
       clientAccounts: {
         select: { email: true },
         take: 1,
@@ -206,9 +209,10 @@ export class InvitesService {
       const phone = lead.whatsapp || lead.phone || null;
       const token = randomBytes(24).toString('hex');
       const invite = await this.prisma.invite.create({
-        data: {
-          token,
-          ...ownerCreateData(await this.owners.requireKind(lead.id), lead.id),
+          data: {
+            token,
+            tenantId: lead.tenantId,
+            ...ownerCreateData(await this.owners.requireKind(lead.id), lead.id),
           phone,
           status: 'PENDING',
           expiresAt: new Date(Date.now() + INVITE_TTL_MS),
@@ -243,6 +247,7 @@ export class InvitesService {
       phone: true,
       whatsapp: true,
       publishedOrigin: true,
+      tenantId: true,
       clientAccounts: {
         select: { email: true },
         take: 1,
@@ -278,9 +283,10 @@ export class InvitesService {
       const phone = lead.whatsapp || lead.phone || null;
       const token = randomBytes(24).toString('hex');
       const invite = await this.prisma.invite.create({
-        data: {
-          token,
-          ...ownerCreateData(await this.owners.requireKind(lead.id), lead.id),
+          data: {
+            token,
+            tenantId: lead.tenantId,
+            ...ownerCreateData(await this.owners.requireKind(lead.id), lead.id),
           phone,
           status: 'PENDING',
           expiresAt: new Date(Date.now() + INVITE_TTL_MS),

@@ -6,6 +6,7 @@ import {
 import { USER_ROLE } from '../auth/roles';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { StudioUsersService } from './studio-users.service';
+import { runWithTenant } from '../tenant/tenant-context';
 
 describe('StudioUsersService', () => {
   const prisma = {
@@ -33,6 +34,7 @@ describe('StudioUsersService', () => {
     email: 'admin@namao.local',
     name: 'Admin',
     role: USER_ROLE.ADMIN,
+    tenantId: 'tenant-1',
     leadId: null,
     customerId: null,
   };
@@ -41,6 +43,7 @@ describe('StudioUsersService', () => {
     email: 'ana@namao.local',
     name: 'Ana',
     role: USER_ROLE.OPERATOR,
+    tenantId: 'tenant-1',
     createdAt: new Date('2026-09-14T12:00:00.000Z'),
     updatedAt: new Date('2026-09-14T12:00:00.000Z'),
   };
@@ -53,10 +56,13 @@ describe('StudioUsersService', () => {
 
   it('lista só ADMIN e OPERATOR', async () => {
     prisma.user.findMany.mockResolvedValue([]);
-    await service.list();
+    await runWithTenant('tenant-1', () => service.list());
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { role: { in: [USER_ROLE.ADMIN, USER_ROLE.OPERATOR] } },
+        where: {
+          tenantId: 'tenant-1',
+          role: { in: [USER_ROLE.ADMIN, USER_ROLE.OPERATOR] },
+        },
       }),
     );
   });
@@ -70,8 +76,10 @@ describe('StudioUsersService', () => {
       passwordHash: 'hash',
     });
     await expect(
-      service.create({ email: 'ana@namao.local' }),
-    ).rejects.toThrow(/já tem acesso ao studio/);
+      runWithTenant('tenant-1', () => service.create({ email: 'ana@namao.local' })),
+    ).rejects.toThrow(
+      /já tem acesso ao studio/,
+    );
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
@@ -83,7 +91,9 @@ describe('StudioUsersService', () => {
       email: 'miguellsz553@gmail.com',
       name: 'Miguellsz553',
     });
-    const result = await service.create({ email: 'miguellsz553@gmail.com' });
+    const result = await runWithTenant('tenant-1', () =>
+      service.create({ email: 'miguellsz553@gmail.com' }),
+    );
     expect(result.role).toBe(USER_ROLE.OPERATOR);
     expect(result).not.toHaveProperty('password');
     expect(prisma.user.create).toHaveBeenCalledWith(
@@ -92,6 +102,7 @@ describe('StudioUsersService', () => {
           email: 'miguellsz553@gmail.com',
           name: 'Miguellsz553',
           role: USER_ROLE.OPERATOR,
+          tenantId: 'tenant-1',
         }),
       }),
     );
@@ -111,7 +122,9 @@ describe('StudioUsersService', () => {
   it('cria OPERATOR, gera senha e envia convite', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.create.mockResolvedValue(created);
-    const result = await service.create({ email: 'ana@namao.local' });
+    const result = await runWithTenant('tenant-1', () =>
+      service.create({ email: 'ana@namao.local' }),
+    );
     expect(result).toEqual(created);
     expect(result).not.toHaveProperty('password');
     expect(prisma.user.create).toHaveBeenCalledWith(
@@ -120,6 +133,7 @@ describe('StudioUsersService', () => {
           email: 'ana@namao.local',
           name: 'Ana',
           role: USER_ROLE.OPERATOR,
+          tenantId: 'tenant-1',
         }),
       }),
     );
@@ -141,9 +155,13 @@ describe('StudioUsersService', () => {
     prisma.user.delete.mockResolvedValue({});
     mail.sendStudioWelcome.mockRejectedValue(new Error('resend down'));
     await expect(
-      service.create({ email: 'ana@namao.local' }),
-    ).rejects.toThrow('resend down');
-    expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: created.id } });
+      runWithTenant('tenant-1', () => service.create({ email: 'ana@namao.local' })),
+    ).rejects.toThrow(
+      'resend down',
+    );
+    expect(prisma.user.delete).toHaveBeenCalledWith({
+      where: { id: created.id },
+    });
   });
 
   it('não remove a própria conta', async () => {
@@ -152,10 +170,11 @@ describe('StudioUsersService', () => {
       email: admin.email,
       name: admin.name,
       role: USER_ROLE.ADMIN,
+      tenantId: 'tenant-1',
     });
-    await expect(service.remove(admin.id, admin)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      runWithTenant('tenant-1', () => service.remove(admin.id, admin)),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('não apaga o último admin', async () => {
@@ -164,18 +183,19 @@ describe('StudioUsersService', () => {
       email: 'other@namao.local',
       name: 'Other',
       role: USER_ROLE.ADMIN,
+      tenantId: 'tenant-1',
     });
     prisma.user.count.mockResolvedValue(0);
-    await expect(service.remove('admin-2', admin)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      runWithTenant('tenant-1', () => service.remove('admin-2', admin)),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('não encontra conta que não é staff', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
-    await expect(service.resetPassword('c1')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      runWithTenant('tenant-1', () => service.resetPassword('c1')),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('envia a nova senha por e-mail e não devolve plaintext', async () => {
@@ -184,9 +204,12 @@ describe('StudioUsersService', () => {
       email: 'op@namao.local',
       name: 'Operador',
       role: USER_ROLE.OPERATOR,
+      tenantId: 'tenant-1',
     });
     prisma.user.update.mockResolvedValue({});
-    const result = await service.resetPassword('op-1');
+    const result = await runWithTenant('tenant-1', () =>
+      service.resetPassword('op-1'),
+    );
     expect(result).toEqual({ ok: true });
     expect(result).not.toHaveProperty('password');
     expect(mail.sendStudioWelcome).toHaveBeenCalledWith(
@@ -210,10 +233,48 @@ describe('StudioUsersService', () => {
         createdAt: new Date('2026-09-14T13:00:00.000Z'),
       },
     ]);
-    const { items } = await service.listActivity('op-1');
+    const { items } = await runWithTenant('tenant-1', () =>
+      service.listActivity('op-1'),
+    );
     expect(items.map((item) => item.kind)).toEqual([
       'auth.login',
       'account.created',
     ]);
+  });
+
+  it('atualiza permissões de imagens e vídeos', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...created,
+      canAccessImages: false,
+      canAccessVideos: false,
+    });
+    prisma.user.update.mockResolvedValue({
+      ...created,
+      canAccessImages: true,
+      canAccessVideos: false,
+    });
+    const result = await runWithTenant('tenant-1', () =>
+      service.update(created.id, { canAccessImages: true }, admin),
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { canAccessImages: true },
+      }),
+    );
+    expect(result.canAccessImages).toBe(true);
+    expect(result.canAccessVideos).toBe(false);
+  });
+
+  it('lista usuários com as flags de acesso', async () => {
+    prisma.user.findMany.mockResolvedValue([]);
+    await runWithTenant('tenant-1', () => service.list());
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          canAccessImages: true,
+          canAccessVideos: true,
+        }),
+      }),
+    );
   });
 });

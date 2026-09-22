@@ -17,7 +17,9 @@
     "studio:plan": "tsx scripts/studio.ts --plan",
     "studio:check-env": "tsx scripts/check-studio-pages-env.ts",
     "pages": "tsx scripts/website.ts && tsx scripts/studio.ts",
-    "pages:plan": "tsx scripts/website.ts --plan && tsx scripts/studio.ts --plan"
+    "pages:plan": "tsx scripts/website.ts --plan && tsx scripts/studio.ts --plan",
+    "mail-dns": "tsx scripts/mail-dns.ts",
+    "mail-dns:plan": "tsx scripts/mail-dns.ts --plan"
   },
   "dependencies": {
     "dotenv": "^16.4.7"

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -13,6 +13,9 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { resolveJwtSecret } from './jwt-secret';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
+import { StudioPermissionGuard } from './studio-permission.guard';
+import { TenantContextInterceptor } from '../tenant/tenant.interceptor';
+import { TenantGuard } from '../tenant/tenant.guard';
 
 @Module({
   imports: [
@@ -35,10 +38,16 @@ import { RolesGuard } from './roles.guard';
     AuthRateLimitService,
     JwtAuthGuard,
     RolesGuard,
+    StudioPermissionGuard,
     CookieOriginGuard,
+    TenantGuard,
+    TenantContextInterceptor,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: StudioPermissionGuard },
     { provide: APP_GUARD, useClass: CookieOriginGuard },
+    { provide: APP_GUARD, useClass: TenantGuard },
+    { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
   ],
   exports: [
     AuthService,
@@ -47,6 +56,7 @@ import { RolesGuard } from './roles.guard';
     PassportModule,
     JwtAuthGuard,
     RolesGuard,
+    StudioPermissionGuard,
     CookieOriginGuard,
   ],
 })

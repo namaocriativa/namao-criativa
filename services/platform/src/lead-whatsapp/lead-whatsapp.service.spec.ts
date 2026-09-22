@@ -23,6 +23,11 @@ describe('LeadWhatsAppService', () => {
     requireKind: jest.fn().mockResolvedValue('lead'),
     findProfile: jest.fn(),
   };
+  const packages = {
+    findActive: jest.fn(),
+    requireActive: jest.fn(),
+    getOfferTemplate: jest.fn(),
+  };
   const service = new LeadWhatsAppService(
     prisma as never,
     config as never,
@@ -31,6 +36,7 @@ describe('LeadWhatsAppService', () => {
     accounts as never,
     activity as never,
     owners as never,
+    packages as never,
   );
 
   const lead = {
@@ -49,6 +55,7 @@ describe('LeadWhatsAppService', () => {
     evolution.configured.mockReturnValue(true);
     prisma.lead.findUnique.mockResolvedValue({ ...lead });
     prisma.clientAccount.findFirst.mockResolvedValue({ id: 'user-1' });
+    packages.findActive.mockResolvedValue([]);
     owners.kindOf.mockResolvedValue('lead');
   });
 
@@ -58,6 +65,7 @@ describe('LeadWhatsAppService', () => {
       'site-introduction',
       'instagram-permission',
       'credentials',
+      'package-offer',
     ]);
     expect(result.items[0].available).toBe(true);
     expect(result.items[0].to).toBe('+5511999999999');
@@ -247,6 +255,77 @@ describe('LeadWhatsAppService', () => {
     owners.kindOf.mockResolvedValue(null);
     await expect(service.list('missing')).rejects.toBeInstanceOf(
       NotFoundException,
+    );
+  });
+
+  it('lista enviar pacote quando há pacote ativo', async () => {
+    packages.findActive.mockResolvedValue([
+      { id: 'pkg-1', name: 'Site', price: 1200, currency: 'BRL' },
+    ]);
+    const result = await service.list('lead-1');
+    const offer = result.items.find((item) => item.id === 'package-offer');
+    expect(offer?.available).toBe(true);
+    expect(offer?.packages).toHaveLength(1);
+  });
+
+  it('preview da proposta interpola o pacote', async () => {
+    packages.requireActive.mockResolvedValue({
+      id: 'pkg-1',
+      name: 'Site Estratégico',
+      summary: 'Presença digital',
+      description: null,
+      benefits: ['Google'],
+      price: 1200,
+      promoPrice: 800,
+      currency: 'BRL',
+      status: 'active',
+    });
+    packages.getOfferTemplate.mockResolvedValue({
+      emailSubject: '',
+      emailBody: '',
+      whatsappMessage: '{{lead.name}} · {{package.name}} · {{package.priceLine}}',
+    });
+    const preview = await service.preview('lead-1', 'package-offer', 'pkg-1');
+    expect(preview.text).toContain('Firma');
+    expect(preview.text).toContain('Site Estratégico');
+    expect(preview.canSend).toBe(true);
+    expect(preview.packageId).toBe('pkg-1');
+  });
+
+  it('envia a proposta pelo WhatsApp', async () => {
+    packages.requireActive.mockResolvedValue({
+      id: 'pkg-1',
+      name: 'Site Estratégico',
+      summary: null,
+      description: null,
+      benefits: [],
+      price: 1200,
+      promoPrice: null,
+      currency: 'BRL',
+      status: 'active',
+    });
+    packages.getOfferTemplate.mockResolvedValue({
+      emailSubject: '',
+      emailBody: '',
+      whatsappMessage: 'Proposta {{package.name}}',
+    });
+    evolution.sendText.mockResolvedValue({ skipped: false, ok: true, data: {} });
+    const result = await service.send(
+      'lead-1',
+      'package-offer',
+      undefined,
+      'pkg-1',
+    );
+    expect(evolution.sendText).toHaveBeenCalledWith({
+      phone: '+5511999999999',
+      text: 'Proposta Site Estratégico',
+    });
+    expect(result.sent).toBe(true);
+    expect(activity.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'whatsapp',
+        kind: 'package-offer',
+      }),
     );
   });
 });

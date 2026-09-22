@@ -19,6 +19,12 @@ describe('LeadMailService', () => {
     requireKind: jest.fn().mockResolvedValue('lead'),
     findProfile: jest.fn(),
   };
+  const packages = {
+    findActive: jest.fn(),
+    requireActive: jest.fn(),
+    getOfferTemplate: jest.fn(),
+  };
+  const mailer = { sendPackageOffer: jest.fn() };
   const service = new LeadMailService(
     prisma as never,
     config as never,
@@ -26,6 +32,8 @@ describe('LeadMailService', () => {
     accounts as never,
     activity as never,
     owners as never,
+    packages as never,
+    mailer as never,
   );
 
   beforeEach(() => {
@@ -46,6 +54,7 @@ describe('LeadMailService', () => {
       clientAccounts: [],
       instagramConnections: [],
     });
+    packages.findActive.mockResolvedValue([]);
     owners.kindOf.mockResolvedValue('lead');
   });
 
@@ -55,11 +64,14 @@ describe('LeadMailService', () => {
       'site-introduction',
       'instagram-permission',
       'credentials',
+      'package-offer',
     ]);
     expect(result.items[0].available).toBe(true);
     expect(result.items[0].to).toBe('contato@firma.com');
     expect(result.items[1].available).toBe(true);
     expect(result.items[2].available).toBe(true);
+    expect(result.items[3].available).toBe(false);
+    expect(result.items[3].unavailableReason).toMatch(/pacote ativo/i);
   });
 
   it('marca pedido de Instagram indisponível se já conectou', async () => {
@@ -214,6 +226,84 @@ describe('LeadMailService', () => {
     owners.kindOf.mockResolvedValue(null);
     await expect(service.list('missing')).rejects.toBeInstanceOf(
       NotFoundException,
+    );
+  });
+
+  it('lista enviar pacote quando há pacote ativo', async () => {
+    packages.findActive.mockResolvedValue([
+      { id: 'pkg-1', name: 'Site', price: 1200, promoPrice: 800, currency: 'BRL' },
+    ]);
+    const result = await service.list('lead-1');
+    const offer = result.items.find((item) => item.id === 'package-offer');
+    expect(offer?.available).toBe(true);
+    expect(offer?.packages).toHaveLength(1);
+  });
+
+  it('preview da proposta interpola o pacote', async () => {
+    packages.requireActive.mockResolvedValue({
+      id: 'pkg-1',
+      name: 'Site Estratégico',
+      summary: 'Presença digital',
+      description: 'Site completo',
+      benefits: ['Google'],
+      price: 1200,
+      promoPrice: 800,
+      currency: 'BRL',
+      status: 'active',
+    });
+    packages.getOfferTemplate.mockResolvedValue({
+      emailSubject: '{{package.name}} para {{lead.name}}',
+      emailBody: '{{package.priceLine}}\n{{package.benefits}}',
+      whatsappMessage: '',
+    });
+    const preview = await service.preview('lead-1', 'package-offer', 'pkg-1');
+    expect(preview.subject).toContain('Site Estratégico');
+    expect(preview.html).toContain('de ');
+    expect(preview.html).toContain('• Google');
+    expect(preview.canSend).toBe(true);
+    expect(preview.packageId).toBe('pkg-1');
+  });
+
+  it('recusa preview de proposta sem pacote', async () => {
+    packages.requireActive.mockRejectedValue(
+      new BadRequestException('Selecione um pacote para enviar a proposta.'),
+    );
+    await expect(service.preview('lead-1', 'package-offer')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('envia a proposta pelo mailer', async () => {
+    packages.requireActive.mockResolvedValue({
+      id: 'pkg-1',
+      name: 'Site Estratégico',
+      summary: 'Presença',
+      description: null,
+      benefits: [],
+      price: 1200,
+      promoPrice: null,
+      currency: 'BRL',
+      status: 'active',
+    });
+    packages.getOfferTemplate.mockResolvedValue({
+      emailSubject: 'Proposta',
+      emailBody: 'Olá, {{lead.name}}',
+      whatsappMessage: '',
+    });
+    mailer.sendPackageOffer.mockResolvedValue(undefined);
+    const result = await service.send('lead-1', 'package-offer', 'pkg-1');
+    expect(mailer.sendPackageOffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'contato@firma.com',
+        subject: 'Proposta',
+      }),
+    );
+    expect(result).toMatchObject({ sent: true, to: 'contato@firma.com', packageId: 'pkg-1' });
+    expect(activity.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'package-offer',
+        channel: 'email',
+      }),
     );
   });
 });
