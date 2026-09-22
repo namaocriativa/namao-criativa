@@ -488,7 +488,7 @@ export function initLeadEmailsModal(
     if (view === "preview" || view === "packages") {
       showList();
       setStatus("");
-      if (view === "list") void loadList();
+      void loadList();
       return;
     }
     close();
