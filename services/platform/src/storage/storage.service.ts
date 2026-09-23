@@ -78,7 +78,14 @@ export interface SavedVideo {
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
-  private readonly storageRoot = path.join(__dirname, '..', '..', 'storage');
+  /**
+   * Keep generated media outside the compiled `dist` tree. In production this
+   * path is the Coolify persistent volume; locally it falls back to the
+   * workspace storage directory.
+   */
+  private readonly storageRoot = path.resolve(
+    process.env.STORAGE_ROOT?.trim() || path.join(process.cwd(), 'storage'),
+  );
   private readonly leadsRoot = path.join(this.storageRoot, 'leads');
   private readonly packagesRoot = path.join(this.storageRoot, 'packages');
   private readonly imageProjectsRoot = path.join(

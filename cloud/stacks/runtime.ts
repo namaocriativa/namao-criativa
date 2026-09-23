@@ -40,6 +40,7 @@ export function buildRuntimeEnvs(opts: {
     PORT: '3000',
     NODE_ENV: 'production',
     DATABASE_URL: opts.databaseUrl,
+    STORAGE_ROOT: '/app/services/platform/storage',
     JWT_SECRET: requireJwtSecret(process.env.JWT_SECRET, 'production'),
   };
 

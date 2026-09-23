@@ -25,7 +25,7 @@ RUN npx prisma generate --schema=services/platform/prisma/schema.prisma
 FROM base AS production
 RUN npm run build -w @namao/landing-kit \
   && npm run build -w @namao/platform \
-  && mkdir -p /app/services/platform/storage/leads
+  && mkdir -p /app/services/platform/storage
 
 ENV NODE_ENV=production
 ENV PORT=3000
