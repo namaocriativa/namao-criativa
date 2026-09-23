@@ -9,6 +9,10 @@ export function safeNextPath(
   return value;
 }
 
+export function isStoragePath(pathname: string): boolean {
+  return pathname === '/storage' || pathname.startsWith('/storage/');
+}
+
 export function isUnauthenticatedApiAllowed(
   method: string,
   pathname: string,

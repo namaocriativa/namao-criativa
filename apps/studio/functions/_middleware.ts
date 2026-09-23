@@ -2,6 +2,7 @@ import {
   fetchStudioApi,
   isHtmlNavigation,
   isSameStudioOrigin,
+  isStoragePath,
   isUnauthenticatedApiAllowed,
   originForStudioApiProxy,
   pagesPrettyPath,
@@ -145,12 +146,12 @@ export async function onRequest(context: {
     return next();
   }
 
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname) && !isStoragePath(pathname)) {
     return next();
   }
 
   const html = isHtmlNavigation(request);
-  const api = isApiPath(pathname) && !html;
+  const api = isApiPath(pathname) && (!html || isStoragePath(pathname));
 
   if (api) {
     if (!apiOrigin) {

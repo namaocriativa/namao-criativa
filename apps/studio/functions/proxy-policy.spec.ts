@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   headersForStudioApiProxy,
   isHtmlNavigation,
+  isStoragePath,
   isUnauthenticatedApiAllowed,
   studioProxyStatus,
 } from './proxy-policy';
@@ -60,6 +61,12 @@ test('studioProxyStatus não deixa 502/504 vazar para a página HTML da Cloudfla
   assert.equal(studioProxyStatus(502), 400);
   assert.equal(studioProxyStatus(504), 400);
   assert.equal(studioProxyStatus(503), 400);
+});
+
+test('storage do servidor é encaminhado mesmo sendo URL de navegação ou imagem estática', () => {
+  assert.equal(isStoragePath('/storage/characters/char-1/sheet.jpg'), true);
+  assert.equal(isStoragePath('/storage'), true);
+  assert.equal(isStoragePath('/storage-other/file.jpg'), false);
 });
 
 test('mídia pública do calendário não exige cookie do studio', () => {
