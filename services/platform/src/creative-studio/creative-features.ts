@@ -1,4 +1,5 @@
 export const FLYER_VENDA_LANDING_ID = 'flyer-venda-landing';
+export const CAROUSEL_INSTAGRAM_ID = 'carousel-instagram';
 export const PERSONAGENS_ID = 'personagens';
 export const MOVIES_ID = 'movies';
 export const INICIO_FIM_ID = 'inicio-fim';
@@ -50,6 +51,21 @@ export const CREATIVE_FEATURES: CreativeFeatureDefinition[] = [
     defaults: {
       model: 'gemini-3-pro-image',
       aspectRatio: '2:3',
+      imageSize: '2K',
+    },
+  },
+  {
+    id: CAROUSEL_INSTAGRAM_ID,
+    kind: 'image',
+    title: 'Carrossel Instagram',
+    description:
+      'Série de slides 4:5 para o feed: um briefing vira capa, dicas e CTA com a mesma identidade visual.',
+    status: 'ready',
+    composer: ['prompt', 'notes'],
+    projectKind: 'image',
+    defaults: {
+      model: 'gemini-3-pro-image',
+      aspectRatio: '4:5',
       imageSize: '2K',
     },
   },

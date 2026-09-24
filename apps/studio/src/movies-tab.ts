@@ -48,8 +48,12 @@ function clipSrc(shot: CreativeMovieShot): string {
   return `/${shot.localPath.replace(/^\/+/, "")}`;
 }
 
+function isCharacterImage(asset: CreativeCharacterAsset): boolean {
+  return asset.kind !== "video" && !(asset.mimeType || "").startsWith("video/");
+}
+
 function heroOf(character: CreativeCharacter | undefined): CreativeCharacterAsset | undefined {
-  const assets = character?.assets || [];
+  const assets = (character?.assets || []).filter(isCharacterImage);
   return (
     [...assets].reverse().find((item) => item.kind === "sheet") ||
     [...assets].reverse().find((item) => item.kind === "photo") ||
@@ -99,6 +103,9 @@ export function initMoviesTab(): {
   let busy = false;
   let mode: "list" | "create" | "board" = "list";
   let boardMovie: CreativeMovie | null = null;
+  let newTakeAssets = new Map<string, string>();
+  let pickerCharacterId: string | null = null;
+  let pickerShotId: string | null = null;
   let routeSeq = 0;
   let playIndex = 0;
   let playList: string[] = [];
@@ -193,29 +200,37 @@ export function initMoviesTab(): {
     });
   }
 
-  function characterPicker(selectedIds: string[], shotId?: string): string {
+  function characterPicker(
+    selectedIds: string[],
+    shotId?: string,
+    selectedAssets = new Map<string, string>(),
+  ): string {
     if (!characters.length) {
       return `<p class="movies-hint">Nenhum personagem na biblioteca. <a href="/criativo/habilidade/personagens">Criar em Personagens</a>.</p>`;
     }
     const selected = new Set(selectedIds);
-    return `<div class="movies-cast" role="group" aria-label="Personagens no take">
-      ${characters
-        .map((item) => {
-          const hero = heroOf(item);
-          const src = assetSrc(hero);
-          const active = selected.has(item.id);
-          return `<button type="button" class="movies-cast-option${active ? " is-active" : ""}" data-character-id="${escapeHtml(item.id)}"${shotId ? ` data-shot-id="${escapeHtml(shotId)}"` : ""} aria-pressed="${active ? "true" : "false"}" title="${escapeHtml(item.name)}">
-            ${
-              src
-                ? `<img src="${escapeHtml(src)}" alt="" draggable="false" />`
-                : `<span class="movies-cast-empty"></span>`
-            }
-            <span>${escapeHtml(item.name)}</span>
-          </button>`;
-        })
-        .join("")}
-    </div>
-    <p class="movies-hint">Marque um ou mais personagens — até 4 no mesmo take.</p>`;
+    return `<div class="movies-character-picker">
+      <div class="movies-cast" role="group" aria-label="Personagens no take">
+        ${characters
+          .map((item) => {
+            const chosenAsset = item.assets?.find(
+              (asset) => asset.id === selectedAssets.get(item.id) && isCharacterImage(asset),
+            );
+            const src = assetSrc(chosenAsset || heroOf(item));
+            const active = selected.has(item.id);
+            return `<button type="button" class="movies-cast-option${active ? " is-active" : ""}" data-character-id="${escapeHtml(item.id)}"${shotId ? ` data-shot-id="${escapeHtml(shotId)}"` : ""} aria-pressed="${active ? "true" : "false"}" title="Escolher imagem de ${escapeHtml(item.name)}">
+              ${
+                src
+                  ? `<img src="${escapeHtml(src)}" alt="" draggable="false" />`
+                  : `<span class="movies-cast-empty"></span>`
+              }
+              <span>${escapeHtml(item.name)}</span>
+            </button>`;
+          })
+          .join("")}
+      </div>
+      <p class="movies-hint">Selecione um personagem para escolher a foto usada como referência neste take. Até 4 personagens.</p>
+    </div>`;
   }
 
   function renderBoard(movie: CreativeMovie) {
@@ -231,6 +246,11 @@ export function initMoviesTab(): {
     const takes = (movie.shots || [])
       .map((shot, index) => {
         const clip = clipSrc(shot);
+        const selectedAssets = new Map(
+          (shot.cast || [])
+            .filter((item) => item.assetId)
+            .map((item) => [item.characterId, item.assetId as string]),
+        );
         const missingHero = shotCharacters(shot).some((item) => !heroOf(item));
         return `<article class="movies-take${portrait ? " movies-take-9x16" : ""}" data-shot-card="${escapeHtml(shot.id)}">
           <div class="movies-take-head">
@@ -239,7 +259,7 @@ export function initMoviesTab(): {
               shot.status === "failed" || shot.status === "generating" ? " is-failed" : ""
             }">${escapeHtml(statusLabel(shot.status))}</span>
           </div>
-          ${characterPicker(shotCharacterIds(shot), shot.id)}
+          ${characterPicker(shotCharacterIds(shot), shot.id, selectedAssets)}
           ${
             missingHero
               ? `<p class="movies-hint">Sem retrato na ficha — o take sai em texto. Gere o hero em Personagens para travar o rosto.</p>`
@@ -299,7 +319,7 @@ export function initMoviesTab(): {
             <div class="movies-take-head">
               <span class="movies-take-index">Novo take</span>
             </div>
-            ${characterPicker(characters[0]?.id ? [characters[0].id] : [])}
+            ${characterPicker([...newTakeAssets.keys()], undefined, newTakeAssets)}
             <form id="movies-shot-create" class="criativo-flyer-form">
               <label>
                 Cenário
@@ -316,6 +336,19 @@ export function initMoviesTab(): {
               <button type="submit">Adicionar take</button>
             </form>
           </article>
+        </div>
+        <div class="videos-picker movies-character-modal" id="movies-character-modal" hidden>
+          <div class="videos-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="movies-character-modal-title">
+            <header>
+              <h3 id="movies-character-modal-title">Escolha a foto do personagem</h3>
+              <button type="button" data-character-modal-close>Fechar</button>
+            </header>
+            <p class="movies-hint" id="movies-character-modal-status"></p>
+            <div class="videos-picker-grid" id="movies-character-image-grid"></div>
+            <p class="movies-toolbar">
+              <button type="button" class="outline danger" id="movies-character-remove" hidden>Remover personagem deste take</button>
+            </p>
+          </div>
         </div>
       </div>
     `;
@@ -365,6 +398,22 @@ export function initMoviesTab(): {
       event.preventDefault();
       void addShot(movie.id);
     });
+    composerEl.querySelector("[data-character-modal-close]")?.addEventListener("click", () => {
+      closeCharacterPicker();
+    });
+    composerEl.querySelector("#movies-character-modal")?.addEventListener("click", (event) => {
+      if (event.target === event.currentTarget) closeCharacterPicker();
+    });
+    composerEl.querySelector("#movies-character-image-grid")?.addEventListener("click", (event) => {
+      const card = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
+        "[data-character-asset]",
+      );
+      if (!card?.dataset.characterAsset) return;
+      void selectCharacterAsset(card.dataset.characterAsset);
+    });
+    composerEl.querySelector("#movies-character-remove")?.addEventListener("click", () => {
+      void removeCharacterFromTake();
+    });
   }
 
   function playAll(movie: CreativeMovie) {
@@ -378,46 +427,127 @@ export function initMoviesTab(): {
     void player.play();
   }
 
-  function toggleCastSelection(scope: Element, characterId: string): string[] {
-    const buttons = [
-      ...scope.querySelectorAll<HTMLButtonElement>("[data-character-id]"),
-    ];
-    const current = buttons
-      .filter((item) => item.classList.contains("is-active"))
-      .map((item) => item.dataset.characterId || "")
-      .filter(Boolean);
-    const selected = new Set(current);
-    if (selected.has(characterId)) {
-      if (selected.size === 1) return [...selected];
-      selected.delete(characterId);
-    } else {
-      if (selected.size >= 4) {
-        setStatus("No máximo 4 personagens por take", true);
-        return [...selected];
-      }
-      selected.add(characterId);
+  function closeCharacterPicker() {
+    const modal = composerEl.querySelector<HTMLElement>("#movies-character-modal");
+    if (modal) modal.hidden = true;
+    document.body.style.overflow = "";
+    pickerCharacterId = null;
+    pickerShotId = null;
+  }
+
+  function openCharacterPicker(characterId: string, shotId?: string) {
+    const character = characters.find((item) => item.id === characterId);
+    if (!character) return;
+    pickerCharacterId = characterId;
+    pickerShotId = shotId || null;
+    const modal = composerEl.querySelector<HTMLElement>("#movies-character-modal");
+    const title = composerEl.querySelector<HTMLElement>("#movies-character-modal-title");
+    const status = composerEl.querySelector<HTMLElement>("#movies-character-modal-status");
+    const grid = composerEl.querySelector<HTMLElement>("#movies-character-image-grid");
+    const remove = composerEl.querySelector<HTMLButtonElement>("#movies-character-remove");
+    if (!modal || !title || !status || !grid || !remove) return;
+
+    title.textContent = `Escolha a foto de ${character.name}`;
+    const images = (character.assets || []).filter(isCharacterImage);
+    const currentAssetId =
+      (shotId
+        ? boardMovie?.shots
+            ?.find((shot) => shot.id === shotId)
+            ?.cast?.find((item) => item.characterId === characterId)?.assetId
+        : newTakeAssets.get(characterId)) || heroOf(character)?.id;
+    status.textContent = images.length
+      ? "A imagem escolhida será enviada ao Gemini como referência visual deste personagem neste take."
+      : "Este personagem ainda não tem imagens. Gere ou envie uma foto em Personagens antes de continuar.";
+    grid.innerHTML = images
+      .map((asset) => {
+        const src = assetSrc(asset);
+        const selected = asset.id === currentAssetId;
+        return `<button type="button" class="videos-picker-card movies-character-image-option${selected ? " is-active" : ""}" data-character-asset="${escapeHtml(asset.id)}" aria-pressed="${selected ? "true" : "false"}" aria-label="Usar ${escapeHtml(asset.filename || asset.kind)}">
+          <img src="${escapeHtml(src)}" alt="${escapeHtml(asset.filename || character.name)}" />
+          <span>${escapeHtml(asset.filename || asset.kind)}</span>
+        </button>`;
+      })
+      .join("");
+    const alreadyInTake = shotId
+      ? shotCharacterIds(
+          boardMovie?.shots?.find((shot) => shot.id === shotId) || ({} as CreativeMovieShot),
+        ).includes(characterId)
+      : newTakeAssets.has(characterId);
+    remove.hidden = !alreadyInTake;
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function renderNewTakePicker() {
+    const picker = composerEl.querySelector<HTMLElement>("#movies-add-take .movies-character-picker");
+    if (picker) {
+      picker.outerHTML = characterPicker([...newTakeAssets.keys()], undefined, newTakeAssets);
     }
-    buttons.forEach((item) => {
-      const id = item.dataset.characterId || "";
-      const active = selected.has(id);
-      item.classList.toggle("is-active", active);
-      item.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+
+  async function selectCharacterAsset(assetId: string) {
+    const characterId = pickerCharacterId;
+    if (!characterId) return;
+    if (!pickerShotId) {
+      if (!newTakeAssets.has(characterId) && newTakeAssets.size >= 4) {
+        setStatus("No máximo 4 personagens por take", true);
+        return;
+      }
+      newTakeAssets.set(characterId, assetId);
+      renderNewTakePicker();
+      setStatus("");
+      closeCharacterPicker();
+      return;
+    }
+
+    const movie = boardMovie;
+    const shot = movie?.shots?.find((item) => item.id === pickerShotId);
+    if (!movie || !shot) return;
+    const characterIds = shotCharacterIds(shot);
+    if (!characterIds.includes(characterId)) {
+      if (characterIds.length >= 4) {
+        setStatus("No máximo 4 personagens por take", true);
+        return;
+      }
+      characterIds.push(characterId);
+    }
+    const saved = await patchShot(movie.id, shot.id, {
+      characterIds,
+      characterAssets: { [characterId]: assetId },
     });
-    return buttons
-      .map((item) => item.dataset.characterId || "")
-      .filter((id) => selected.has(id));
+    if (saved) {
+      setStatus("");
+      closeCharacterPicker();
+    }
+  }
+
+  async function removeCharacterFromTake() {
+    const characterId = pickerCharacterId;
+    if (!characterId) return;
+    if (!pickerShotId) {
+      newTakeAssets.delete(characterId);
+      renderNewTakePicker();
+      setStatus("");
+      closeCharacterPicker();
+      return;
+    }
+    const movie = boardMovie;
+    const shot = movie?.shots?.find((item) => item.id === pickerShotId);
+    if (!shot || !movie) return;
+    const characterIds = shotCharacterIds(shot).filter((id) => id !== characterId);
+    if (!characterIds.length) {
+      setStatus("O take precisa de pelo menos um personagem", true);
+      return;
+    }
+    const saved = await patchShot(movie.id, shot.id, { characterIds });
+    if (saved) {
+      setStatus("");
+      closeCharacterPicker();
+    }
   }
 
   function selectedNewCharacterIds(): string[] {
-    const ids = [
-      ...composerEl.querySelectorAll<HTMLElement>(
-        "#movies-add-take .movies-cast-option.is-active",
-      ),
-    ]
-      .map((item) => item.dataset.characterId || "")
-      .filter(Boolean);
-    if (ids.length) return ids;
-    return characters[0]?.id ? [characters[0].id] : [];
+    return [...newTakeAssets.keys()];
   }
 
   async function loadMovies() {
@@ -490,10 +620,17 @@ export function initMoviesTab(): {
       const res = await api(`/creative/movies/${encodeURIComponent(movieId)}/shots`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ characterIds, scene, action, dialogue: dialogue || undefined }),
+        body: JSON.stringify({
+          characterIds,
+          characterAssets: Object.fromEntries(newTakeAssets),
+          scene,
+          action,
+          dialogue: dialogue || undefined,
+        }),
       });
       if (!res.ok) throw new Error(await readError(res, "Falha ao adicionar take"));
       const next = (await res.json()) as CreativeMovie;
+      newTakeAssets = new Map();
       setStatus("");
       renderBoard(next);
     } catch (error) {
@@ -506,9 +643,9 @@ export function initMoviesTab(): {
   async function patchShot(
     movieId: string,
     shotId: string,
-    body: Record<string, string | number | string[]>,
-  ) {
-    if (busy) return;
+    body: Record<string, unknown>,
+  ): Promise<CreativeMovie | undefined> {
+    if (busy) return undefined;
     const res = await api(
       `/creative/movies/${encodeURIComponent(movieId)}/shots/${encodeURIComponent(shotId)}`,
       {
@@ -519,11 +656,14 @@ export function initMoviesTab(): {
     );
     if (!res.ok) {
       setStatus(await readError(res, "Falha ao salvar take"), true);
-      return;
+      return undefined;
     }
     const next = (await res.json()) as CreativeMovie;
     movies = movies.map((item) => (item.id === movieId ? next : item));
-    if ("characterIds" in body || "characterId" in body) renderBoard(next);
+    if ("characterIds" in body || "characterId" in body || "characterAssets" in body) {
+      renderBoard(next);
+    }
+    return next;
   }
 
   async function generateShot(movieId: string, shotId: string) {
@@ -611,20 +751,18 @@ export function initMoviesTab(): {
       ".movies-cast-option",
     );
     if (!btn || !composerEl.contains(btn)) return;
+    if (btn.closest("#movies-character-modal")) return;
     const characterId = btn.dataset.characterId;
     if (!characterId) return;
-    const shotId = btn.dataset.shotId;
-    const scope = shotId
-      ? composerEl.querySelector(`[data-shot-card="${shotId}"]`)
-      : composerEl.querySelector("#movies-add-take");
-    if (!scope) return;
-    const next = toggleCastSelection(scope, characterId);
-    if (!next.length) {
-      setStatus("O take precisa de pelo menos um personagem", true);
-      return;
-    }
-    if (!shotId || !boardMovie) return;
-    void patchShot(boardMovie.id, shotId, { characterIds: next });
+    event.preventDefault();
+    openCharacterPicker(characterId, btn.dataset.shotId);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const modal = composerEl.querySelector<HTMLElement>("#movies-character-modal");
+    if (!modal || modal.hidden) return;
+    closeCharacterPicker();
   });
 
   function onRoute(route: AppRoute) {

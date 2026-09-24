@@ -322,9 +322,17 @@ export class CreativeCharacterService {
     return { character, files };
   }
 
-  async heroImageFile(id: string) {
+  async heroImageFile(id: string, assetId?: string) {
     const character = await this.findById(id);
-    const hero = pickCharacterHero(character.assets);
+    const selected = assetId
+      ? character.assets.find(
+          (asset) =>
+            asset.id === assetId &&
+            asset.kind !== CHARACTER_ASSET_KIND.VIDEO &&
+            !asset.mimeType?.startsWith('video/'),
+        )
+      : undefined;
+    const hero = selected || pickCharacterHero(character.assets);
     if (!hero) return { character, file: null };
     const buffer = await this.storage.readStorageFile(hero.localPath);
     if (!buffer?.length || buffer.length > MAX_INLINE_BYTES) {

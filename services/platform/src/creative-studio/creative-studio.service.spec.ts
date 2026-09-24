@@ -1,8 +1,10 @@
 import { CreativeStudioService } from './creative-studio.service';
 import {
+  CAROUSEL_INSTAGRAM_ID,
   FLYER_VENDA_LANDING_ID,
   PLAYGROUND_IMAGEM_ID,
 } from './creative-features';
+import { CAROUSEL_SYSTEM_INSTRUCTION } from './carousel-instagram.planner';
 import { FLYER_SYSTEM_INSTRUCTION } from './flyer-venda.planner';
 
 describe('CreativeStudioService', () => {
@@ -14,6 +16,7 @@ describe('CreativeStudioService', () => {
     create: jest.fn(),
     addReferences: jest.fn(),
     generate: jest.fn(),
+    update: jest.fn(),
   };
   const storage = { readStorageFile: jest.fn() };
 
@@ -152,5 +155,127 @@ describe('CreativeStudioService', () => {
     expect(result.projectId).toBe('proj-1');
     expect(result.spec.audienceNoun).toBe('pacientes');
     expect(result.spec.packages[0].priceTo).toBe('R$ 800');
+  });
+
+  it('planeja o carrossel, gera cada slide em 4:5 e usa o anterior como referência', async () => {
+    llm.generateJson.mockImplementation(async (_prompt, validate) =>
+      validate({
+        caption: 'Hidrate-se. Salve o post.',
+        artDirection: 'Feed escuro',
+        palette: 'preto e lima',
+        slides: [
+          { role: 'cover', headline: 'Água agora', visual: 'capa' },
+          { role: 'tip', headline: '500 ml', visual: 'garrafa' },
+          { role: 'cta', headline: 'Salve', visual: 'cta' },
+        ],
+      }),
+    );
+    imageStudio.create.mockResolvedValue({ id: 'carousel-1' });
+    imageStudio.update.mockResolvedValue({});
+    imageStudio.generate
+      .mockResolvedValueOnce({
+        assets: [{ id: 'slide-1', kind: 'generated' }],
+      })
+      .mockResolvedValueOnce({
+        assets: [{ id: 'slide-2', kind: 'generated' }],
+      })
+      .mockResolvedValueOnce({
+        assets: [{ id: 'slide-3', kind: 'generated' }],
+      });
+
+    const result = await service.generateCarousel(
+      {
+        prompt: 'Hábitos de hidratação para treino de manhã',
+        slideCount: 3,
+        notes: 'Tom direto',
+      },
+      {
+        id: 'user-1',
+        email: 'a@b.c',
+        name: 'Ana',
+        role: 'ADMIN',
+        leadId: null,
+        customerId: null,
+      },
+    );
+
+    expect(imageStudio.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        featureId: CAROUSEL_INSTAGRAM_ID,
+        aspectRatio: '4:5',
+        imageSize: '2K',
+        systemInstruction: CAROUSEL_SYSTEM_INSTRUCTION,
+        skillRun: expect.objectContaining({
+          prompt: 'Hábitos de hidratação para treino de manhã',
+          slideCount: 3,
+        }),
+      }),
+      'user-1',
+    );
+    expect(imageStudio.generate).toHaveBeenCalledTimes(3);
+    expect(imageStudio.generate.mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        aspectRatio: '4:5',
+        referenceAssetIds: [],
+      }),
+    );
+    expect(imageStudio.generate.mock.calls[1][1]).toEqual(
+      expect.objectContaining({
+        referenceAssetIds: ['slide-1'],
+      }),
+    );
+    expect(imageStudio.generate.mock.calls[2][1]).toEqual(
+      expect.objectContaining({
+        referenceAssetIds: ['slide-2'],
+      }),
+    );
+    expect(imageStudio.generate.mock.calls[0][1].prompt).toContain('Água agora');
+    expect(result.projectId).toBe('carousel-1');
+    expect(result.completedSlides).toBe(3);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('mantém os slides já gerados se um generate falhar no meio', async () => {
+    llm.generateJson.mockImplementation(async (_prompt, validate) =>
+      validate({
+        caption: 'Salve',
+        slides: [
+          { role: 'cover', headline: 'Capa' },
+          { role: 'tip', headline: 'Meio' },
+          { role: 'cta', headline: 'Fim' },
+        ],
+      }),
+    );
+    imageStudio.create.mockResolvedValue({ id: 'carousel-2' });
+    imageStudio.update.mockResolvedValue({});
+    imageStudio.generate
+      .mockResolvedValueOnce({
+        assets: [{ id: 'slide-1', kind: 'generated' }],
+      })
+      .mockRejectedValueOnce(new Error('Gemini timeout'));
+
+    const result = await service.generateCarousel(
+      { prompt: 'Carrossel parcial', slideCount: 3 },
+      {
+        id: 'user-1',
+        email: 'a@b.c',
+        name: 'Ana',
+        role: 'ADMIN',
+        leadId: null,
+        customerId: null,
+      },
+    );
+
+    expect(result.completedSlides).toBe(1);
+    expect(result.error).toBe('Gemini timeout');
+    expect(imageStudio.update).toHaveBeenCalledWith(
+      'carousel-2',
+      expect.objectContaining({
+        skillRun: expect.objectContaining({
+          completedSlides: 1,
+          error: 'Gemini timeout',
+        }),
+      }),
+    );
   });
 });

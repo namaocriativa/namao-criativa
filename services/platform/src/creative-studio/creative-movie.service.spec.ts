@@ -209,8 +209,33 @@ describe('CreativeMovieService', () => {
     );
     expect(prisma.creativeMovieShotCast.createMany).toHaveBeenCalledWith({
       data: [
-        { shotId: 's2', characterId: 'ch1', sortOrder: 0 },
-        { shotId: 's2', characterId: 'ch2', sortOrder: 1 },
+        { shotId: 's2', characterId: 'ch1', assetId: null, sortOrder: 0 },
+        { shotId: 's2', characterId: 'ch2', assetId: null, sortOrder: 1 },
+      ],
+    });
+  });
+
+  it('grava a imagem escolhida de cada personagem no take', async () => {
+    prisma.creativeMovie.findUnique
+      .mockResolvedValueOnce({ ...movie, shots: [] })
+      .mockResolvedValue(movie);
+    prisma.creativeMovieShot.create.mockResolvedValue({ id: 's3' });
+    characters.findById.mockImplementation(async (id: string) => ({
+      id,
+      name: id,
+      assets: [{ id: `${id}-img`, kind: 'photo', mimeType: 'image/jpeg' }],
+    }));
+    await runWithTenant('tenant-1', () =>
+      service.addShot('m1', {
+        characterIds: ['ch1'],
+        characterAssets: { ch1: 'ch1-img' },
+        scene: 'sala',
+        action: 'entra',
+      }),
+    );
+    expect(prisma.creativeMovieShotCast.createMany).toHaveBeenCalledWith({
+      data: [
+        { shotId: 's3', characterId: 'ch1', assetId: 'ch1-img', sortOrder: 0 },
       ],
     });
   });
@@ -222,9 +247,10 @@ describe('CreativeMovieService', () => {
         {
           ...movie.shots[0],
           cast: [
-            ...movie.shots[0].cast,
+            { ...movie.shots[0].cast[0], assetId: 'luma-photo' },
             {
               characterId: 'ch2',
+              assetId: 'eduarda-sheet',
               sortOrder: 1,
               character: {
                 id: 'ch2',
@@ -241,8 +267,8 @@ describe('CreativeMovieService', () => {
       .mockResolvedValueOnce(duo)
       .mockResolvedValue(duo);
     await service.generateShot('m1', 's1');
-    expect(characters.heroImageFile).toHaveBeenCalledWith('ch1');
-    expect(characters.heroImageFile).toHaveBeenCalledWith('ch2');
+    expect(characters.heroImageFile).toHaveBeenCalledWith('ch1', 'luma-photo');
+    expect(characters.heroImageFile).toHaveBeenCalledWith('ch2', 'eduarda-sheet');
     expect(geminiVideos.generate).toHaveBeenCalledWith(
       expect.objectContaining({
         frames: [

@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -94,6 +95,10 @@ export class CreateMovieShotDto {
   @MaxLength(64)
   characterId?: string;
 
+  @IsOptional()
+  @IsObject()
+  characterAssets?: Record<string, string>;
+
   @IsString()
   @MinLength(1)
   @MaxLength(4000)
@@ -124,6 +129,10 @@ export class UpdateMovieShotDto {
   @MinLength(1)
   @MaxLength(64)
   characterId?: string;
+
+  @IsOptional()
+  @IsObject()
+  characterAssets?: Record<string, string>;
 
   @IsOptional()
   @IsString()

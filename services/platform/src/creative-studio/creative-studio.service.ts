@@ -15,12 +15,22 @@ import { LeadService } from '../lead/lead.service';
 import { StorageService } from '../storage/storage.service';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 import {
+  CAROUSEL_INSTAGRAM_ID,
   FLYER_VENDA_LANDING_ID,
   PLAYGROUND_IMAGEM_ID,
   findCreativeFeature,
   listCreativeFeatures,
 } from './creative-features';
+import { GenerateCarouselDto } from './dto/generate-carousel.dto';
 import { GenerateFlyerDto } from './dto/generate-flyer.dto';
+import {
+  CAROUSEL_SYSTEM_INSTRUCTION,
+  buildCarouselPlannerPrompt,
+  buildCarouselSlidePrompt,
+  clampSlideCount,
+  parseCarouselSpec,
+  type CarouselSpec,
+} from './carousel-instagram.planner';
 import {
   FLYER_SYSTEM_INSTRUCTION,
   buildFlyerImagePrompt,
@@ -146,6 +156,114 @@ export class CreativeStudioService {
       userMessage: generated.userMessage,
       modelMessage: generated.modelMessage,
       assets: generated.assets,
+    };
+  }
+
+  async generateCarousel(dto: GenerateCarouselDto, user: JwtUser) {
+    const feature = findCreativeFeature(CAROUSEL_INSTAGRAM_ID);
+    if (!feature) {
+      throw new NotFoundException('Feature não encontrada');
+    }
+
+    const prompt = dto.prompt.trim();
+    if (!prompt) {
+      throw new BadRequestException('Informe o briefing do carrossel');
+    }
+    const notes = dto.notes?.trim() || '';
+    const slideCount = clampSlideCount(dto.slideCount);
+    const plannerContext = { prompt, notes, slideCount };
+
+    let spec: CarouselSpec;
+    try {
+      spec = await this.llm.generateJson(
+        buildCarouselPlannerPrompt(plannerContext),
+        (value) => parseCarouselSpec(value, plannerContext),
+        {
+          role: 'plan',
+          temperature: 0.2,
+          expectedShape: 'CarouselSpec',
+        },
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Falha ao planejar o carrossel';
+      throw new BadGatewayException(message);
+    }
+
+    const defaults = feature.defaults || {};
+    const aspectRatio = defaults.aspectRatio || '4:5';
+    const imageSize = defaults.imageSize || '2K';
+    const baseSkillRun = {
+      prompt,
+      notes,
+      slideCount: spec.slides.length,
+      completedSlides: 0,
+      spec,
+    };
+    const project = await this.imageStudio.create(
+      {
+        name: `Carrossel · ${prompt.slice(0, 60)}`,
+        featureId: CAROUSEL_INSTAGRAM_ID,
+        model: defaults.model,
+        aspectRatio,
+        imageSize,
+        temperature: 0.4,
+        systemInstruction: CAROUSEL_SYSTEM_INSTRUCTION,
+        googleSearch: false,
+        skillRun: baseSkillRun,
+      },
+      user.id,
+    );
+
+    const assets: Array<{ id: string }> = [];
+    let lastGeneratedId: string | undefined;
+    let error: string | undefined;
+    for (const slide of spec.slides) {
+      try {
+        const generated = await this.imageStudio.generate(project.id, {
+          prompt: buildCarouselSlidePrompt(spec, slide, spec.slides.length),
+          model: defaults.model,
+          aspectRatio,
+          imageSize,
+          temperature: 0.4,
+          systemInstruction: CAROUSEL_SYSTEM_INSTRUCTION,
+          googleSearch: false,
+          referenceAssetIds: lastGeneratedId ? [lastGeneratedId] : [],
+        });
+        const next = (generated.assets || []).find(
+          (asset: { kind?: string; id?: string }) =>
+            asset.kind === 'generated' && asset.id,
+        );
+        if (next?.id) {
+          lastGeneratedId = next.id;
+          assets.push({ id: next.id });
+        }
+        await this.imageStudio.update(project.id, {
+          skillRun: {
+            ...baseSkillRun,
+            completedSlides: assets.length,
+          },
+        });
+      } catch (err) {
+        error = err instanceof Error ? err.message : 'Falha ao gerar um slide';
+        await this.imageStudio.update(project.id, {
+          skillRun: {
+            ...baseSkillRun,
+            completedSlides: assets.length,
+            error,
+          },
+        });
+        break;
+      }
+    }
+
+    return {
+      featureId: CAROUSEL_INSTAGRAM_ID,
+      projectId: project.id,
+      spec,
+      completedSlides: assets.length,
+      error,
+      assets,
     };
   }
 

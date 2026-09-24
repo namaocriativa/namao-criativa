@@ -1,11 +1,11 @@
 import { api } from "./api";
 import {
+  CAROUSEL_INSTAGRAM_ID,
   FLYER_VENDA_LANDING_ID,
   INICIO_FIM_ID,
   MOVIES_ID,
   PERSONAGENS_ID,
   UGC_SKILLS_ID,
-  findCreativeFeature,
 } from "./creative/features";
 import { navigate, type AppRoute } from "./router";
 import type { AgencyPackage, Lead } from "./types";
@@ -176,6 +176,41 @@ export function initCreativeTab(): {
     });
   }
 
+  function renderCarouselComposer() {
+    composerEl.innerHTML = `
+      <form id="criativo-carousel-form" class="criativo-flyer-form">
+        <div class="criativo-composer-copy">
+          <p class="criativo-kicker">Carrossel Instagram</p>
+          <h3>Um briefing vira uma série 4:5 para o feed</h3>
+        </div>
+        <label>
+          Briefing
+          <textarea id="criativo-carousel-prompt" rows="5" required placeholder="Ex.: 5 slides sobre hábitos de hidratação para quem treina de manhã. Tom direto, CTA para salvar."></textarea>
+        </label>
+        <label>
+          Quantidade de slides
+          <select id="criativo-carousel-count">
+            <option value="3">3 slides</option>
+            <option value="4">4 slides</option>
+            <option value="5" selected>5 slides</option>
+            <option value="6">6 slides</option>
+            <option value="7">7 slides</option>
+          </select>
+        </label>
+        <label>
+          Notas
+          <textarea id="criativo-carousel-notes" rows="3" placeholder="Tom, oferta, paleta ou CTA. Opcional."></textarea>
+        </label>
+        <div class="criativo-composer-actions">
+          <button type="submit" id="criativo-carousel-btn">Gerar carrossel</button>
+        </div>
+      </form>`;
+    composerEl.querySelector("#criativo-carousel-form")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void generateCarousel();
+    });
+  }
+
   function filterLeadSuggestions(query: string) {
     const suggestions = composerEl.querySelector("#criativo-lead-suggestions") as HTMLElement | null;
     if (!suggestions) return;
@@ -271,6 +306,48 @@ export function initCreativeTab(): {
     }
   }
 
+  async function generateCarousel() {
+    if (busy) return;
+    const prompt = (
+      composerEl.querySelector("#criativo-carousel-prompt") as HTMLTextAreaElement | null
+    )?.value.trim();
+    const notes = (
+      composerEl.querySelector("#criativo-carousel-notes") as HTMLTextAreaElement | null
+    )?.value;
+    const slideCount = Number(
+      (composerEl.querySelector("#criativo-carousel-count") as HTMLSelectElement | null)
+        ?.value || 5,
+    );
+    if (!prompt) {
+      setStatus("Escreva o briefing do carrossel", true);
+      return;
+    }
+    busy = true;
+    const btn = composerEl.querySelector("#criativo-carousel-btn") as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    setStatus("Gerando o carrossel… Isso pode levar alguns minutos.");
+    try {
+      const res = await api("/creative/features/carousel-instagram/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          slideCount,
+          notes: notes?.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Falha ao gerar o carrossel"));
+      const payload = (await res.json()) as { projectId: string; error?: string };
+      if (!payload.projectId) throw new Error("Projeto não retornado");
+      navigate({ name: "imagens-project", id: payload.projectId });
+    } catch (error) {
+      setStatus(errorMessage(error, "Falha ao gerar o carrossel"), true);
+    } finally {
+      busy = false;
+      if (btn) btn.disabled = false;
+    }
+  }
+
   document.addEventListener("click", (event) => {
     const suggestions = composerEl.querySelector("#criativo-lead-suggestions") as HTMLElement | null;
     if (!suggestions || suggestions.hidden) return;
@@ -289,16 +366,21 @@ export function initCreativeTab(): {
     ) {
       return;
     }
-    if (route.id !== FLYER_VENDA_LANDING_ID || !findCreativeFeature(route.id)) {
-      composerEl.innerHTML = `<p class="criativo-empty">Habilidade não encontrada.</p>`;
+    if (route.id === FLYER_VENDA_LANDING_ID) {
       setStatus("");
+      void loadCatalogs().then(() => {
+        renderComposer();
+      });
+      renderComposer();
       return;
     }
+    if (route.id === CAROUSEL_INSTAGRAM_ID) {
+      setStatus("");
+      renderCarouselComposer();
+      return;
+    }
+    composerEl.innerHTML = `<p class="criativo-empty">Habilidade não encontrada.</p>`;
     setStatus("");
-    void loadCatalogs().then(() => {
-      renderComposer();
-    });
-    renderComposer();
   }
 
   return { onRoute };

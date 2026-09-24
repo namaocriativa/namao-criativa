@@ -7,6 +7,7 @@ import {
 } from '../auth/studio-permission.decorator';
 import { StudioAuth } from '../auth/studio-auth.decorator';
 import { CreativeStudioService } from './creative-studio.service';
+import { GenerateCarouselDto } from './dto/generate-carousel.dto';
 import { GenerateFlyerDto } from './dto/generate-flyer.dto';
 
 @StudioAuth()
@@ -26,5 +27,14 @@ export class CreativeStudioController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.creativeStudio.generateFlyer(dto, user);
+  }
+
+  @Post('features/carousel-instagram/generate')
+  @StudioPermission(STUDIO_PERMISSION.IMAGES)
+  generateCarousel(
+    @Body() dto: GenerateCarouselDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.creativeStudio.generateCarousel(dto, user);
   }
 }

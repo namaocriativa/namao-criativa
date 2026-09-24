@@ -53,11 +53,15 @@ export type ImageSkillRunPackage = {
 };
 
 export type ImageSkillRun = {
-  leadId: string;
-  leadLabel: string;
-  packageIds: string[];
-  packages: ImageSkillRunPackage[];
-  notes: string;
+  leadId?: string;
+  leadLabel?: string;
+  packageIds?: string[];
+  packages?: ImageSkillRunPackage[];
+  notes?: string;
+  prompt?: string;
+  slideCount?: number;
+  completedSlides?: number;
+  error?: string;
   spec?: unknown;
 };
 
@@ -87,6 +91,7 @@ const IMAGE_SETTING_KEYS = [
   'personGeneration',
   'thinkingLevel',
   'includeThoughts',
+  'skillRun',
 ] as const;
 
 export function imageSettingsPatch(source: object): Partial<ImageProjectSettings> {
@@ -349,8 +354,38 @@ function pickSkillRun(
         ? (fallback as unknown as Record<string, unknown>)
         : null;
   if (!raw) return undefined;
+  const spec =
+    raw.spec && typeof raw.spec === 'object' && !Array.isArray(raw.spec)
+      ? (raw.spec as Record<string, unknown>)
+      : undefined;
+  const notes = typeof raw.notes === 'string' ? raw.notes.trim().slice(0, 4000) : '';
+  const prompt =
+    typeof raw.prompt === 'string' ? raw.prompt.trim().slice(0, 4000) : '';
+  const error =
+    typeof raw.error === 'string' && raw.error.trim()
+      ? raw.error.trim().slice(0, 500)
+      : undefined;
+  const slideCount =
+    typeof raw.slideCount === 'number' && Number.isFinite(raw.slideCount)
+      ? raw.slideCount
+      : undefined;
+  const completedSlides =
+    typeof raw.completedSlides === 'number' && Number.isFinite(raw.completedSlides)
+      ? raw.completedSlides
+      : undefined;
   const leadId = typeof raw.leadId === 'string' ? raw.leadId.trim() : '';
-  if (!leadId) return fallback;
+  if (!leadId) {
+    if (!spec && !prompt && !fallback) return undefined;
+    if (!spec && !prompt) return fallback;
+    return {
+      notes,
+      ...(prompt ? { prompt } : {}),
+      ...(slideCount != null ? { slideCount } : {}),
+      ...(completedSlides != null ? { completedSlides } : {}),
+      ...(error ? { error } : {}),
+      ...(spec ? { spec } : {}),
+    };
+  }
   const packageIds = Array.isArray(raw.packageIds)
     ? raw.packageIds
         .map((id) => String(id || '').trim())
@@ -376,10 +411,6 @@ function pickSkillRun(
         ];
       })
     : [];
-  const spec =
-    raw.spec && typeof raw.spec === 'object' && !Array.isArray(raw.spec)
-      ? (raw.spec as Record<string, unknown>)
-      : undefined;
   return {
     leadId,
     leadLabel:
@@ -388,7 +419,7 @@ function pickSkillRun(
         : leadId,
     packageIds,
     packages,
-    notes: typeof raw.notes === 'string' ? raw.notes.trim().slice(0, 4000) : '',
+    notes,
     ...(spec ? { spec } : {}),
   };
 }

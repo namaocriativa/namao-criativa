@@ -1,4 +1,5 @@
 import {
+  CAROUSEL_INSTAGRAM_ID,
   CREATIVE_FEATURES,
   FLYER_VENDA_LANDING_ID,
   INICIO_FIM_ID,
@@ -12,6 +13,11 @@ import {
 describe('creative-features', () => {
   it('registra flyer, personagens, filmes, início e fim, UGC Skills, imagem livre e vídeo livre', () => {
     expect(findCreativeFeature(FLYER_VENDA_LANDING_ID)?.status).toBe('ready');
+    expect(findCreativeFeature(CAROUSEL_INSTAGRAM_ID)?.status).toBe('ready');
+    expect(findCreativeFeature(CAROUSEL_INSTAGRAM_ID)?.kind).toBe('image');
+    expect(findCreativeFeature(CAROUSEL_INSTAGRAM_ID)?.defaults?.aspectRatio).toBe(
+      '4:5',
+    );
     expect(findCreativeFeature(PERSONAGENS_ID)?.status).toBe('ready');
     expect(findCreativeFeature(MOVIES_ID)?.status).toBe('ready');
     expect(findCreativeFeature(MOVIES_ID)?.kind).toBe('video');
@@ -28,6 +34,7 @@ describe('creative-features', () => {
     expect(creativeFeaturesByKind('image').map((item) => item.id)).toEqual([
       'playground-imagem',
       FLYER_VENDA_LANDING_ID,
+      CAROUSEL_INSTAGRAM_ID,
       PERSONAGENS_ID,
     ]);
     expect(creativeFeaturesByKind('video').map((item) => item.id)).toEqual([

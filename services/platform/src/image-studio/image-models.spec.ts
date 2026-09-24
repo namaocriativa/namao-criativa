@@ -101,4 +101,27 @@ describe('image-models', () => {
       spec: { headline: 'Presença digital' },
     });
   });
+
+  it('preserva skillRun de carrossel sem leadId', () => {
+    const settings = normalizeImageProjectSettings(
+      {
+        model: 'gemini-3-pro-image',
+        temperature: 0.4,
+      },
+      {
+        ...defaultImageProjectSettings(),
+        featureId: 'carousel-instagram',
+        skillRun: {
+          prompt: 'Hábitos de hidratação',
+          slideCount: 5,
+          spec: { caption: 'Salve o post' },
+        },
+      },
+    );
+    expect(settings.skillRun).toMatchObject({
+      prompt: 'Hábitos de hidratação',
+      slideCount: 5,
+      spec: { caption: 'Salve o post' },
+    });
+  });
 });

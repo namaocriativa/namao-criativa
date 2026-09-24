@@ -1,6 +1,7 @@
 import {
   fetchAdminApi,
   isHtmlNavigation,
+  isPublicPath,
   isSameAdminOrigin,
   isUnauthenticatedApiAllowed,
   originForAdminApiProxy,
@@ -17,14 +18,6 @@ export function isApiPath(pathname: string): boolean {
   return API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
-}
-
-export function isPublicPath(pathname: string): boolean {
-  if (pathname === '/login.html' || pathname === '/login') return true;
-  if (pathname.startsWith('/assets/login')) return true;
-  if (pathname.startsWith('/assets/modulepreload-polyfill')) return true;
-  if (/\.(css|woff2?|png|jpe?g|gif|svg|ico|map)$/i.test(pathname)) return true;
-  return false;
 }
 
 function stripSlash(url: string): string {

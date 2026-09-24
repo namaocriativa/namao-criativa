@@ -2,12 +2,14 @@ import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
+import type { ImageSkillRun } from '../image-models';
 
 export class UpdateImageProjectDto {
   @IsOptional()
@@ -63,4 +65,8 @@ export class UpdateImageProjectDto {
   @IsOptional()
   @IsBoolean()
   includeThoughts?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  skillRun?: ImageSkillRun;
 }

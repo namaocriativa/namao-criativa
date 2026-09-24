@@ -13,6 +13,15 @@ export function isStoragePath(pathname: string): boolean {
   return pathname === '/storage' || pathname.startsWith('/storage/');
 }
 
+/** Hashed Vite bundles and the login page. Never gate these behind JWT. */
+export function isPublicPath(pathname: string): boolean {
+  if (pathname === '/login.html' || pathname === '/login') return true;
+  if (pathname.startsWith('/assets/')) return true;
+  return /\.(css|js|mjs|cjs|wasm|woff2?|png|jpe?g|gif|svg|ico|map|webp|avif)$/i.test(
+    pathname,
+  );
+}
+
 export function isUnauthenticatedApiAllowed(
   method: string,
   pathname: string,

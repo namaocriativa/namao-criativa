@@ -147,11 +147,15 @@ export interface ImageSkillRunPackage {
 }
 
 export interface ImageSkillRun {
-  leadId: string;
-  leadLabel: string;
-  packageIds: string[];
-  packages: ImageSkillRunPackage[];
+  leadId?: string;
+  leadLabel?: string;
+  packageIds?: string[];
+  packages?: ImageSkillRunPackage[];
   notes?: string;
+  prompt?: string;
+  slideCount?: number;
+  completedSlides?: number;
+  error?: string;
   spec?: Record<string, unknown> | null;
 }
 
@@ -196,6 +200,7 @@ export type CreativeMovieShotStatus = "draft" | "generating" | "ready" | "failed
 export interface CreativeMovieShotCast {
   shotId?: string;
   characterId: string;
+  assetId?: string | null;
   sortOrder?: number;
   character?: CreativeCharacter;
 }

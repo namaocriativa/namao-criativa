@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   headersForStudioApiProxy,
   isHtmlNavigation,
+  isPublicPath,
   isStoragePath,
   isUnauthenticatedApiAllowed,
   studioProxyStatus,
@@ -61,6 +62,15 @@ test('studioProxyStatus não deixa 502/504 vazar para a página HTML da Cloudfla
   assert.equal(studioProxyStatus(502), 400);
   assert.equal(studioProxyStatus(504), 400);
   assert.equal(studioProxyStatus(503), 400);
+});
+
+test('assets do Vite e a página de login são públicos sem cookie', () => {
+  assert.equal(isPublicPath('/login'), true);
+  assert.equal(isPublicPath('/assets/login-abc123.js'), true);
+  assert.equal(isPublicPath('/assets/theme-def456.js'), true);
+  assert.equal(isPublicPath('/assets/main-xyz.js'), true);
+  assert.equal(isPublicPath('/leads'), false);
+  assert.equal(isPublicPath('/criativo/habilidade/personagens'), false);
 });
 
 test('storage do servidor é encaminhado mesmo sendo URL de navegação ou imagem estática', () => {

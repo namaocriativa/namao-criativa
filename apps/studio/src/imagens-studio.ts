@@ -1,6 +1,7 @@
 import { api } from "./api";
 import { formatChatMarkdown } from "./chat-markdown";
 import {
+  CAROUSEL_INSTAGRAM_ID,
   creativeSkillFeatures,
   findCreativeFeature,
   isPlaygroundFeature,
@@ -355,11 +356,89 @@ const THINKING_LEVEL_LABELS: Record<string, string> = {
     return (message.assets || []).filter((asset) => asset.kind === "generated");
   }
 
+  function renderCarouselRecap(run: ImageSkillRun | undefined, imagesHtml: string): string {
+    const spec = (run?.spec || {}) as Record<string, unknown>;
+    const caption = String(spec.caption || "");
+    const slides = Array.isArray(spec.slides)
+      ? (spec.slides as Array<Record<string, unknown>>)
+      : [];
+    const headlines = slides
+      .map((slide, index) => {
+        const headline = String(slide.headline || "").trim();
+        if (!headline) return "";
+        return `<li><span>${index + 1}</span>${escapeHtml(headline)}</li>`;
+      })
+      .filter(Boolean)
+      .join("");
+    const error = run?.error
+      ? `<p class="imagens-empty">${escapeHtml(run.error)}</p>`
+      : "";
+    return `<article class="imagens-skill-recap">
+      <p class="criativo-kicker">Carrossel Instagram</p>
+      <h3>${escapeHtml(current?.name || "Carrossel")}</h3>
+      ${error}
+      ${
+        caption
+          ? `<div class="imagens-carousel-caption">
+              <p class="criativo-field-label">Legenda</p>
+              <pre>${escapeHtml(caption)}</pre>
+              <button type="button" data-copy-caption>Copiar legenda</button>
+            </div>`
+          : ""
+      }
+      ${headlines ? `<ol class="imagens-carousel-headlines">${headlines}</ol>` : ""}
+      <div class="imagens-carousel" data-carousel>
+        ${imagesHtml || `<p class="imagens-empty">Nenhum slide gerado ainda.</p>`}
+        <div class="imagens-carousel-nav">
+          <button type="button" data-carousel-prev aria-label="Slide anterior">‹</button>
+          <p class="imagens-carousel-index" data-carousel-index></p>
+          <button type="button" data-carousel-next aria-label="Próximo slide">›</button>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  function bindCarousel() {
+    const root = threadEl.querySelector("[data-carousel]") as HTMLElement | null;
+    if (!root) return;
+    const slides = [...root.querySelectorAll(".imagens-carousel-slide")];
+    if (!slides.length) return;
+    let index = 0;
+    const label = root.querySelector("[data-carousel-index]");
+    const show = () => {
+      slides.forEach((slide, i) => {
+        slide.classList.toggle("is-active", i === index);
+      });
+      if (label) label.textContent = `${index + 1} / ${slides.length}`;
+    };
+    root.querySelector("[data-carousel-prev]")?.addEventListener("click", () => {
+      index = (index - 1 + slides.length) % slides.length;
+      show();
+    });
+    root.querySelector("[data-carousel-next]")?.addEventListener("click", () => {
+      index = (index + 1) % slides.length;
+      show();
+    });
+    show();
+  }
+
   function renderSkillRecap(): string {
     const featureId = current?.settings?.featureId || "";
     const feature = findCreativeFeature(featureId);
     const run = current?.settings?.skillRun as ImageSkillRun | undefined;
     const generated = (current?.messages || []).flatMap((message) => generatedOf(message));
+    const carouselImages = generated
+      .map((asset, index) => {
+        const src = assetSrc(asset);
+        if (!src) return "";
+        return `<a class="imagens-carousel-slide${index === 0 ? " is-active" : ""}" href="${escapeHtml(src)}" target="_blank" rel="noreferrer">
+          <img src="${escapeHtml(src)}" alt="Slide ${index + 1}" />
+        </a>`;
+      })
+      .join("");
+    if (featureId === CAROUSEL_INSTAGRAM_ID) {
+      return renderCarouselRecap(run, carouselImages);
+    }
     const images = generated
       .map((asset) => {
         const src = assetSrc(asset);
@@ -426,6 +505,7 @@ const THINKING_LEVEL_LABELS: Record<string, string> = {
   function renderThread(pendingPrompt?: string) {
     if (isSkillProject(current) && !pendingPrompt) {
       threadEl.innerHTML = renderSkillRecap();
+      bindCarousel();
       threadEl.scrollTop = 0;
       return;
     }
@@ -1030,6 +1110,22 @@ const THINKING_LEVEL_LABELS: Record<string, string> = {
     const cancelBtn = target?.closest("[data-proposal-cancel]") as HTMLElement | null;
     if (cancelBtn?.dataset.proposalCancel) {
       void cancelProposal(cancelBtn.dataset.proposalCancel);
+      return;
+    }
+    const copyBtn = target?.closest("[data-copy-caption]") as HTMLElement | null;
+    if (copyBtn) {
+      const caption = threadEl.querySelector(".imagens-carousel-caption pre")?.textContent || "";
+      if (caption) {
+        void navigator.clipboard.writeText(caption).then(
+          () => {
+            copyBtn.textContent = "Copiada";
+            setTimeout(() => {
+              copyBtn.textContent = "Copiar legenda";
+            }, 1600);
+          },
+          () => setStatus("Não deu para copiar a legenda", true),
+        );
+      }
     }
   });
 

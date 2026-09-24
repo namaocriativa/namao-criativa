@@ -137,6 +137,10 @@ export class CreativeMovieService {
       dto.characterIds,
       dto.characterId,
     );
+    const characterAssets = await this.requireCharacterAssets(
+      characterIds,
+      dto.characterAssets,
+    );
     const scene = dto.scene.trim();
     const action = dto.action.trim();
     if (!scene || !action) {
@@ -161,6 +165,7 @@ export class CreativeMovieService {
         data: characterIds.map((characterId, index) => ({
           shotId: shot.id,
           characterId,
+          assetId: characterAssets.get(characterId) || null,
           sortOrder: index,
         })),
       });
@@ -173,10 +178,28 @@ export class CreativeMovieService {
     if (shot.status === MOVIE_SHOT_STATUS.GENERATING) {
       throw new ConflictException('Aguarde o take terminar de gerar');
     }
+    const currentCastIds = (shot.cast || []).map((item) => item.characterId);
     const characterIds =
       dto.characterIds !== undefined || dto.characterId
         ? await this.requireCastIds(dto.characterIds, dto.characterId)
-        : null;
+        : currentCastIds.length
+          ? currentCastIds
+          : [shot.characterId];
+    const shouldUpdateCast =
+      dto.characterIds !== undefined ||
+      Boolean(dto.characterId) ||
+      dto.characterAssets !== undefined;
+    const requestedAssets = {
+      ...Object.fromEntries(
+        (shot.cast || [])
+          .filter((item) => item.assetId)
+          .map((item) => [item.characterId, item.assetId as string]),
+      ),
+      ...(dto.characterAssets || {}),
+    };
+    const characterAssets = shouldUpdateCast
+      ? await this.requireCharacterAssets(characterIds, requestedAssets)
+      : new Map<string, string>();
     await this.prisma.$transaction(async (tx) => {
       await tx.creativeMovieShot.update({
         where: { id: shotId },
@@ -190,12 +213,13 @@ export class CreativeMovieService {
             typeof dto.sortOrder === 'number' ? dto.sortOrder : shot.sortOrder,
         },
       });
-      if (characterIds) {
+      if (shouldUpdateCast) {
         await tx.creativeMovieShotCast.deleteMany({ where: { shotId } });
         await tx.creativeMovieShotCast.createMany({
           data: characterIds.map((characterId, index) => ({
             shotId,
             characterId,
+            assetId: characterAssets.get(characterId) || null,
             sortOrder: index,
           })),
         });
@@ -265,7 +289,14 @@ export class CreativeMovieService {
       action: shot.action,
       dialogue: shot.dialogue,
     });
-    const frames = await this.loadCastFrames(cast.map((item) => item.id));
+    const frames = await this.loadCastFrames(
+      shot.cast?.length
+        ? shot.cast.map((item) => ({
+            id: item.characterId,
+            assetId: item.assetId,
+          }))
+        : [{ id: shot.characterId }],
+    );
 
     try {
       const result = await this.geminiVideos.generate({
@@ -308,6 +339,38 @@ export class CreativeMovieService {
       throw new BadGatewayException(message);
     }
     return this.touch(movieId);
+  }
+
+  private async requireCharacterAssets(
+    characterIds: string[],
+    requested: Record<string, string> | undefined,
+  ): Promise<Map<string, string>> {
+    const entries = Object.entries(requested || {});
+    if (entries.some(([characterId]) => !characterIds.includes(characterId))) {
+      throw new BadRequestException(
+        'A imagem selecionada precisa pertencer a um personagem do take',
+      );
+    }
+    const selected = new Map<string, string>();
+    for (const [characterId, assetId] of entries) {
+      if (typeof assetId !== 'string' || !assetId.trim()) {
+        throw new BadRequestException('Imagem de personagem inválida');
+      }
+      const character = await this.characters.findById(characterId);
+      const asset = character.assets?.find(
+        (item: { id: string; kind: string; mimeType?: string | null }) =>
+          item.id === assetId &&
+          item.kind !== 'video' &&
+          !item.mimeType?.startsWith('video/'),
+      );
+      if (!asset) {
+        throw new BadRequestException(
+          `A imagem selecionada não pertence ao personagem ${character.name}`,
+        );
+      }
+      selected.set(characterId, assetId);
+    }
+    return selected;
   }
 
   private async requireCastIds(
@@ -381,11 +444,14 @@ export class CreativeMovieService {
   }
 
   private async loadCastFrames(
-    characterIds: string[],
+    cast: Array<{ id: string; assetId?: string | null }>,
   ): Promise<VideoInlineImage[]> {
     const frames: VideoInlineImage[] = [];
-    for (const id of characterIds) {
-      const { file } = await this.characters.heroImageFile(id);
+    for (const member of cast) {
+      const { file } = await this.characters.heroImageFile(
+        member.id,
+        member.assetId || undefined,
+      );
       if (!file?.buffer?.length || file.buffer.length > MAX_INLINE_BYTES) {
         continue;
       }
@@ -400,6 +466,7 @@ export class CreativeMovieService {
   private async requireShot(movieId: string, shotId: string) {
     const shot = await this.prisma.creativeMovieShot.findFirst({
       where: { id: shotId, movieId },
+      include: { cast: true },
     });
     if (!shot) {
       throw new NotFoundException(`Take ${shotId} não encontrado`);

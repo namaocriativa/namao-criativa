@@ -532,9 +532,9 @@ model CreativeCharacter {
 
   tenant    Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdBy User?                    @relation("CreativeCharacterCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  assets     CreativeCharacterAsset[]
-  movieShots CreativeMovieShot[]
-  movieCast  CreativeMovieShotCast[]
+  assets       CreativeCharacterAsset[]
+  movieShots   CreativeMovieShot[]
+  movieCast    CreativeMovieShotCast[]
   ugcClips   CreativeUgcClip[]
 
   @@index([createdByUserId])
@@ -551,7 +551,8 @@ model CreativeCharacterAsset {
   mimeType    String?
   createdAt   DateTime @default(now())
 
-  character CreativeCharacter @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  character       CreativeCharacter       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  movieShotCasts   CreativeMovieShotCast[]
 
   @@index([characterId, createdAt])
   @@index([kind])
@@ -603,14 +604,17 @@ model CreativeMovieShot {
 model CreativeMovieShotCast {
   shotId      String
   characterId String
+  assetId     String?
   sortOrder   Int    @default(0)
 
-  shot      CreativeMovieShot @relation(fields: [shotId], references: [id], onDelete: Cascade)
-  character CreativeCharacter @relation(fields: [characterId], references: [id], onDelete: Restrict)
+  shot      CreativeMovieShot     @relation(fields: [shotId], references: [id], onDelete: Cascade)
+  character CreativeCharacter     @relation(fields: [characterId], references: [id], onDelete: Restrict)
+  asset     CreativeCharacterAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
 
   @@id([shotId, characterId])
   @@index([characterId])
   @@index([shotId, sortOrder])
+  @@index([assetId])
 }
 
 model CreativeStartEndClip {
