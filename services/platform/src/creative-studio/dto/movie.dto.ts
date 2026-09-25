@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
   IsInt,
   IsObject,
   IsOptional,
@@ -12,6 +13,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { MOVIE_CAMERA_IDS, MOVIE_FRAMING_IDS } from '../movies.direction';
 
 export const MAX_MOVIE_SHOT_CAST = 4;
 
@@ -113,6 +115,14 @@ export class CreateMovieShotDto {
   @IsString()
   @MaxLength(2000)
   dialogue?: string;
+
+  @IsOptional()
+  @IsIn(MOVIE_FRAMING_IDS)
+  framing?: string;
+
+  @IsOptional()
+  @IsIn(MOVIE_CAMERA_IDS)
+  camera?: string;
 }
 
 export class UpdateMovieShotDto {
@@ -150,6 +160,14 @@ export class UpdateMovieShotDto {
   @IsString()
   @MaxLength(2000)
   dialogue?: string;
+
+  @IsOptional()
+  @IsIn(MOVIE_FRAMING_IDS)
+  framing?: string;
+
+  @IsOptional()
+  @IsIn(MOVIE_CAMERA_IDS)
+  camera?: string;
 
   @IsOptional()
   @IsInt()

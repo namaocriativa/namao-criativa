@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--seo-->
+  </head>
+  <body class="auth-body">
+    <header class="site-nav">
+      <a class="nav-brand" href="/">
+        <img src="/logo-mark.png" alt="Namão Criativa" width="40" height="40" decoding="async" />
+        <span>Namão</span>
+      </a>
+      <nav>
+        <button type="button" class="text-btn" id="logout-btn">Sair</button>
+      </nav>
+    </header>
+    <main class="proposal-main">
+      <p class="kicker" id="proposal-kicker">Proposta</p>
+      <h1 id="proposal-title">Sua proposta</h1>
+      <p class="lede" id="proposal-lede">Carregando…</p>
+      <p class="status" id="proposal-status"></p>
+
+      <section class="proposal-card" id="proposal-package" hidden>
+        <p class="kicker">Pacote</p>
+        <h2 id="proposal-package-name">—</h2>
+        <p id="proposal-price" class="proposal-price"></p>
+        <p id="proposal-summary"></p>
+        <p id="proposal-description"></p>
+        <ul id="proposal-benefits"></ul>
+      </section>
+
+      <section class="proposal-card" id="proposal-steps" hidden>
+        <p class="kicker">Próximos passos</p>
+        <ol id="proposal-steps-list"></ol>
+      </section>
+
+      <section class="proposal-card" id="proposal-legal" hidden>
+        <p class="kicker">Transparência</p>
+        <p id="proposal-legal-copy"></p>
+        <p>
+          Ao aceitar, você concorda com os
+          <a href="/termos.html" target="_blank" rel="noopener noreferrer">Termos de uso</a>
+          e com a
+          <a href="/privacidade.html" target="_blank" rel="noopener noreferrer">Política de privacidade</a>.
+        </p>
+        <label class="proposal-check" id="proposal-accept-row">
+          <input type="checkbox" id="proposal-terms" />
+          <span>Li e aceito os Termos de uso e quero me tornar cliente da Namão.</span>
+        </label>
+        <button type="button" class="btn btn-primary" id="proposal-accept" disabled>
+          Aceitar proposta
+        </button>
+        <p>
+          <a class="btn btn-ghost" id="proposal-dashboard-link" href="/dashboard.html" hidden>Ir para o painel</a>
+        </p>
+      </section>
+
+      <section class="proposal-card" id="proposal-pix" hidden></section>
+    </main>
+    <footer class="site-footer site-footer--compact">
+      <div class="footer-inner">
+        <div class="footer-meta">
+          <p>© 2026 Namão Criativa</p>
+          <nav class="footer-legal" aria-label="Documentos legais">
+            <a href="/termos.html">Termos de uso</a>
+            <a href="/privacidade.html">Privacidade</a>
+          </nav>
+        </div>
+      </div>
+    </footer>
+    <script type="module" src="/src/proposta.ts"></script>
+  </body>
+</html>

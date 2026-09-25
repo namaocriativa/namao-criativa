@@ -42,15 +42,17 @@ import {
 import {
   getGeneratePayload,
   mountSiteWizard,
-  openSiteWizard,
-  setWizardApiKind,
-  setWizardLeadId,
   setWizardOnConfirm,
 } from "./site-config";
 import { entityKindOf, profileApi, type EntityKind } from "./profile-api";
 import { initLeadGallery } from "./lead-gallery";
 import { initLeadAccountModal } from "./lead-account-modal";
 import { initLeadShareModal } from "./lead-share-modal";
+import { initLeadWebsiteModal } from "./lead-website-modal";
+import {
+  websiteHealthHostsHtml,
+  type WebsiteHealth,
+} from "./website-health-ui";
 import { initLeadEditModal } from "./lead-edit-modal";
 import { initLeadEmailsModal } from "./lead-emails-modal";
 import { initLeadWhatsAppModal } from "./lead-whatsapp-modal";
@@ -163,14 +165,9 @@ let customersSearchDebounce: ReturnType<typeof setTimeout> | null = null;
 
 const detailHeading = el<HTMLElement>("detail-heading");
 const leadSitePanel = el<HTMLElement>("lead-site-panel");
-const siteGenerateBtn = el<HTMLButtonElement>("site-generate-btn");
-const siteCancelBtn = el<HTMLButtonElement>("site-cancel-btn");
+const siteAddBtn = el<HTMLButtonElement>("site-add-btn");
+const siteDeployBtn = el<HTMLButtonElement>("site-deploy-btn");
 const sitePromptBtn = el<HTMLButtonElement>("site-prompt-btn");
-const siteRefreshBtn = el<HTMLButtonElement>("site-refresh-btn");
-const siteLocalBtn = el<HTMLButtonElement>("site-local-btn");
-const siteAccountBtn = el<HTMLButtonElement>("site-account-btn");
-const sitePublishBtn = el<HTMLButtonElement>("site-publish-btn");
-const siteDeleteBtn = el<HTMLButtonElement>("site-delete-btn");
 const siteStatus = el<HTMLElement>("site-status");
 const siteActions = el<HTMLElement>("site-actions");
 const siteProgressLog = el<HTMLElement>("site-progress-log");
@@ -180,21 +177,25 @@ const siteProgressBar = el<HTMLElement>("site-progress-bar");
 const siteProgressCard = el<HTMLElement>("site-progress-card");
 const siteProgressToggle = el<HTMLButtonElement>("site-progress-toggle");
 const siteDownloadLogBtn = el<HTMLButtonElement>("site-download-log-btn");
+const heroHealth = el<HTMLElement>("lead-hero-health");
+const heroHealthSummary = el<HTMLElement>("lead-hero-health-summary");
+const heroHealthList = el<HTMLElement>("lead-hero-health-list");
+const heroHealthRefresh = el<HTMLButtonElement>("lead-hero-health-refresh");
 
 let currentLeadId: string | null = null;
 let currentEntityKind: EntityKind = "lead";
 let currentLead: Lead | null = null;
 let historyLoadSeq = 0;
+let heroHealthSeq = 0;
 let activeJobId: string | null = null;
 let siteEventSource: EventSource | null = null;
-let llmReady = false;
-let vercelReady = false;
 
 const JOB_STORAGE_KEY = "landingActiveJob";
 
 function setLeadView(on: boolean) {
   document.body.classList.toggle("is-lead-view", on);
   leadContext.hidden = !on;
+  if (!on) heroHealth.hidden = true;
   const fold = document.getElementById("lead-context-fold");
   if (fold instanceof HTMLDetailsElement) {
     fold.open = on && window.matchMedia("(min-width: 1100px)").matches;
@@ -379,8 +380,22 @@ const leadGallery = initLeadGallery(el<HTMLElement>("lead-gallery-root"), {
     loadSavedLeads();
   },
 });
-const leadAccount = initLeadAccountModal(el<HTMLElement>("lead-account-root"));
+initLeadAccountModal(el<HTMLElement>("lead-account-root"));
 const leadShare = initLeadShareModal(el<HTMLElement>("lead-share-root"));
+const leadWebsite = initLeadWebsiteModal(el<HTMLElement>("lead-website-root"), {
+  onLinked: (lead) => {
+    renderLead(lead);
+    loadSavedLeads();
+    loadSavedCustomers();
+    const repo = lead.websiteRepo || lead.websiteProjectId;
+    setStatus(
+      siteStatus,
+      repo
+        ? `${repo} vinculado. Push em main publica; use Publicar agora para disparar a Action.`
+        : "Site vinculado.",
+    );
+  },
+});
 const leadEmails = initLeadEmailsModal(el<HTMLElement>("lead-emails-root"), {
   onSent: () => {
     if (currentLead) void loadLeadHistory(currentLead);
@@ -773,6 +788,7 @@ function renderLeadContext(lead: Lead) {
     <div><dt>Instagram</dt><dd>${contextValue(lead.instagram)}</dd></div>
     <div><dt>Fontes</dt><dd>${contextValue(sources.length ? sources.join(", ") : null)}</dd></div>
     <div><dt>Atualizado</dt><dd>${contextValue(lead.updatedAt ? formatDate(lead.updatedAt) : null)}</dd></div>
+    <div id="lead-proposal-status"><dt>Proposta</dt><dd><span class="missing">—</span></dd></div>
   `;
 
   const previewHref = lead.id
@@ -812,6 +828,11 @@ function renderLeadContext(lead: Lead) {
         ? `<button type="button" data-context-action="convert-customer">Transformar em cliente</button>`
         : ""
     }
+    ${
+      lead.id
+        ? `<button type="button" data-context-action="mark-paid" hidden>Marcar como pago</button>`
+        : ""
+    }
   `;
   leadContextActions
     .querySelector("[data-context-action='gallery']")
@@ -839,8 +860,14 @@ function renderLeadContext(lead: Lead) {
     ?.addEventListener("click", () => {
       if (lead.id) void convertLeadToCustomer(lead);
     });
+  leadContextActions
+    .querySelector("[data-context-action='mark-paid']")
+    ?.addEventListener("click", () => {
+      if (lead.id) void markProposalPaid(lead);
+    });
 
   void loadLeadHistory(lead);
+  void loadLeadProposal(lead);
 }
 
 type HistoryItem = {
@@ -884,6 +911,71 @@ function fallbackHistory(lead: Lead): HistoryItem[] {
     });
   }
   return history;
+}
+
+async function loadLeadProposal(lead: Lead) {
+  const row = document.getElementById("lead-proposal-status");
+  const markPaidBtn = leadContextActions.querySelector(
+    "[data-context-action='mark-paid']",
+  ) as HTMLButtonElement | null;
+  if (!lead.id || !row) {
+    if (markPaidBtn) markPaidBtn.hidden = true;
+    return;
+  }
+  try {
+    const res = await api(profileApi(entityKindOf(lead), lead.id, "/proposal"));
+    const data = (await res.json().catch(() => ({}))) as {
+      proposal?: {
+        status?: string;
+        paymentStatus?: string;
+        package?: { name?: string };
+      } | null;
+    };
+    if (!res.ok || !data.proposal) {
+      row.innerHTML = `<dt>Proposta</dt><dd><span class="missing">não enviada</span></dd>`;
+      if (markPaidBtn) markPaidBtn.hidden = true;
+      return;
+    }
+    const status =
+      data.proposal.status === "accepted" ? "aceita" : "pendente";
+    const payment =
+      data.proposal.paymentStatus === "paid"
+        ? "pago"
+        : data.proposal.paymentStatus === "waived"
+          ? "sem cobrança"
+          : "pagamento pendente";
+    const pkg = data.proposal.package?.name
+      ? ` · ${data.proposal.package.name}`
+      : "";
+    row.innerHTML = `<dt>Proposta</dt><dd>${escapeHtml(`${status} · ${payment}${pkg}`)}</dd>`;
+    if (markPaidBtn) {
+      markPaidBtn.hidden = data.proposal.paymentStatus !== "pending";
+    }
+  } catch {
+    row.innerHTML = `<dt>Proposta</dt><dd><span class="missing">—</span></dd>`;
+    if (markPaidBtn) markPaidBtn.hidden = true;
+  }
+}
+
+async function markProposalPaid(lead: Lead) {
+  if (!lead.id) return;
+  if (!confirm(`Marcar o pagamento de ${lead.name || "este perfil"} como pago?`)) {
+    return;
+  }
+  try {
+    const res = await api(
+      profileApi(entityKindOf(lead), lead.id, "/proposal/mark-paid"),
+      { method: "POST" },
+    );
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      throw new Error(data.message || "Falha ao marcar pagamento");
+    }
+    void loadLeadProposal(lead);
+    void loadLeadHistory(lead);
+  } catch (error) {
+    alert(error instanceof Error ? error.message : "Falha ao marcar pagamento");
+  }
 }
 
 async function loadLeadHistory(lead: Lead) {
@@ -1081,6 +1173,7 @@ function renderLead(lead: Lead) {
   siteActions.hidden = !currentLeadId;
   setSiteActionsEnabled(Boolean(currentLeadId));
   updateLandingMeta(lead);
+  void loadHeroHealth(lead);
   renderLeadContext(lead);
   setLeadView(Boolean(currentLeadId));
   setProgressGenerating(
@@ -1329,7 +1422,7 @@ function renderSavedLeadsList() {
     const category = String(lead.category || "").trim();
     li.innerHTML = `
       <strong>${escapeHtml(lead.name || "Sem nome")}</strong>
-      ${landingBadgeHtml(lead.landingStatus, lead.publishedOrigin)}
+      ${landingBadgeHtml(lead)}
       ${lead.fromPublicSignup ? `<span class="landing-badge origin-badge">cadastro</span>` : ""}
       ${studioAccessTagsHtml(lead)}
       <div class="meta">
@@ -1431,7 +1524,7 @@ function renderSavedCustomersList() {
     const category = String(lead.category || "").trim();
     li.innerHTML = `
       <strong>${escapeHtml(lead.name || "Sem nome")}</strong>
-      ${landingBadgeHtml(lead.landingStatus, lead.publishedOrigin)}
+      ${landingBadgeHtml(lead)}
       ${studioAccessTagsHtml(lead)}
       <div class="meta">
         ${category ? `<span class="lead-category-tag">${escapeHtml(category)}</span> · ` : ""}
@@ -2052,42 +2145,32 @@ void requireStudioSession()
   });
 
 function setSiteActionsEnabled(enabled: boolean) {
-  siteGenerateBtn.disabled = !enabled || !llmReady;
+  siteAddBtn.disabled = !enabled;
   sitePromptBtn.disabled = !enabled;
-  siteCancelBtn.disabled = !(enabled && Boolean(activeJobId));
-  siteAccountBtn.disabled = !enabled;
-  updateSitePublishEnabled();
-  updateSiteLocalEnabled();
-  updateSiteDeleteEnabled();
+  const linked = Boolean(currentLead?.websiteRepo);
+  siteDeployBtn.hidden = !linked;
+  siteDeployBtn.disabled = !enabled || !linked;
 }
 
-function updateSiteDeleteEnabled() {
-  const hasSite = siteDeleteBtn.dataset.hasSite === "1";
-  siteDeleteBtn.disabled = !(Boolean(currentLeadId) && hasSite);
-}
-
-function updateSiteLocalEnabled() {
-  const hasBuild = siteLocalBtn.dataset.hasBuild === "1";
-  siteLocalBtn.disabled = !(Boolean(currentLeadId) && hasBuild);
-}
-
-function updateSitePublishEnabled() {
-  const hasBuild = sitePublishBtn.dataset.hasBuild === "1";
-  sitePublishBtn.disabled = !(
-    Boolean(currentLeadId) &&
-    hasBuild &&
-    vercelReady &&
-    !activeJobId
-  );
-}
-
-function landingBadgeHtml(
-  status: string | null | undefined,
-  publishedOrigin?: string | null,
-) {
-  const value = publishedOrigin ? "published" : status || "none";
+function landingBadgeHtml(lead: Pick<Lead, "landingStatus" | "publishedOrigin" | "websiteProjectId" | "websiteDeployType" | "websiteRepo" | "websiteDomain">) {
+  const repo = lead.websiteRepo || lead.websiteProjectId;
+  if (repo) {
+    const dest =
+      lead.websiteDeployType === "vercel"
+        ? "Vercel"
+        : lead.websiteDeployType === "cloudflare"
+          ? "Cloudflare"
+          : "ligado";
+    const domain =
+      lead.websiteDeployType === "cloudflare" && lead.websiteDomain
+        ? ` · ${lead.websiteDomain}`
+        : "";
+    return `<span class="landing-badge landing-badge--built">${escapeHtml(repo)} · ${escapeHtml(dest)}${escapeHtml(domain)}</span>`;
+  }
+  const value = lead.publishedOrigin ? "published" : lead.landingStatus || "none";
   const labels: Record<string, string> = {
     none: "sem site",
+    linked: "ligado",
     scaffolded: "scaffold",
     generating: "gerando",
     built: "build OK",
@@ -2097,7 +2180,7 @@ function landingBadgeHtml(
     cancelled: "cancelado",
   };
   const cls =
-    value === "built" || value === "published"
+    value === "built" || value === "published" || value === "linked"
       ? "landing-badge landing-badge--built"
       : value === "generating"
         ? "landing-badge landing-badge--generating"
@@ -2108,15 +2191,54 @@ function landingBadgeHtml(
 }
 
 function updateLandingMeta(lead: Lead) {
-  const status = lead.landingStatus || "none";
-  siteDeleteBtn.dataset.hasSite =
-    status !== "none" || Boolean(lead.landingSlug) ? "1" : "0";
-  sitePublishBtn.dataset.hasBuild =
-    status === "built" || Boolean(lead.landingBuiltAt) ? "1" : "0";
-  siteLocalBtn.dataset.hasBuild = sitePublishBtn.dataset.hasBuild;
-  updateSiteDeleteEnabled();
-  updateSitePublishEnabled();
-  updateSiteLocalEnabled();
+  siteAddBtn.textContent = "Configurar site";
+  siteDeployBtn.hidden = !lead.websiteRepo;
+  siteDeployBtn.disabled = !lead.websiteRepo;
+}
+
+function paintHeroHealth(health: WebsiteHealth | null, loading = false) {
+  heroHealth.hidden = false;
+  heroHealth.dataset.status = loading ? "idle" : health?.overall || "idle";
+  heroHealthSummary.textContent = loading
+    ? "Checando site…"
+    : health?.summary || "Sem checagem ainda.";
+  heroHealthList.innerHTML = loading || !health?.items.length
+    ? ""
+    : websiteHealthHostsHtml(health.items);
+}
+
+async function loadHeroHealth(lead: Lead) {
+  const seq = ++heroHealthSeq;
+  const linked = Boolean(lead.websiteRepo || lead.websiteProjectId);
+  if (!lead.id || !linked) {
+    heroHealth.hidden = true;
+    heroHealthList.innerHTML = "";
+    return;
+  }
+  paintHeroHealth(null, true);
+  try {
+    const res = await api(profileApi(entityKindOf(lead), lead.id, "/website/health"));
+    const data = (await res.json().catch(() => ({}))) as WebsiteHealth & {
+      message?: string | string[];
+    };
+    if (seq !== heroHealthSeq || currentLeadId !== lead.id) return;
+    if (!res.ok) {
+      const message = Array.isArray(data.message)
+        ? data.message.join(" ")
+        : data.message;
+      throw new Error(message || "Falha ao checar o site");
+    }
+    paintHeroHealth(data);
+  } catch (error) {
+    if (seq !== heroHealthSeq || currentLeadId !== lead.id) return;
+    paintHeroHealth({
+      overall: "down",
+      summary: errorMessage(error, "Não foi possível checar o site"),
+      pagesDev: null,
+      domain: lead.websiteDomain || null,
+      items: [],
+    });
+  }
 }
 
 function appendSiteLog(line: string) {
@@ -2363,14 +2485,8 @@ async function refreshLlmStatus() {
     if (!res.ok) {
       throw new Error(data.message || "Falha ao checar LLM");
     }
-    llmReady = Boolean(data.ready);
-    vercelReady = Boolean(
-      (data as { vercel?: { configured?: boolean } }).vercel?.configured,
-    );
     setSiteActionsEnabled(Boolean(currentLeadId));
   } catch {
-    llmReady = false;
-    vercelReady = false;
     setSiteActionsEnabled(Boolean(currentLeadId));
   }
 }
@@ -2391,141 +2507,37 @@ siteDownloadLogBtn.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-siteRefreshBtn.addEventListener("click", async () => {
-  await refreshLlmStatus();
-  if (currentLeadId) {
-    try {
-      const res = await api(currentProfileApi());
-      const data = await res.json();
-      if (res.ok) renderLead(data as Lead);
-    } catch {
-      // keep current view
-    }
-  }
-  setStatus(siteStatus, "Status atualizado.");
+heroHealthRefresh.addEventListener("click", () => {
+  if (currentLead) void loadHeroHealth(currentLead);
 });
 
-siteAccountBtn.addEventListener("click", () => {
+siteAddBtn.addEventListener("click", () => {
   if (!currentLeadId) return;
-  leadAccount.open(currentLeadId, currentEntityKind);
+  leadWebsite.open(currentLeadId, currentEntityKind, currentLead);
 });
 
-siteLocalBtn.addEventListener("click", async () => {
+siteDeployBtn.addEventListener("click", async () => {
   const leadId = currentLeadId;
-  if (!leadId) return;
-  siteLocalBtn.disabled = true;
-  setStatus(siteStatus, "Iniciando site local…");
-  const popup = window.open("about:blank", "_blank");
+  if (!leadId || !currentLead?.websiteRepo) return;
+  if (!window.confirm(`Disparar a Action de ${currentLead.websiteRepo} agora?`)) {
+    return;
+  }
+  siteDeployBtn.disabled = true;
   try {
-    const res = await api(`/landing/local/${encodeURIComponent(leadId)}`, {
+    const res = await api(profileApi(currentEntityKind, leadId, "/website/deploy"), {
       method: "POST",
     });
-    const data = (await res.json()) as {
-      url?: string;
-      port?: number;
-      reused?: boolean;
-      message?: string;
-    };
+    const data = (await res.json().catch(() => ({}))) as Lead & { message?: string | string[] };
     if (!res.ok) {
-      throw new Error(data.message || "Falha ao iniciar o site local");
+      const message = Array.isArray(data.message)
+        ? data.message.join(" ")
+        : data.message;
+      throw new Error(message || "Falha ao disparar a Action");
     }
-    const url = String(data.url || "");
-    if (url && popup) popup.location.replace(url);
-    else if (url) window.open(url, "_blank");
-    else popup?.close();
-    setStatus(
-      siteStatus,
-      url
-        ? `Site local ${data.reused ? "já estava" : "iniciado"} em ${url}`
-        : "Site local iniciado.",
-    );
-    appendSiteLog(url ? `Local: ${url}` : "Preview local ok");
+    renderLead({ ...data, _entityKind: currentEntityKind });
+    setStatus(siteStatus, `Action disparada em ${data.websiteRepo || currentLead.websiteRepo}.`);
   } catch (error) {
-    popup?.close();
-    setStatus(siteStatus, errorMessage(error, "Erro ao abrir site local"), true);
-  } finally {
-    setSiteActionsEnabled(Boolean(currentLeadId));
-  }
-});
-
-sitePublishBtn.addEventListener("click", async () => {
-  const leadId = currentLeadId;
-  if (!leadId) return;
-  sitePublishBtn.disabled = true;
-  setStatus(siteStatus, "Publicando na Vercel…");
-  appendSiteLog("Publicando dist/ na Vercel…");
-  try {
-    const res = await api("/landing/publish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || "Falha ao publicar na Vercel");
-    }
-    const url = String(data.url || "");
-    setStatus(siteStatus, url ? `Publicado: ${url}` : "Publicado na Vercel.");
-    appendSiteLog(url ? `Vercel: ${url}` : "Deploy Vercel ok");
-    const leadRes = await api(currentProfileApi("", leadId));
-    const leadData = await leadRes.json();
-    if (leadRes.ok) {
-      renderLead(leadData as Lead);
-      loadSavedLeads();
-    }
-  } catch (error) {
-    setStatus(siteStatus, errorMessage(error, "Erro ao publicar na Vercel"), true);
-  } finally {
-    setSiteActionsEnabled(Boolean(currentLeadId));
-  }
-});
-
-siteDeleteBtn.addEventListener("click", async () => {
-  const leadId = currentLeadId;
-  if (!leadId) return;
-  const ok = window.confirm(
-    "Deletar o site deste lead? A pasta em leads/ será removida e o status voltará para sem site.",
-  );
-  if (!ok) return;
-
-  siteDeleteBtn.disabled = true;
-  setStatus(siteStatus, "Deletando site…");
-  try {
-    if (siteEventSource) {
-      siteEventSource.close();
-      siteEventSource = null;
-    }
-    const res = await api(
-      `/landing/site/${encodeURIComponent(leadId)}`,
-      { method: "DELETE" },
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || "Falha ao deletar site");
-    }
-    clearRememberedJob();
-    siteProgressLog.textContent = "";
-    siteProgressFill.style.width = "0%";
-    siteProgressLabel.textContent = "Aguardando geração";
-    setStatus(
-      siteStatus,
-      data.deletedDir
-        ? `Site removido (${data.path}).`
-        : "Status limpo (pasta já inexistente).",
-    );
-    appendSiteLog(`Site deletado · ${data.path || "?"}`);
-    const leadRes = await api(currentProfileApi("", leadId));
-    const leadData = await leadRes.json();
-    if (leadRes.ok) {
-      updateLandingMeta(leadData as Lead);
-      loadSavedLeads();
-    } else {
-      siteDeleteBtn.dataset.hasSite = "0";
-      updateSiteDeleteEnabled();
-    }
-  } catch (error) {
-    setStatus(siteStatus, errorMessage(error, "Erro ao deletar site"), true);
-    updateSiteDeleteEnabled();
+    setStatus(siteStatus, errorMessage(error, "Falha ao disparar a Action"), true);
   } finally {
     setSiteActionsEnabled(Boolean(currentLeadId));
   }
@@ -2555,33 +2567,6 @@ sitePromptBtn.addEventListener("click", async () => {
   }
 });
 
-siteCancelBtn.addEventListener("click", async () => {
-  if (!activeJobId) return;
-  siteCancelBtn.disabled = true;
-  try {
-    const res = await api(
-      `/landing/jobs/${encodeURIComponent(activeJobId)}/cancel`,
-      { method: "POST" },
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || "Falha ao cancelar");
-    }
-    setStatus(siteStatus, "Cancelamento solicitado…");
-    appendSiteLog("Cancelamento solicitado");
-  } catch (error) {
-    setStatus(siteStatus, errorMessage(error, "Erro ao cancelar"), true);
-    setSiteActionsEnabled(Boolean(currentLeadId));
-  }
-});
-
-siteGenerateBtn.addEventListener("click", () => {
-  if (!currentLeadId) return;
-  setWizardLeadId(currentLeadId);
-  setWizardApiKind(currentEntityKind);
-  openSiteWizard();
-});
-
 setWizardOnConfirm(() => {
   void startLandingGenerate();
 });
@@ -2596,7 +2581,6 @@ async function startLandingGenerate() {
   }
 
   setStatus(siteStatus, "Iniciando geração Gemini...");
-  siteGenerateBtn.disabled = true;
   siteProgressFill.style.width = "0%";
   siteProgressLabel.textContent = "Iniciando pipeline…";
   siteProgressLog.textContent = "";

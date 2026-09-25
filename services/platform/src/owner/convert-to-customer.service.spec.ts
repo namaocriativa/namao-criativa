@@ -16,6 +16,7 @@ describe('ConvertToCustomerService', () => {
     chatEvent: { updateMany: jest.fn() },
     leadActivity: { updateMany: jest.fn(), create: jest.fn() },
     studioLeadShare: { updateMany: jest.fn() },
+    proposal: { updateMany: jest.fn() },
   };
 
   const prisma = {
@@ -118,6 +119,10 @@ describe('ConvertToCustomerService', () => {
         where: { leadId: 'lead-1' },
         data: { customerId: 'lead-1', leadId: null },
       });
+    expect(tx.proposal.updateMany).toHaveBeenCalledWith({
+      where: { leadId: 'lead-1' },
+      data: { customerId: 'lead-1', leadId: null },
+    });
     expect(tx.lead.delete).toHaveBeenCalledWith({ where: { id: 'lead-1' } });
     expect(tx.leadActivity.create).toHaveBeenCalledWith({
       data: expect.objectContaining({

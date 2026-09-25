@@ -118,3 +118,10 @@ cloud/config/stack.json
 # Cloudflare Pages — generated API proxy (see WEBSITE_API_ORIGIN)
 apps/website/public/_redirects
 .wrangler
+
+# Client site clones (own git). Keep catalog + templates.
+websites/*
+!websites/catalog.json
+!websites/README.MD
+!websites/_templates/
+!websites/_templates/**

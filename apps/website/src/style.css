@@ -1297,6 +1297,85 @@ button:disabled {
   }
 }
 
+.proposal-main {
+  width: min(42rem, calc(100% - 2rem));
+  margin: 0 auto 5rem;
+  padding-top: 7.5rem;
+}
+
+.proposal-main h1 {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  letter-spacing: -0.05em;
+}
+
+.proposal-card {
+  margin-top: 1.4rem;
+  border: 1px solid var(--line);
+  padding: 1.35rem 1.25rem 1.25rem;
+}
+
+.proposal-card h2 {
+  margin: 0 0 0.45rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+}
+
+.proposal-card p,
+.proposal-card li {
+  color: var(--muted);
+}
+
+.proposal-price {
+  font-weight: 600;
+  color: var(--fg) !important;
+}
+
+.proposal-card ul,
+.proposal-card ol {
+  margin: 0.7rem 0 0;
+  padding-left: 1.15rem;
+}
+
+.proposal-check {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  margin: 1rem 0;
+  color: var(--fg);
+}
+
+.proposal-check input {
+  margin-top: 0.25rem;
+}
+
+.pix-qr {
+  display: block;
+  width: 220px;
+  height: 220px;
+  margin: 1rem 0;
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.pix-copy {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.85rem 0;
+}
+
+.pix-copy textarea {
+  width: 100%;
+  resize: vertical;
+  background: #111;
+  color: inherit;
+  border: 1px solid var(--line);
+  padding: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
 @media (min-width: 900px) {
   .offer {
     grid-template-columns: 1.15fr 0.85fr;

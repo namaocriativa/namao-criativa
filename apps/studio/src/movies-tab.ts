@@ -1,5 +1,14 @@
 import { api } from "./api";
 import { MOVIES_ID } from "./creative/features";
+import {
+  DEFAULT_MOVIE_CAMERA,
+  DEFAULT_MOVIE_FRAMING,
+  MOVIE_CAMERAS,
+  MOVIE_FRAMINGS,
+  resolveMovieCameraId,
+  resolveMovieFramingId,
+  type MovieDirectionOption,
+} from "./movies-direction";
 import { navigate, titleForRoute, type AppRoute } from "./router";
 import type {
   CreativeCharacter,
@@ -91,6 +100,27 @@ function statusLabel(status: string): string {
   return "Rascunho";
 }
 
+function hasGeneratedClip(shot: CreativeMovieShot): boolean {
+  return Boolean(shot.localPath) || shot.status === "ready";
+}
+
+function generateButtonLabel(shot: CreativeMovieShot): string {
+  return hasGeneratedClip(shot) ? "Regerar take" : "Gerar take";
+}
+
+function takePreview(shot: CreativeMovieShot): string {
+  const text = (shot.scene || shot.action || "").replace(/\s+/g, " ").trim();
+  if (!text) return "Sem cenário ainda";
+  return text.length > 72 ? `${text.slice(0, 71)}…` : text;
+}
+
+function takeCastLabel(shot: CreativeMovieShot): string {
+  const names = shotCharacters(shot)
+    .map((item) => item.name)
+    .filter(Boolean);
+  return names.join(" · ");
+}
+
 export function initMoviesTab(): {
   onRoute: (route: AppRoute) => void;
 } {
@@ -104,6 +134,9 @@ export function initMoviesTab(): {
   let mode: "list" | "create" | "board" = "list";
   let boardMovie: CreativeMovie | null = null;
   let newTakeAssets = new Map<string, string>();
+  let newTakeFraming = DEFAULT_MOVIE_FRAMING;
+  let newTakeCamera = DEFAULT_MOVIE_CAMERA;
+  let selectedShotId: string | "new" | null = null;
   let pickerCharacterId: string | null = null;
   let pickerShotId: string | null = null;
   let routeSeq = 0;
@@ -123,6 +156,7 @@ export function initMoviesTab(): {
   function renderList() {
     mode = "list";
     boardMovie = null;
+    selectedShotId = null;
     nameInput.value = "Filmes";
     const cards = movies
       .map((item) => {
@@ -173,6 +207,7 @@ export function initMoviesTab(): {
   function renderCreate() {
     mode = "create";
     boardMovie = null;
+    selectedShotId = null;
     nameInput.value = "Novo filme";
     composerEl.innerHTML = `
       <form id="movies-create-form" class="criativo-flyer-form">
@@ -233,67 +268,200 @@ export function initMoviesTab(): {
     </div>`;
   }
 
+  function directionChips(
+    options: MovieDirectionOption[],
+    field: "framing" | "camera",
+    selected: string,
+    shotId?: string,
+  ): string {
+    return options
+      .map((item) => {
+        const active = item.id === selected;
+        return `<button type="button" class="movies-direction-chip${
+          active ? " is-active" : ""
+        }" data-field="${field}" data-value="${escapeHtml(item.id)}" data-hint="${escapeHtml(item.hint)}"${
+          shotId ? ` data-shot-id="${escapeHtml(shotId)}"` : ""
+        } aria-pressed="${active ? "true" : "false"}" aria-label="${escapeHtml(item.hint)}" title="${escapeHtml(
+          item.hint,
+        )}">${escapeHtml(item.short)}</button>`;
+      })
+      .join("");
+  }
+
+  function directionHint(options: MovieDirectionOption[], selected: string): string {
+    return options.find((item) => item.id === selected)?.hint || "";
+  }
+
+  function directionPicker(framing: string, camera: string, shotId?: string): string {
+    const framingId = resolveMovieFramingId(framing);
+    const cameraId = resolveMovieCameraId(camera);
+    return `<div class="movies-direction">
+      <p class="movies-take-index">Direção</p>
+      <div class="movies-direction-group">
+        <span class="movies-direction-label">Enquadramento</span>
+        <div class="movies-direction-chips" role="group" aria-label="Enquadramento">
+          ${directionChips(MOVIE_FRAMINGS, "framing", framingId, shotId)}
+        </div>
+        <p class="movies-direction-hint">${escapeHtml(directionHint(MOVIE_FRAMINGS, framingId))}</p>
+      </div>
+      <div class="movies-direction-group">
+        <span class="movies-direction-label">Câmera</span>
+        <div class="movies-direction-chips" role="group" aria-label="Câmera">
+          ${directionChips(MOVIE_CAMERAS, "camera", cameraId, shotId)}
+        </div>
+        <p class="movies-direction-hint">${escapeHtml(directionHint(MOVIE_CAMERAS, cameraId))}</p>
+      </div>
+    </div>`;
+  }
+
+  function rememberSelectedShot(movie: CreativeMovie, preferred?: string | "new" | null) {
+    const shots = movie.shots || [];
+    const id = preferred ?? selectedShotId;
+    if (id === "new") {
+      selectedShotId = "new";
+      return;
+    }
+    if (id && shots.some((shot) => shot.id === id)) {
+      selectedShotId = id;
+      return;
+    }
+    selectedShotId = shots[0]?.id || "new";
+  }
+
+  function statusClass(status: string): string {
+    if (status === "ready") return " is-ready";
+    if (status === "failed" || status === "generating") return " is-failed";
+    return "";
+  }
+
+  function renderTakeList(movie: CreativeMovie): string {
+    const items = (movie.shots || [])
+      .map((shot, index) => {
+        const clip = clipSrc(shot);
+        const active = selectedShotId === shot.id;
+        const cast = takeCastLabel(shot);
+        return `<button type="button" class="movies-take-item${active ? " is-active" : ""}" data-select-shot="${escapeHtml(
+          shot.id,
+        )}" aria-pressed="${active ? "true" : "false"}">
+          ${
+            clip
+              ? `<video src="${escapeHtml(clip)}" muted playsinline preload="metadata"></video>`
+              : `<span class="movies-take-item-empty"></span>`
+          }
+          <span class="movies-take-item-copy">
+            <span class="movies-take-item-head">
+              <span class="movies-take-index">Take ${index + 1}</span>
+              <span class="movies-status${statusClass(shot.status)}">${escapeHtml(statusLabel(shot.status))}</span>
+            </span>
+            ${cast ? `<strong>${escapeHtml(cast)}</strong>` : ""}
+            <em>${escapeHtml(takePreview(shot))}</em>
+          </span>
+        </button>`;
+      })
+      .join("");
+    const creating = selectedShotId === "new";
+    return `<nav class="movies-take-list" aria-label="Takes">
+      ${items}
+      <button type="button" class="movies-take-item movies-take-item-new${creating ? " is-active" : ""}" data-select-shot="new" aria-pressed="${creating ? "true" : "false"}">
+        <span class="movies-take-item-empty"></span>
+        <span class="movies-take-item-copy">
+          <span class="movies-take-item-head">
+            <span class="movies-take-index">Novo take</span>
+          </span>
+          <em>Abrir o formulário para adicionar</em>
+        </span>
+      </button>
+    </nav>`;
+  }
+
+  function renderTakeEditor(movie: CreativeMovie, shot: CreativeMovieShot, index: number): string {
+    const portrait = movie.aspectRatio === "9:16";
+    const clip = clipSrc(shot);
+    const selectedAssets = new Map(
+      (shot.cast || [])
+        .filter((item) => item.assetId)
+        .map((item) => [item.characterId, item.assetId as string]),
+    );
+    const missingHero = shotCharacters(shot).some((item) => !heroOf(item));
+    return `<article class="movies-take${portrait ? " movies-take-9x16" : ""}" data-shot-card="${escapeHtml(shot.id)}">
+      <div class="movies-take-head">
+        <span class="movies-take-index">Take ${index + 1}</span>
+        <span class="movies-status${statusClass(shot.status)}">${escapeHtml(statusLabel(shot.status))}</span>
+      </div>
+      ${characterPicker(shotCharacterIds(shot), shot.id, selectedAssets)}
+      ${
+        missingHero
+          ? `<p class="movies-hint">Sem retrato na ficha — o take sai em texto. Gere o hero em Personagens para travar o rosto.</p>`
+          : ""
+      }
+      ${clip ? `<video src="${escapeHtml(clip)}" controls playsinline></video>` : ""}
+      <form class="criativo-flyer-form" data-shot-form="${escapeHtml(shot.id)}">
+        <label>
+          Cenário
+          <textarea data-field="scene" rows="2" maxlength="4000">${escapeHtml(shot.scene)}</textarea>
+        </label>
+        <label>
+          Ação
+          <textarea data-field="action" rows="2" maxlength="4000">${escapeHtml(shot.action)}</textarea>
+        </label>
+        ${directionPicker(shot.framing || DEFAULT_MOVIE_FRAMING, shot.camera || DEFAULT_MOVIE_CAMERA, shot.id)}
+        <label>
+          Fala (opcional)
+          <textarea data-field="dialogue" rows="2" maxlength="2000">${escapeHtml(shot.dialogue || "")}</textarea>
+        </label>
+        ${shot.error ? `<p class="movies-hint">${escapeHtml(shot.error)}</p>` : ""}
+        <p class="movies-toolbar">
+          <button type="button" data-generate="${escapeHtml(shot.id)}" ${
+            isLockedGenerating(shot) ? "disabled" : ""
+          }>${escapeHtml(generateButtonLabel(shot))}</button>
+          <button type="button" class="outline danger" data-delete-shot="${escapeHtml(shot.id)}">Remover</button>
+        </p>
+      </form>
+    </article>`;
+  }
+
+  function renderNewTakeEditor(): string {
+    return `<article class="movies-take" id="movies-add-take">
+      <div class="movies-take-head">
+        <span class="movies-take-index">Novo take</span>
+      </div>
+      ${characterPicker([...newTakeAssets.keys()], undefined, newTakeAssets)}
+      <form id="movies-shot-create" class="criativo-flyer-form">
+        <label>
+          Cenário
+          <textarea id="movies-new-scene" rows="2" required maxlength="4000" placeholder="Onde acontece"></textarea>
+        </label>
+        <label>
+          Ação
+          <textarea id="movies-new-action" rows="2" required maxlength="4000" placeholder="O que o elenco faz"></textarea>
+        </label>
+        ${directionPicker(newTakeFraming, newTakeCamera)}
+        <label>
+          Fala (opcional)
+          <textarea id="movies-new-dialogue" rows="2" maxlength="2000" placeholder="O que fala"></textarea>
+        </label>
+        <button type="submit">Adicionar take</button>
+      </form>
+    </article>`;
+  }
+
   function renderBoard(movie: CreativeMovie) {
+    const sameMovie = boardMovie?.id === movie.id;
     mode = "board";
     boardMovie = movie;
+    if (sameMovie) rememberSelectedShot(movie);
+    else selectedShotId = (movie.shots || [])[0]?.id || "new";
     nameInput.value = movie.title;
     document.title = titleForRoute(
       { name: "criativo-skill", id: MOVIES_ID, movieId: movie.id },
       movie.title,
     );
-    const portrait = movie.aspectRatio === "9:16";
     const readyClips = (movie.shots || []).filter((shot) => shot.status === "ready" && shot.localPath);
-    const takes = (movie.shots || [])
-      .map((shot, index) => {
-        const clip = clipSrc(shot);
-        const selectedAssets = new Map(
-          (shot.cast || [])
-            .filter((item) => item.assetId)
-            .map((item) => [item.characterId, item.assetId as string]),
-        );
-        const missingHero = shotCharacters(shot).some((item) => !heroOf(item));
-        return `<article class="movies-take${portrait ? " movies-take-9x16" : ""}" data-shot-card="${escapeHtml(shot.id)}">
-          <div class="movies-take-head">
-            <span class="movies-take-index">Take ${index + 1}</span>
-            <span class="movies-status${shot.status === "ready" ? " is-ready" : ""}${
-              shot.status === "failed" || shot.status === "generating" ? " is-failed" : ""
-            }">${escapeHtml(statusLabel(shot.status))}</span>
-          </div>
-          ${characterPicker(shotCharacterIds(shot), shot.id, selectedAssets)}
-          ${
-            missingHero
-              ? `<p class="movies-hint">Sem retrato na ficha — o take sai em texto. Gere o hero em Personagens para travar o rosto.</p>`
-              : ""
-          }
-          ${
-            clip
-              ? `<video src="${escapeHtml(clip)}" controls playsinline></video>`
-              : ""
-          }
-          <form class="criativo-flyer-form" data-shot-form="${escapeHtml(shot.id)}">
-            <label>
-              Cenário
-              <textarea data-field="scene" rows="2" maxlength="4000">${escapeHtml(shot.scene)}</textarea>
-            </label>
-            <label>
-              Ação
-              <textarea data-field="action" rows="2" maxlength="4000">${escapeHtml(shot.action)}</textarea>
-            </label>
-            <label>
-              Fala (opcional)
-              <textarea data-field="dialogue" rows="2" maxlength="2000">${escapeHtml(shot.dialogue || "")}</textarea>
-            </label>
-            ${shot.error ? `<p class="movies-hint">${escapeHtml(shot.error)}</p>` : ""}
-            <p class="movies-toolbar">
-              <button type="button" data-generate="${escapeHtml(shot.id)}" ${
-                isLockedGenerating(shot) ? "disabled" : ""
-              }>Gerar take</button>
-              <button type="button" class="outline danger" data-delete-shot="${escapeHtml(shot.id)}">Remover</button>
-            </p>
-          </form>
-        </article>`;
-      })
-      .join("");
+    const selectedIndex = (movie.shots || []).findIndex((shot) => shot.id === selectedShotId);
+    const selectedShot = selectedIndex >= 0 ? movie.shots![selectedIndex] : null;
+    const stage = selectedShot
+      ? renderTakeEditor(movie, selectedShot, selectedIndex)
+      : renderNewTakeEditor();
     composerEl.innerHTML = `
       <div class="movies-workspace">
         <p class="movies-toolbar">
@@ -314,28 +482,10 @@ export function initMoviesTab(): {
             : ""
         }
         <div class="movies-board">
-          ${takes}
-          <article class="movies-take" id="movies-add-take">
-            <div class="movies-take-head">
-              <span class="movies-take-index">Novo take</span>
-            </div>
-            ${characterPicker([...newTakeAssets.keys()], undefined, newTakeAssets)}
-            <form id="movies-shot-create" class="criativo-flyer-form">
-              <label>
-                Cenário
-                <textarea id="movies-new-scene" rows="2" required maxlength="4000" placeholder="Onde acontece"></textarea>
-              </label>
-              <label>
-                Ação
-                <textarea id="movies-new-action" rows="2" required maxlength="4000" placeholder="O que o elenco faz"></textarea>
-              </label>
-              <label>
-                Fala (opcional)
-                <textarea id="movies-new-dialogue" rows="2" maxlength="2000" placeholder="O que fala"></textarea>
-              </label>
-              <button type="submit">Adicionar take</button>
-            </form>
-          </article>
+          ${renderTakeList(movie)}
+          <div class="movies-take-stage">
+            ${stage}
+          </div>
         </div>
         <div class="videos-picker movies-character-modal" id="movies-character-modal" hidden>
           <div class="videos-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="movies-character-modal-title">
@@ -366,6 +516,14 @@ export function initMoviesTab(): {
     composerEl.querySelector("#movies-play-all")?.addEventListener("click", () => {
       playAll(movie);
     });
+    composerEl.querySelectorAll<HTMLButtonElement>("[data-select-shot]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.selectShot;
+        if (!id || id === selectedShotId) return;
+        rememberSelectedShot(movie, id);
+        renderBoard(movie);
+      });
+    });
     const player = composerEl.querySelector("#movies-player") as HTMLVideoElement | null;
     player?.addEventListener("ended", () => {
       playIndex += 1;
@@ -374,12 +532,44 @@ export function initMoviesTab(): {
     composerEl.querySelectorAll<HTMLFormElement>("[data-shot-form]").forEach((form) => {
       const shotId = form.dataset.shotForm;
       if (!shotId) return;
-      form.querySelectorAll<HTMLTextAreaElement>("[data-field]").forEach((field) => {
+      form.querySelectorAll<HTMLTextAreaElement>("textarea[data-field]").forEach((field) => {
         field.addEventListener("blur", () => {
           const key = field.dataset.field;
           if (!key) return;
           void patchShot(movie.id, shotId, { [key]: field.value });
         });
+      });
+    });
+    composerEl.querySelectorAll<HTMLButtonElement>(".movies-direction-chip").forEach((btn) => {
+      const group = btn.closest(".movies-direction-group");
+      const hintEl = group?.querySelector<HTMLElement>(".movies-direction-hint");
+      const activeChip = () =>
+        group?.querySelector<HTMLButtonElement>(".movies-direction-chip.is-active") || null;
+      const paintHint = (chip?: HTMLButtonElement | null) => {
+        if (hintEl) hintEl.textContent = chip?.dataset.hint || "";
+      };
+      btn.addEventListener("mouseenter", () => paintHint(btn));
+      btn.addEventListener("focus", () => paintHint(btn));
+      btn.addEventListener("mouseleave", () => paintHint(activeChip()));
+      btn.addEventListener("blur", () => paintHint(activeChip()));
+      btn.addEventListener("click", () => {
+        const field = btn.dataset.field;
+        const value = btn.dataset.value;
+        if (!field || !value) return;
+        const chips = btn.closest(".movies-direction-chips");
+        chips?.querySelectorAll<HTMLButtonElement>(".movies-direction-chip").forEach((chip) => {
+          const active = chip === btn;
+          chip.classList.toggle("is-active", active);
+          chip.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+        paintHint(btn);
+        const shotId = btn.dataset.shotId;
+        if (!shotId) {
+          if (field === "framing") newTakeFraming = value;
+          if (field === "camera") newTakeCamera = value;
+          return;
+        }
+        void patchShot(movie.id, shotId, { [field]: value });
       });
     });
     composerEl.querySelectorAll<HTMLButtonElement>("[data-generate]").forEach((btn) => {
@@ -550,6 +740,16 @@ export function initMoviesTab(): {
     return [...newTakeAssets.keys()];
   }
 
+  function selectedDirectionValue(
+    root: string,
+    field: "framing" | "camera",
+  ): string | undefined {
+    const chip = composerEl.querySelector<HTMLButtonElement>(
+      `${root} .movies-direction-chip[data-field="${field}"].is-active`,
+    );
+    return chip?.dataset.value;
+  }
+
   async function loadMovies() {
     const res = await api("/creative/movies");
     if (!res.ok) throw new Error(await readError(res, "Falha ao listar filmes"));
@@ -606,6 +806,8 @@ export function initMoviesTab(): {
     const dialogue = (
       composerEl.querySelector("#movies-new-dialogue") as HTMLTextAreaElement | null
     )?.value.trim();
+    const framing = selectedDirectionValue("#movies-shot-create", "framing") || newTakeFraming;
+    const camera = selectedDirectionValue("#movies-shot-create", "camera") || newTakeCamera;
     if (!characterIds.length) {
       setStatus("Crie um personagem antes de montar o take", true);
       return;
@@ -626,11 +828,16 @@ export function initMoviesTab(): {
           scene,
           action,
           dialogue: dialogue || undefined,
+          framing,
+          camera,
         }),
       });
       if (!res.ok) throw new Error(await readError(res, "Falha ao adicionar take"));
       const next = (await res.json()) as CreativeMovie;
       newTakeAssets = new Map();
+      newTakeFraming = DEFAULT_MOVIE_FRAMING;
+      newTakeCamera = DEFAULT_MOVIE_CAMERA;
+      selectedShotId = next.shots?.[next.shots.length - 1]?.id || "new";
       setStatus("");
       renderBoard(next);
     } catch (error) {
@@ -676,6 +883,8 @@ export function initMoviesTab(): {
     const dialogue = (
       form?.querySelector('[data-field="dialogue"]') as HTMLTextAreaElement | null
     )?.value;
+    const framing = selectedDirectionValue(`[data-shot-form="${shotId}"]`, "framing");
+    const camera = selectedDirectionValue(`[data-shot-form="${shotId}"]`, "camera");
     busy = true;
     setStatus("Gerando take…");
     try {
@@ -684,7 +893,7 @@ export function initMoviesTab(): {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scene, action, dialogue }),
+          body: JSON.stringify({ scene, action, dialogue, framing, camera }),
         },
       );
       const res = await api(
@@ -719,6 +928,9 @@ export function initMoviesTab(): {
       );
       if (!res.ok) throw new Error(await readError(res, "Falha ao remover take"));
       const next = (await res.json()) as CreativeMovie;
+      if (selectedShotId === shotId) {
+        selectedShotId = next.shots?.[0]?.id || "new";
+      }
       setStatus("");
       renderBoard(next);
     } catch (error) {

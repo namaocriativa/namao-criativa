@@ -252,6 +252,9 @@ npx wrangler pages deploy apps/studio/dist --project-name=namao-studio
 | `GA4_SERVICE_ACCOUNT_JSON` | não | service account com Viewer na propriedade GA4 |
 | `RESEND_API_KEY` | não | convites do studio e e-mails de acesso |
 | `RESEND_FROM` | não | remetente verificado no Resend (`Namão Criativa <contato@…>`) |
+| `NAMAO_PIX_KEY` | não | Chave PIX ou EMV copia-e-cola da proposta |
+| `NAMAO_CNPJ` | não | CNPJ exibido na proposta |
+| `NAMAO_LEGAL_NAME` | não | Razão social no PIX/proposta |
 
 DNS do Resend na zona Cloudflare (DKIM `resend._domainkey`, CNAME `send`/`rsend` **DNS-only**, SPF `include:_spf.resend.com`, DMARC se ainda não existir):
 

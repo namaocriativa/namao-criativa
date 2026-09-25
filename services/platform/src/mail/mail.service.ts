@@ -148,6 +148,15 @@ export class MailService {
     await this.send(params);
   }
 
+  async sendProposal(params: { to: string; html: string; text: string }) {
+    await this.send({
+      to: params.to,
+      subject: 'Sua proposta está pronta — Namão Criativa',
+      html: params.html,
+      text: params.text,
+    });
+  }
+
   private logoUrl(): string {
     return publicLogoUrl(this.config.get<string>('NAMAO_PUBLIC_URL'));
   }

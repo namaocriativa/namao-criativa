@@ -23,6 +23,7 @@ import { StudioAuth } from '../auth/studio-auth.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { ConvertToCustomerService } from '../owner/convert-to-customer.service';
+import { ProposalService } from '../proposal/proposal.service';
 import { CreateStudioLeadShareDto } from '../studio-lead-access/dto/create-studio-lead-share.dto';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
 import { StudioLeadShareService } from '../studio-lead-access/studio-lead-share.service';
@@ -41,6 +42,7 @@ export class LeadController {
     private readonly whatsapp: LeadWhatsAppService,
     private readonly activity: LeadActivityService,
     private readonly convertToCustomer: ConvertToCustomerService,
+    private readonly proposals: ProposalService,
     private readonly shares: StudioLeadShareService,
     private readonly access: StudioLeadAccessService,
   ) {}
@@ -137,6 +139,16 @@ export class LeadController {
   @Get(':id/history')
   listHistory(@Param('id') id: string) {
     return this.activity.listHistory(id);
+  }
+
+  @Get(':id/proposal')
+  getProposal(@Param('id') id: string) {
+    return this.proposals.getForOwner(id);
+  }
+
+  @Post(':id/proposal/mark-paid')
+  markProposalPaid(@Param('id') id: string) {
+    return this.proposals.markPaid(id);
   }
 
   @Post(':id/convert-to-customer')

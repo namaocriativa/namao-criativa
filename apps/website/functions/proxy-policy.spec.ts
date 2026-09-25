@@ -14,6 +14,8 @@ test('isApiPath covers platform routes without swallowing pages', () => {
   assert.equal(isApiPath('/namao-chat'), true);
   assert.equal(isApiPath('/namao-chat/session'), true);
   assert.equal(isApiPath('/dashboard/analytics'), true);
+  assert.equal(isApiPath('/proposal'), true);
+  assert.equal(isApiPath('/proposal/accept'), true);
   assert.equal(isApiPath('/dashboard/analytics?range=7d'.split('?')[0]), true);
   assert.equal(isApiPath('/invite-requests'), true);
   assert.equal(isApiPath('/login'), false);

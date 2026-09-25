@@ -20,6 +20,10 @@ import {
   UpdateMovieDto,
   UpdateMovieShotDto,
 } from './dto/movie.dto';
+import {
+  resolveMovieCamera,
+  resolveMovieFraming,
+} from './movies.direction';
 import { MOVIE_SHOT_STATUS, movieShotPrompt } from './movies.planner';
 import { assertSameTenant, requireTenantId, tenantWhere } from '../tenant/tenant.util';
 
@@ -157,6 +161,8 @@ export class CreativeMovieService {
           scene,
           action,
           dialogue: dto.dialogue?.trim() || '',
+          framing: resolveMovieFraming(dto.framing).id,
+          camera: resolveMovieCamera(dto.camera).id,
           status: MOVIE_SHOT_STATUS.DRAFT,
         },
         select: { id: true },
@@ -209,6 +215,14 @@ export class CreativeMovieService {
           action: dto.action?.trim() || shot.action,
           dialogue:
             dto.dialogue !== undefined ? dto.dialogue.trim() : shot.dialogue,
+          framing:
+            dto.framing !== undefined
+              ? resolveMovieFraming(dto.framing).id
+              : shot.framing,
+          camera:
+            dto.camera !== undefined
+              ? resolveMovieCamera(dto.camera).id
+              : shot.camera,
           sortOrder:
             typeof dto.sortOrder === 'number' ? dto.sortOrder : shot.sortOrder,
         },
@@ -288,6 +302,8 @@ export class CreativeMovieService {
       scene: shot.scene,
       action: shot.action,
       dialogue: shot.dialogue,
+      framing: shot.framing,
+      camera: shot.camera,
     });
     const frames = await this.loadCastFrames(
       shot.cast?.length

@@ -21,6 +21,7 @@ test('sitemap lists only indexable canonical URLs', () => {
   assert.doesNotMatch(xml, /dashboard/);
   assert.doesNotMatch(xml, /conectar/);
   assert.doesNotMatch(xml, /register/);
+  assert.doesNotMatch(xml, /proposta/);
 });
 
 test('home SEO head uses absolute OG and JSON-LD', () => {

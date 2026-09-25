@@ -29,6 +29,10 @@ export function publicLoginUrl(base?: string | null): string {
   return `${origin}/login.html`;
 }
 
+export function publicProposalLoginUrl(base?: string | null): string {
+  return `${publicLoginUrl(base)}?next=${encodeURIComponent('/proposta.html')}`;
+}
+
 export function publicLogoUrl(base?: string | null): string {
   const origin = (base || 'http://localhost:5174').replace(/\/$/, '');
   return `${origin}/logo.png`;

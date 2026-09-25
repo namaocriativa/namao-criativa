@@ -30,6 +30,8 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
 import { VideoStudioModule } from './video-studio/video-studio.module';
 import { CreativeStudioModule } from './creative-studio/creative-studio.module';
 import { CalendarModule } from './calendar/calendar.module';
+import { WebsiteProjectsModule } from './website-projects/website-projects.module';
+import { ProposalModule } from './proposal/proposal.module';
 
 @Module({
   imports: [
@@ -60,6 +62,8 @@ import { CalendarModule } from './calendar/calendar.module';
     VideoStudioModule,
     CreativeStudioModule,
     CalendarModule,
+    WebsiteProjectsModule,
+    ProposalModule,
     InviteRequestsModule,
     DashboardModule,
     StudioActivityModule,

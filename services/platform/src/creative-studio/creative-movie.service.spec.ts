@@ -57,6 +57,8 @@ describe('CreativeMovieService', () => {
         scene: 'cobertura',
         action: 'acena',
         dialogue: 'Oi.',
+        framing: 'plano_medio',
+        camera: 'fixa',
         status: MOVIE_SHOT_STATUS.DRAFT,
         character: {
           id: 'ch1',
@@ -137,6 +139,7 @@ describe('CreativeMovieService', () => {
     });
     expect(geminiVideos.generate).toHaveBeenCalledWith(
       expect.objectContaining({
+        prompt: expect.stringContaining('plano médio'),
         frames: [expect.objectContaining({ mimeType: 'image/jpeg' })],
         settings: expect.objectContaining({
           aspectRatio: '16:9',
@@ -204,7 +207,11 @@ describe('CreativeMovieService', () => {
     );
     expect(prisma.creativeMovieShot.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ characterId: 'ch1' }),
+        data: expect.objectContaining({
+          characterId: 'ch1',
+          framing: 'plano_medio',
+          camera: 'fixa',
+        }),
       }),
     );
     expect(prisma.creativeMovieShotCast.createMany).toHaveBeenCalledWith({
@@ -238,6 +245,47 @@ describe('CreativeMovieService', () => {
         { shotId: 's3', characterId: 'ch1', assetId: 'ch1-img', sortOrder: 0 },
       ],
     });
+  });
+
+  it('atualiza enquadramento e câmera do take', async () => {
+    prisma.creativeMovieShot.findFirst.mockResolvedValue(movie.shots[0]);
+    await service.updateShot('m1', 's1', {
+      framing: 'detalhe',
+      camera: 'handheld',
+    });
+    expect(prisma.creativeMovieShot.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          framing: 'detalhe',
+          camera: 'handheld',
+        }),
+      }),
+    );
+  });
+
+  it('grava enquadramento e câmera no take', async () => {
+    prisma.creativeMovie.findUnique
+      .mockResolvedValueOnce({ ...movie, shots: [] })
+      .mockResolvedValue(movie);
+    prisma.creativeMovieShot.create.mockResolvedValue({ id: 's4' });
+    characters.findById.mockResolvedValue({});
+    await runWithTenant('tenant-1', () =>
+      service.addShot('m1', {
+        characterIds: ['ch1'],
+        scene: 'rua',
+        action: 'caminha',
+        framing: 'close',
+        camera: 'dolly_in',
+      }),
+    );
+    expect(prisma.creativeMovieShot.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          framing: 'close',
+          camera: 'dolly_in',
+        }),
+      }),
+    );
   });
 
   it('gera take com retrato de cada personagem do elenco', async () => {

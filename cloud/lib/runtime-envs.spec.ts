@@ -50,6 +50,48 @@ test('buildRuntimeEnvs injeta Resend quando o cloud/.env tem a chave', () => {
   );
 });
 
+test('buildRuntimeEnvs injeta PIX quando o cloud/.env tem as chaves', () => {
+  withEnv(
+    {
+      JWT_SECRET: 'a-long-random-production-secret',
+      NAMAO_PIX_KEY: '0002010102112636',
+      NAMAO_CNPJ: '45.836.753/0001-70',
+      NAMAO_LEGAL_NAME: 'LEONE DE SOUZA - ME',
+    },
+    () => {
+      const envs = buildRuntimeEnvs({
+        state,
+        stack,
+        databaseUrl: 'postgres://namao:namao@db:5432/namao',
+      });
+      assert.equal(envs.NAMAO_PIX_KEY, '0002010102112636');
+      assert.equal(envs.NAMAO_CNPJ, '45.836.753/0001-70');
+      assert.equal(envs.NAMAO_LEGAL_NAME, 'LEONE DE SOUZA - ME');
+    },
+  );
+});
+
+test('buildRuntimeEnvs injeta Cloudflare e GitHub websites quando existem', () => {
+  withEnv(
+    {
+      JWT_SECRET: 'a-long-random-production-secret',
+      GITHUB_WEBSITES_TOKEN: 'ghp_test',
+      CLOUDFLARE_API_TOKEN: 'cf_test',
+      CLOUDFLARE_ACCOUNT_ID: 'acct_1',
+    },
+    () => {
+      const envs = buildRuntimeEnvs({
+        state,
+        stack,
+        databaseUrl: 'postgres://namao:namao@db:5432/namao',
+      });
+      assert.equal(envs.GITHUB_WEBSITES_TOKEN, 'ghp_test');
+      assert.equal(envs.CLOUDFLARE_API_TOKEN, 'cf_test');
+      assert.equal(envs.CLOUDFLARE_ACCOUNT_ID, 'acct_1');
+    },
+  );
+});
+
 test('buildRuntimeEnvs omite Resend quando a chave não existe', () => {
   withEnv(
     {

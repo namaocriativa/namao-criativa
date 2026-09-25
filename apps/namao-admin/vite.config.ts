@@ -86,6 +86,7 @@ export default defineConfig({
   plugins: [loginPagePlugin(), react(), namaoLogoPlugin()],
   server: {
     port: 5175,
+    strictPort: true,
     proxy: {
       '/auth': apiProxy(),
       '/studio': apiProxy(),

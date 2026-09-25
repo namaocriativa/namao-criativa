@@ -85,6 +85,9 @@ Arquivo: `services/platform/.env`
 | `JWT_SECRET` | Sim | Segredo JWT. Em produção a API recusa vazio ou placeholder de desenvolvimento |
 | `NAMAO_PUBLIC_URL` | Não | URL do site Namão. Default: `http://localhost:5174` |
 | `NAMAO_STUDIO_URL` | Não | URL do studio (CORS). Default local: `http://localhost:5173` |
+| `NAMAO_PIX_KEY` | Não | Chave PIX ou o EMV copia-e-cola completo da página de proposta |
+| `NAMAO_CNPJ` | Não | CNPJ exibido na proposta |
+| `NAMAO_LEGAL_NAME` | Não | Nome no PIX/proposta. Default: Namão Criativa |
 | `STUDIO_ADMIN_EMAIL` | Não | Bootstrap do primeiro admin do studio |
 | `STUDIO_ADMIN_PASSWORD` | Não | Senha do bootstrap (mínimo 8 caracteres) |
 | `META_APP_ID` / `META_APP_SECRET` | Não | App Meta para OAuth Instagram Graph |

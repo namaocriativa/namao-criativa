@@ -32,6 +32,9 @@ describe('AuthService', () => {
     instagramConnection: {
       findFirst: jest.fn(),
     },
+    proposal: {
+      findFirst: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
   const jwt = { sign: jest.fn().mockReturnValue('token') };
@@ -85,6 +88,7 @@ describe('AuthService', () => {
     prisma.lead.findUnique.mockResolvedValue(null);
     prisma.customer.findUnique.mockResolvedValue(null);
     prisma.instagramConnection.findFirst.mockResolvedValue(null);
+    prisma.proposal.findFirst.mockResolvedValue(null);
     prisma.invite.update.mockResolvedValue({});
     prisma.tenant.findUnique.mockResolvedValue({
       id: 'namao_default_tenant',
@@ -222,6 +226,30 @@ describe('AuthService', () => {
     });
     expect(result.contactWhatsAppUrl).toContain('https://wa.me/5519997306695?text=');
     expect(result.contactWhatsAppUrl).toContain(encodeURIComponent('pagamento'));
+    expect(result.proposal).toBeNull();
+    expect(result.payment).toBeNull();
+  });
+
+  it('me devolve proposta pendente', async () => {
+    prisma.lead.findUnique.mockResolvedValue({
+      id: 'lead-1',
+      name: 'Loja Ana',
+    });
+    prisma.proposal.findFirst.mockResolvedValue({
+      id: 'prop-1',
+      status: 'pending',
+      paymentStatus: 'pending',
+      collectPayment: true,
+      acceptedAt: null,
+      paidAt: null,
+      packageSnapshot: { name: 'Site', price: 800, currency: 'BRL' },
+    });
+    const result = await service.me(jwtUser);
+    expect(result.proposal).toEqual({
+      status: 'pending',
+      paymentStatus: 'pending',
+    });
+    expect(result.payment).toBeNull();
   });
 
   it('me devolve accountKind customer quando o perfil já foi convertido', async () => {

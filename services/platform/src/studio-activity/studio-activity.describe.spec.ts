@@ -31,6 +31,20 @@ describe('describeStudioAction', () => {
       title: 'Enviou e-mail (proposta de pacote)',
       summary: 'Lead abc',
     });
+    expect(
+      describeStudioAction('POST', '/leads/abc/emails/proposal'),
+    ).toEqual({
+      kind: 'email.send',
+      title: 'Enviou e-mail (link da proposta)',
+      summary: 'Lead abc',
+    });
+    expect(
+      describeStudioAction('POST', '/customers/abc/proposal/mark-paid'),
+    ).toEqual({
+      kind: 'proposal.paid',
+      title: 'Marcou proposta como paga',
+      summary: 'Customer abc',
+    });
     expect(describeStudioAction('POST', '/leads/abc/shares')).toEqual({
       kind: 'lead.share',
       title: 'Compartilhou perfil',
@@ -161,6 +175,31 @@ describe('describeStudioAction', () => {
       title: 'Gerou clipe UGC Skills',
       summary: 'Clipe abc',
     });
+  });
+
+  it('traduz o vínculo de site existente', () => {
+    expect(describeStudioAction('POST', '/leads/abc/website')).toEqual({
+      kind: 'website.link',
+      title: 'Vinculou site existente',
+      summary: 'Perfil abc',
+    });
+    expect(describeStudioAction('POST', '/customers/cust-1/website')).toEqual({
+      kind: 'website.link',
+      title: 'Vinculou site existente',
+      summary: 'Perfil cust-1',
+    });
+    expect(describeStudioAction('POST', '/leads/abc/website/deploy')).toEqual({
+      kind: 'website.deploy',
+      title: 'Disparou deploy do site',
+      summary: 'Perfil abc',
+    });
+    expect(describeStudioAction('POST', '/leads/abc/website/domain/sync')).toEqual(
+      {
+        kind: 'website.domain',
+        title: 'Sincronizou domínio do site',
+        summary: 'Perfil abc',
+      },
+    );
   });
 
   it('traduz o calendário de conteúdo', () => {

@@ -1,5 +1,6 @@
 import './chrome';
 import { clearChatSession, mountWebsiteChat } from './chat/mount';
+import { bindPixCopy, pixBlockHtml, type PixBlock } from './pix-block';
 import { api, clearSession, probeLoggedIn } from './session';
 
 type MeResponse = {
@@ -11,6 +12,8 @@ type MeResponse = {
     username?: string | null;
     igUserId?: string | null;
   };
+  proposal?: { status?: string; paymentStatus?: string } | null;
+  payment?: PixBlock | null;
   lead?: {
     name?: string | null;
     category?: string | null;
@@ -257,8 +260,23 @@ async function loadAnalytics() {
 async function boot() {
   try {
     const me = (await api('/auth/me')) as MeResponse;
+    if (me.proposal?.status === 'pending') {
+      location.href = '/proposta.html';
+      return;
+    }
     const name = me.user?.name || 'Cliente';
     const isLead = me.accountKind === 'lead';
+    const paymentEl = document.getElementById('dash-payment');
+    if (paymentEl instanceof HTMLElement) {
+      if (me.payment) {
+        paymentEl.hidden = false;
+        paymentEl.innerHTML = pixBlockHtml(me.payment);
+        bindPixCopy(paymentEl);
+      } else {
+        paymentEl.hidden = true;
+        paymentEl.innerHTML = '';
+      }
+    }
     userLine.textContent = `${name} · ${me.user?.email || ''}`;
     dashTitle.textContent = `Olá, ${name.split(' ')[0]}`;
     dashKicker.textContent = isLead ? 'Prévia da conta' : 'Área do cliente';

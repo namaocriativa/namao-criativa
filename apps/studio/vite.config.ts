@@ -169,6 +169,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
     proxy: {
       '/leads': apiProxy(),
       '/customers': apiProxy(),
@@ -185,6 +186,7 @@ export default defineConfig({
       '/locations': apiProxy(),
       '/storage': apiProxy(),
       '/landing': apiProxy(),
+      '/website-projects': apiProxy(),
       '/config': apiProxy(),
       '/auth': apiProxy(),
       '/invites': apiProxy(),

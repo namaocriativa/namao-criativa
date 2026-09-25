@@ -1,0 +1,195 @@
+name: Reusable client website
+
+on:
+  workflow_call:
+    inputs:
+      deploy-type:
+        description: cloudflare or vercel
+        required: true
+        type: string
+      framework:
+        description: next or vite
+        required: true
+        type: string
+      project-name:
+        description: Cloudflare Pages or Vercel project name
+        required: true
+        type: string
+      custom-domain:
+        description: Optional apex hostname to attach after Cloudflare deploy
+        required: false
+        type: string
+        default: ""
+      account-id:
+        description: Cloudflare account ID (optional; falls back to repo variable)
+        required: false
+        type: string
+        default: ""
+      working-directory:
+        description: Path to the site inside the client repo
+        required: false
+        type: string
+        default: .
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
+      VERCEL_TOKEN:
+        required: false
+
+concurrency:
+  group: client-website-${{ inputs.project-name }}-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ inputs.account-id || vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Install
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Prepare Cloudflare Pages output
+        if: inputs.deploy-type == 'cloudflare'
+        id: out
+        run: |
+          if [ -d out ]; then
+            echo "dir=out" >> "$GITHUB_OUTPUT"
+          elif [ -d dist ]; then
+            echo "dir=dist" >> "$GITHUB_OUTPUT"
+          elif [ "${{ inputs.framework }}" = "next" ]; then
+            echo "Next did not emit out/. Set output: 'export' in next.config."
+            exit 1
+          else
+            echo "Missing dist/. Vite sites should emit dist/."
+            exit 1
+          fi
+
+      - id: cf
+        if: inputs.deploy-type == 'cloudflare'
+        name: Check Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "Skipping Pages deploy until CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure Cloudflare Pages project
+        if: inputs.deploy-type == 'cloudflare' && steps.cf.outputs.ok == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PROJECT: ${{ inputs.project-name }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/cf-project.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT}")
+          if [ "$code" = "200" ]; then
+            echo "Pages project ${PROJECT} exists."
+            exit 0
+          fi
+          body=$(curl -sS -X POST \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects" \
+            -d "{\"name\":\"${PROJECT}\",\"production_branch\":\"main\"}")
+          echo "$body"
+          if echo "$body" | grep -Eqi '"success"[[:space:]]*:[[:space:]]*true|already|exist'; then
+            echo "created ${PROJECT}"
+            exit 0
+          fi
+          echo "Failed to create Pages project ${PROJECT}"
+          exit 1
+
+      - name: Deploy Cloudflare Pages
+        if: inputs.deploy-type == 'cloudflare' && steps.cf.outputs.ok == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ${{ inputs.working-directory }}
+          command: pages deploy ${{ steps.out.outputs.dir }} --project-name=${{ inputs.project-name }} --branch=main --commit-hash=${{ github.sha }} --commit-dirty=true
+
+      - name: Attach custom domain
+        if: inputs.deploy-type == 'cloudflare' && steps.cf.outputs.ok == 'true' && inputs.custom-domain != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ inputs.project-name }}
+          RAW_DOMAIN: ${{ inputs.custom-domain }}
+        run: |
+          set -euo pipefail
+          host=$(printf '%s' "$RAW_DOMAIN" | sed -E 's#^https?://##; s#/.*##; s/^www\.//' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+          if [ -z "$host" ]; then
+            echo "No custom domain to attach."
+            exit 0
+          fi
+          attach() {
+            local name="$1"
+            local body
+            body=$(curl -sS -X POST \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/pages/projects/${PROJECT}/domains" \
+              -d "{\"name\":\"${name}\"}")
+            echo "$body"
+            if echo "$body" | grep -Eqi '"success"[[:space:]]*:[[:space:]]*true|already|exist'; then
+              echo "attached $name"
+              return 0
+            fi
+            echo "WARN: could not attach $name"
+            return 0
+          }
+          attach "$host"
+          attach "www.$host"
+
+      - id: vercel
+        if: inputs.deploy-type == 'vercel'
+        name: Check Vercel credentials
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "Skipping Vercel deploy until VERCEL_TOKEN is set."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy Vercel
+        if: inputs.deploy-type == 'vercel' && steps.vercel.outputs.ok == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes vercel deploy --prod --yes --token "$VERCEL_TOKEN"

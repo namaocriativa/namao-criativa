@@ -1,0 +1,42 @@
+name: CD client website
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy-type:
+        description: cloudflare or vercel
+        type: string
+        default: cloudflare
+      custom-domain:
+        description: Optional custom domain (Cloudflare Pages)
+        type: string
+        required: false
+      project-name:
+        description: Pages or Vercel project name
+        type: string
+        default: paulinhocabelos
+      account-id:
+        description: Cloudflare account ID (optional; falls back to repo variable)
+        type: string
+        required: false
+
+concurrency:
+  group: cd-client-website-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    uses: namaocriativa/namao-criativa/.github/workflows/reusable-client-website.yml@main
+    with:
+      deploy-type: ${{ inputs.deploy-type || 'cloudflare' }}
+      framework: next
+      project-name: ${{ inputs.project-name || 'paulinhocabelos' }}
+      custom-domain: ${{ inputs.custom-domain || '' }}
+      account-id: ${{ inputs.account-id || vars.CLOUDFLARE_ACCOUNT_ID }}
+    secrets: inherit

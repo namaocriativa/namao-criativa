@@ -177,6 +177,13 @@ export const SEO_PAGES: PageSeo[] = [
     noindex: true,
   },
   {
+    file: 'proposta.html',
+    path: '/proposta.html',
+    title: 'Sua proposta — Namão Criativa',
+    description: 'Revise e aceite a proposta da Namão Criativa.',
+    noindex: true,
+  },
+  {
     file: 'conectar.html',
     path: '/conectar.html',
     title: 'Conectar Instagram — Namão Criativa',

@@ -56,6 +56,11 @@ export interface Lead {
   activeLandingJobId?: string | null;
   publishedOrigin?: string | null;
   vercelProjectId?: string | null;
+  websiteProjectId?: string | null;
+  websiteDeployType?: "cloudflare" | "vercel" | string | null;
+  websiteRepo?: string | null;
+  websiteFramework?: string | null;
+  websiteDomain?: string | null;
   fromPublicSignup?: boolean;
   createdBy?: { id: string; name: string; email: string } | null;
   sharedWithMe?: boolean;
@@ -213,6 +218,8 @@ export interface CreativeMovieShot {
   scene: string;
   action: string;
   dialogue?: string;
+  framing?: string;
+  camera?: string;
   status: CreativeMovieShotStatus;
   error?: string;
   localPath?: string;

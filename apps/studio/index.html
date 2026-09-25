@@ -1240,30 +1240,25 @@
               página do lead.
             </p>
           </div>
+          <div class="lead-hero-health" id="lead-hero-health" hidden>
+            <p class="lead-hero-health__summary">
+              <span class="lead-website-health__dot" aria-hidden="true"></span>
+              <span id="lead-hero-health-summary"></span>
+              <button type="button" class="lead-hero-health__refresh" id="lead-hero-health-refresh">
+                Atualizar
+              </button>
+            </p>
+            <ul class="lead-hero-health__hosts" id="lead-hero-health-list"></ul>
+          </div>
           <div class="actions" id="site-actions" hidden>
-            <button type="button" id="site-generate-btn" disabled>
-              Gerar site
+            <button type="button" id="site-add-btn" disabled>
+              Configurar site
             </button>
-            <button type="button" class="secondary" id="site-cancel-btn" disabled>
-              Cancelar
+            <button type="button" class="secondary" id="site-deploy-btn" hidden disabled>
+              Publicar agora
             </button>
             <button type="button" class="secondary" id="site-prompt-btn" disabled>
               Copiar prompt Cursor
-            </button>
-            <button type="button" class="secondary" id="site-refresh-btn">
-              Atualizar status
-            </button>
-            <button type="button" class="secondary" id="site-local-btn" disabled>
-              Abrir local
-            </button>
-            <button type="button" class="secondary" id="site-account-btn" disabled>
-              Ver Senha
-            </button>
-            <button type="button" class="secondary" id="site-publish-btn" disabled>
-              Publicar na Vercel
-            </button>
-            <button type="button" class="danger" id="site-delete-btn" disabled>
-              Deletar site
             </button>
           </div>
           <div class="status" id="site-status"></div>
@@ -1352,6 +1347,7 @@
     <div id="lead-gallery-root"></div>
     <div id="lead-account-root"></div>
     <div id="lead-share-root"></div>
+    <div id="lead-website-root"></div>
     <div id="lead-edit-root"></div>
     <div id="lead-emails-root"></div>
     <div id="lead-whatsapp-root"></div>

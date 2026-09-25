@@ -28,6 +28,7 @@ describe('LeadWhatsAppService', () => {
     requireActive: jest.fn(),
     getOfferTemplate: jest.fn(),
   };
+  const proposals = { upsertFromSend: jest.fn() };
   const service = new LeadWhatsAppService(
     prisma as never,
     config as never,
@@ -37,6 +38,7 @@ describe('LeadWhatsAppService', () => {
     activity as never,
     owners as never,
     packages as never,
+    proposals as never,
   );
 
   const lead = {
@@ -66,6 +68,7 @@ describe('LeadWhatsAppService', () => {
       'instagram-permission',
       'credentials',
       'package-offer',
+      'proposal',
     ]);
     expect(result.items[0].available).toBe(true);
     expect(result.items[0].to).toBe('+5511999999999');
@@ -327,5 +330,27 @@ describe('LeadWhatsAppService', () => {
         kind: 'package-offer',
       }),
     );
+  });
+
+  it('envia o link da proposta pelo WhatsApp', async () => {
+    prisma.lead.findUnique.mockResolvedValue({
+      ...lead,
+      clientAccounts: [{ email: 'ana@loja.com' }],
+    });
+    packages.requireActive.mockResolvedValue({
+      id: 'pkg-1',
+      name: 'Site Estratégico',
+    });
+    proposals.upsertFromSend.mockResolvedValue({});
+    evolution.sendText.mockResolvedValue({ skipped: false, ok: true, data: {} });
+    const result = await service.send('lead-1', 'proposal', undefined, 'pkg-1');
+    expect(proposals.upsertFromSend).toHaveBeenCalledWith('lead-1', 'pkg-1');
+    expect(evolution.sendText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phone: '+5511999999999',
+        text: expect.stringContaining('proposta.html'),
+      }),
+    );
+    expect(result.sent).toBe(true);
   });
 });

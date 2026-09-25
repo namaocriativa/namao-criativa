@@ -9,6 +9,7 @@ import {
   normalizeEmail,
   publicLoginUrl,
   publicLogoUrl,
+  publicProposalLoginUrl,
 } from '../lead-account/lead-account.util';
 import { LeadAccountService } from '../lead-account/lead-account.service';
 import { InvitesService } from '../invites/invites.service';
@@ -36,12 +37,18 @@ import {
 } from '../mail/package-offer-email';
 import { PackagesService } from '../packages/packages.service';
 import { renderOfferTemplate } from '../packages/offer-template';
+import { ProposalService } from '../proposal/proposal.service';
+import {
+  proposalEmailHtml,
+  proposalEmailText,
+} from '../mail/proposal-email';
 
 export const LEAD_EMAIL_KINDS = [
   'site-introduction',
   'instagram-permission',
   'credentials',
   'package-offer',
+  'proposal',
 ] as const;
 
 export type LeadEmailKind = (typeof LEAD_EMAIL_KINDS)[number];
@@ -72,6 +79,12 @@ const TEMPLATES: Record<
       'Envia a proposta comercial usando um pacote ativo como conteúdo.',
     subject: 'Proposta comercial — Namão Criativa',
   },
+  proposal: {
+    title: 'Enviar proposta',
+    description:
+      'Envia o link autenticado para o cliente ver e aceitar a proposta.',
+    subject: 'Sua proposta está pronta — Namão Criativa',
+  },
 };
 
 @Injectable()
@@ -85,6 +98,7 @@ export class LeadMailService {
     private readonly owners: OwnerLookup,
     private readonly packages: PackagesService,
     private readonly mailer: MailService,
+    private readonly proposals: ProposalService,
   ) {}
 
   async list(leadId: string) {
@@ -94,10 +108,18 @@ export class LeadMailService {
     const cred = await this.credentialsRecipient(lead);
     const siteUrl = lead.publishedOrigin?.trim() || null;
     const activePackages = await this.packages.findActive();
+    const hasAccount = lead.clientAccounts.length > 0;
     const offerReason = to
       ? activePackages.length
         ? null
         : 'Nenhum pacote ativo cadastrado.'
+      : 'Lead sem e-mail válido para envio.';
+    const proposalReason = to
+      ? hasAccount
+        ? activePackages.length
+          ? null
+          : 'Nenhum pacote ativo cadastrado.'
+        : 'Envie o acesso ao painel antes.'
       : 'Lead sem e-mail válido para envio.';
 
     return {
@@ -143,6 +165,14 @@ export class LeadMailService {
           unavailableReason: offerReason,
           packages: activePackages,
         },
+        {
+          id: 'proposal' as const,
+          ...TEMPLATES.proposal,
+          to,
+          available: Boolean(to) && hasAccount && activePackages.length > 0,
+          unavailableReason: proposalReason,
+          packages: activePackages,
+        },
       ],
     };
   }
@@ -154,6 +184,10 @@ export class LeadMailService {
 
     if (emailKind === 'package-offer') {
       return this.previewPackageOffer(lead, logoUrl, packageId);
+    }
+
+    if (emailKind === 'proposal') {
+      return this.previewProposal(lead, logoUrl, packageId);
     }
 
     if (emailKind === 'site-introduction') {
@@ -232,6 +266,9 @@ export class LeadMailService {
     const emailKind = this.parseKind(kind);
     if (emailKind === 'package-offer') {
       return this.sendPackageOffer(leadId, packageId);
+    }
+    if (emailKind === 'proposal') {
+      return this.sendProposal(leadId, packageId);
     }
     const result =
       emailKind === 'site-introduction'
@@ -400,6 +437,88 @@ export class LeadMailService {
       title: `E-mail enviado: ${TEMPLATES['package-offer'].title}`,
       summary: `Enviado para ${to} · ${pkg.name}`,
       payload: { to, kind: 'package-offer', packageId: pkg.id },
+    });
+    return { sent: true as const, to, packageId: pkg.id };
+  }
+
+  private async previewProposal(
+    lead: {
+      name: string;
+      email: string | null;
+      clientAccounts: Array<{ email: string }>;
+    },
+    logoUrl: string,
+    packageId?: string,
+  ) {
+    const pkg = await this.packages.requireActive(packageId || '');
+    const to = this.instagramRecipient(lead);
+    const hasAccount = lead.clientAccounts.length > 0;
+    const loginUrl = publicProposalLoginUrl(
+      this.config.get<string>('NAMAO_PUBLIC_URL'),
+    );
+    const notices = [
+      to ? null : 'Lead sem e-mail válido para envio. Atualize o e-mail do lead.',
+      hasAccount ? null : 'Envie o acesso ao painel antes.',
+    ].filter(Boolean);
+    return {
+      id: 'proposal' as const,
+      ...TEMPLATES.proposal,
+      to: to || '—',
+      canSend: Boolean(to) && hasAccount,
+      html: proposalEmailHtml({
+        name: lead.name,
+        packageName: pkg.name,
+        loginUrl,
+        logoUrl,
+      }),
+      text: proposalEmailText({
+        name: lead.name,
+        packageName: pkg.name,
+        loginUrl,
+      }),
+      notice: notices.join(' ') || null,
+      packageId: pkg.id,
+    };
+  }
+
+  private async sendProposal(leadId: string, packageId?: string) {
+    const lead = await this.requireLead(leadId);
+    const to = this.instagramRecipient(lead);
+    if (!to) {
+      throw new BadRequestException(
+        'Lead sem e-mail válido para envio. Atualize o e-mail do lead.',
+      );
+    }
+    if (!lead.clientAccounts.length) {
+      throw new BadRequestException('Envie o acesso ao painel antes.');
+    }
+    const pkg = await this.packages.requireActive(packageId || '');
+    await this.proposals.upsertFromSend(leadId, pkg.id);
+    const loginUrl = publicProposalLoginUrl(
+      this.config.get<string>('NAMAO_PUBLIC_URL'),
+    );
+    const logoUrl = publicLogoUrl(this.config.get<string>('NAMAO_PUBLIC_URL'));
+    await this.mailer.sendProposal({
+      to,
+      html: proposalEmailHtml({
+        name: lead.name,
+        packageName: pkg.name,
+        loginUrl,
+        logoUrl,
+      }),
+      text: proposalEmailText({
+        name: lead.name,
+        packageName: pkg.name,
+        loginUrl,
+      }),
+    });
+    await this.activity.record({
+      leadId,
+      channel: 'email',
+      kind: 'proposal',
+      title: `E-mail enviado: ${TEMPLATES.proposal.title}`,
+      summary: `Enviado para ${to} · ${pkg.name}`,
+      payload: { to, kind: 'proposal', packageId: pkg.id },
     });
     return { sent: true as const, to, packageId: pkg.id };
   }

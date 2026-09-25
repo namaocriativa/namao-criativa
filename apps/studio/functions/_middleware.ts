@@ -29,6 +29,7 @@ const API_PREFIXES = [
       '/locations',
   '/storage',
   '/landing',
+  '/website-projects',
   '/config',
   '/invites',
   '/studio',

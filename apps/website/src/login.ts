@@ -33,7 +33,11 @@ form.addEventListener('submit', async (event) => {
       }),
     });
     clearChatSession();
-    location.href = '/dashboard.html';
+    const me = (await api('/auth/me')) as {
+      proposal?: { status?: string } | null;
+    };
+    location.href =
+      me.proposal?.status === 'pending' ? '/proposta.html' : '/dashboard.html';
   } catch (error) {
     statusEl.textContent =
       error instanceof Error ? error.message : 'Falha no login';

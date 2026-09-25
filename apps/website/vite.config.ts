@@ -15,6 +15,7 @@ export default defineConfig({
   plugins: [namaoSeoPlugin()],
   server: {
     port: 5174,
+    strictPort: true,
     proxy: {
       '/auth': api,
       '/dashboard/analytics': api,
@@ -22,6 +23,7 @@ export default defineConfig({
       '/leads': api,
       '/invite-requests': api,
       '/namao-chat': api,
+      '/proposal': api,
     },
   },
   build: {

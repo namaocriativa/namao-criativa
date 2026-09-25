@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { EvolutionClient } from '../evolution/evolution.client';
 import { InvitesService } from '../invites/invites.service';
 import { LeadAccountService } from '../lead-account/lead-account.service';
-import { publicLoginUrl } from '../lead-account/lead-account.util';
+import { publicLoginUrl, publicProposalLoginUrl } from '../lead-account/lead-account.util';
 import { LeadActivityService } from '../lead-activity/lead-activity.service';
 import { OwnerLookup } from '../owner/owner-lookup.service';
 import { ownerWhere } from '../owner/owner.util';
@@ -21,14 +21,17 @@ import {
   applyWhatsAppPlaceholders,
   credentialsWhatsApp,
   instagramPermissionWhatsApp,
+  proposalWhatsApp,
   siteIntroductionWhatsApp,
 } from '../whatsapp/lead-whatsapp-messages';
+import { ProposalService } from '../proposal/proposal.service';
 
 export const LEAD_WHATSAPP_KINDS = [
   'site-introduction',
   'instagram-permission',
   'credentials',
   'package-offer',
+  'proposal',
 ] as const;
 
 export type LeadWhatsAppKind = (typeof LEAD_WHATSAPP_KINDS)[number];
@@ -55,6 +58,11 @@ const TEMPLATES: Record<
     description:
       'Envia a proposta comercial usando um pacote ativo como conteúdo.',
   },
+  proposal: {
+    title: 'Enviar proposta',
+    description:
+      'Envia o link autenticado para o cliente ver e aceitar a proposta.',
+  },
 };
 
 @Injectable()
@@ -68,6 +76,7 @@ export class LeadWhatsAppService {
     private readonly activity: LeadActivityService,
     private readonly owners: OwnerLookup,
     private readonly packages: PackagesService,
+    private readonly proposals: ProposalService,
   ) {}
 
   async list(leadId: string) {
@@ -119,6 +128,23 @@ export class LeadWhatsAppService {
           }),
           packages: activePackages,
         },
+        {
+          ...this.listItem('proposal', to, {
+            available:
+              Boolean(to) &&
+              Boolean(client) &&
+              evolutionReady &&
+              activePackages.length > 0,
+            unavailableReason: this.channelReason(to, evolutionReady, {
+              extra: client
+                ? activePackages.length
+                  ? null
+                  : 'Nenhum pacote ativo cadastrado.'
+                : 'Envie o acesso ao painel antes.',
+            }),
+          }),
+          packages: activePackages,
+        },
       ],
     };
   }
@@ -132,6 +158,10 @@ export class LeadWhatsAppService {
 
     if (messageKind === 'package-offer') {
       return this.previewPackageOffer(lead, to, evolutionReady, packageId);
+    }
+
+    if (messageKind === 'proposal') {
+      return this.previewProposal(lead, to, evolutionReady, packageId);
     }
 
     if (messageKind === 'site-introduction') {
@@ -228,6 +258,9 @@ export class LeadWhatsAppService {
 
     if (messageKind === 'package-offer') {
       return this.sendPackageOffer(lead, phone, editedText, packageId);
+    }
+    if (messageKind === 'proposal') {
+      return this.sendProposal(lead, phone, editedText, packageId);
     }
 
     if (messageKind === 'instagram-permission' && lead.instagramConnections.length) {
@@ -338,6 +371,82 @@ export class LeadWhatsAppService {
       title: `WhatsApp enviado: ${TEMPLATES['package-offer'].title}`,
       summary: `Enviado para ${phone} · ${pkg.name}`,
       payload: { to: phone, kind: 'package-offer', packageId: pkg.id },
+    });
+    return {
+      sent: true as const,
+      to: phone,
+      packageId: pkg.id,
+      text,
+    };
+  }
+
+  private async previewProposal(
+    lead: {
+      name: string;
+      whatsapp: string | null;
+      phone: string | null;
+      clientAccounts: Array<{ email: string }>;
+    },
+    to: string,
+    evolutionReady: boolean,
+    packageId?: string,
+  ) {
+    const pkg = await this.packages.requireActive(packageId || '');
+    const hasAccount = lead.clientAccounts.length > 0;
+    const notices = [
+      this.phoneNotice(lead),
+      this.evolutionNotice(evolutionReady),
+      hasAccount ? null : 'Envie o acesso ao painel antes.',
+    ].filter(Boolean);
+    return {
+      id: 'proposal' as const,
+      ...TEMPLATES.proposal,
+      to,
+      canSend: Boolean(this.phoneOf(lead)) && hasAccount && evolutionReady,
+      text: proposalWhatsApp({
+        name: lead.name,
+        packageName: pkg.name,
+        loginUrl: publicProposalLoginUrl(this.config.get('NAMAO_PUBLIC_URL')),
+      }),
+      notice: notices.join(' ') || null,
+      packageId: pkg.id,
+    };
+  }
+
+  private async sendProposal(
+    lead: { id: string; name: string; clientAccounts: Array<{ email: string }> },
+    phone: string,
+    editedText: string | undefined,
+    packageId?: string,
+  ) {
+    if (!lead.clientAccounts.length) {
+      throw new BadRequestException('Envie o acesso ao painel antes.');
+    }
+    const pkg = await this.packages.requireActive(packageId || '');
+    await this.proposals.upsertFromSend(lead.id, pkg.id);
+    const text =
+      editedText?.trim() ||
+      proposalWhatsApp({
+        name: lead.name,
+        packageName: pkg.name,
+        loginUrl: publicProposalLoginUrl(this.config.get('NAMAO_PUBLIC_URL')),
+      });
+    const result = await this.evolution.sendText({ phone, text });
+    if (result.skipped) {
+      throw new BadGatewayException('WhatsApp (Evolution) não configurado.');
+    }
+    if (!result.ok) {
+      throw new BadGatewayException(
+        `Falha ao enviar WhatsApp: ${result.error}`,
+      );
+    }
+    await this.activity.record({
+      leadId: lead.id,
+      channel: 'whatsapp',
+      kind: 'proposal',
+      title: `WhatsApp enviado: ${TEMPLATES.proposal.title}`,
+      summary: `Enviado para ${phone} · ${pkg.name}`,
+      payload: { to: phone, kind: 'proposal', packageId: pkg.id },
     });
     return {
       sent: true as const,

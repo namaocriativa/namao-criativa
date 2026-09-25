@@ -9,6 +9,7 @@ const EMAIL_KIND_LABELS: Record<string, string> = {
   'site-introduction': 'apresentação do site',
   'instagram-permission': 'permissão do Instagram',
   'package-offer': 'proposta de pacote',
+  proposal: 'link da proposta',
 };
 
 const WHATSAPP_KIND_LABELS: Record<string, string> = {
@@ -16,6 +17,7 @@ const WHATSAPP_KIND_LABELS: Record<string, string> = {
   'instagram-permission': 'permissão do Instagram',
   credentials: 'acesso ao painel',
   'package-offer': 'proposta de pacote',
+  proposal: 'link da proposta',
 };
 
 type Rule = {
@@ -104,6 +106,15 @@ const RULES: Rule[] = [
       kind: 'lead.convert',
       title: 'Converteu lead em customer',
       summary: `Lead ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/(leads|customers)\/([^/]+)\/proposal\/mark-paid$/,
+    describe: (match) => ({
+      kind: 'proposal.paid',
+      title: 'Marcou proposta como paga',
+      summary: `${ownerLabel(match[1])} ${match[2]}`,
     }),
   },
   {
@@ -650,6 +661,33 @@ const RULES: Rule[] = [
       kind: 'config.llm',
       title: 'Atualizou configuração de LLM',
       summary: 'Salvou modelos e chaves de ambiente',
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/(?:leads|customers)\/([^/]+)\/website\/domain\/sync$/,
+    describe: (match) => ({
+      kind: 'website.domain',
+      title: 'Sincronizou domínio do site',
+      summary: `Perfil ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/(?:leads|customers)\/([^/]+)\/website\/deploy$/,
+    describe: (match) => ({
+      kind: 'website.deploy',
+      title: 'Disparou deploy do site',
+      summary: `Perfil ${match[1]}`,
+    }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/(?:leads|customers)\/([^/]+)\/website$/,
+    describe: (match) => ({
+      kind: 'website.link',
+      title: 'Vinculou site existente',
+      summary: `Perfil ${match[1]}`,
     }),
   },
   {

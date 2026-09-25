@@ -49,6 +49,23 @@ export function instagramPermissionWhatsApp(params: {
   ].join('\n');
 }
 
+export function proposalWhatsApp(params: {
+  name: string;
+  packageName: string;
+  loginUrl: string;
+}): string {
+  return [
+    `Olá, ${params.name || 'olá'}.`,
+    '',
+    `Sua proposta da Namão Criativa está pronta: *${params.packageName}*.`,
+    '',
+    'Entre no painel para ver os detalhes, os próximos passos e aceitar.',
+    params.loginUrl,
+    '',
+    'Namão Criativa',
+  ].join('\n');
+}
+
 export function credentialsWhatsApp(params: {
   name: string;
   email: string;

@@ -24,7 +24,8 @@ describe('LeadMailService', () => {
     requireActive: jest.fn(),
     getOfferTemplate: jest.fn(),
   };
-  const mailer = { sendPackageOffer: jest.fn() };
+  const mailer = { sendPackageOffer: jest.fn(), sendProposal: jest.fn() };
+  const proposals = { upsertFromSend: jest.fn() };
   const service = new LeadMailService(
     prisma as never,
     config as never,
@@ -34,6 +35,7 @@ describe('LeadMailService', () => {
     owners as never,
     packages as never,
     mailer as never,
+    proposals as never,
   );
 
   beforeEach(() => {
@@ -65,6 +67,7 @@ describe('LeadMailService', () => {
       'instagram-permission',
       'credentials',
       'package-offer',
+      'proposal',
     ]);
     expect(result.items[0].available).toBe(true);
     expect(result.items[0].to).toBe('contato@firma.com');
@@ -305,5 +308,28 @@ describe('LeadMailService', () => {
         channel: 'email',
       }),
     );
+  });
+
+  it('envia o link da proposta e persiste o pacote', async () => {
+    prisma.lead.findUnique.mockResolvedValue({
+      id: 'lead-1',
+      name: 'Firma',
+      email: 'contato@firma.com',
+      publishedOrigin: 'https://firma.vercel.app',
+      clientAccounts: [{ email: 'ana@loja.com' }],
+      instagramConnections: [],
+    });
+    packages.requireActive.mockResolvedValue({
+      id: 'pkg-1',
+      name: 'Site Estratégico',
+    });
+    mailer.sendProposal.mockResolvedValue(undefined);
+    proposals.upsertFromSend.mockResolvedValue({});
+    const result = await service.send('lead-1', 'proposal', 'pkg-1');
+    expect(proposals.upsertFromSend).toHaveBeenCalledWith('lead-1', 'pkg-1');
+    expect(mailer.sendProposal).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'contato@firma.com' }),
+    );
+    expect(result).toMatchObject({ sent: true, packageId: 'pkg-1' });
   });
 });

@@ -44,6 +44,8 @@ import {
   TENANT_STATUS,
 } from '../tenant/tenant.constants';
 import { resolveDefaultTenantId } from '../tenant/tenant.util';
+import { ownerWhere } from '../owner/owner.util';
+import { clientProposalSummary } from '../proposal/proposal.view';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -458,6 +460,17 @@ export class AuthService implements OnModuleInit {
       `Olá! Sou ${who}. Criei uma conta na Namão e quero falar sobre o pagamento para o serviço completo.`,
     );
 
+    const proposalRow = ownerId
+      ? await this.prisma.proposal.findFirst({
+          where: ownerWhere(ownerId),
+          orderBy: { createdAt: 'desc' },
+        })
+      : null;
+    const { proposal, payment } = await clientProposalSummary(
+      proposalRow,
+      this.config,
+    );
+
     return {
       user,
       accountKind,
@@ -470,6 +483,8 @@ export class AuthService implements OnModuleInit {
           }
         : { connected: false as const },
       contactWhatsAppUrl,
+      proposal,
+      payment,
     };
   }
 

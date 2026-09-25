@@ -71,6 +71,20 @@ export function buildRuntimeEnvs(opts: {
   const resendFrom = process.env.RESEND_FROM?.trim();
   if (resendFrom) envs.RESEND_FROM = resendFrom;
 
+  const githubWebsites = process.env.GITHUB_WEBSITES_TOKEN?.trim();
+  if (githubWebsites) envs.GITHUB_WEBSITES_TOKEN = githubWebsites;
+  const cfToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  if (cfToken) envs.CLOUDFLARE_API_TOKEN = cfToken;
+  const cfAccount = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  if (cfAccount) envs.CLOUDFLARE_ACCOUNT_ID = cfAccount;
+
+  const pixKey = process.env.NAMAO_PIX_KEY?.trim();
+  if (pixKey) envs.NAMAO_PIX_KEY = pixKey;
+  const cnpj = process.env.NAMAO_CNPJ?.trim();
+  if (cnpj) envs.NAMAO_CNPJ = cnpj;
+  const legalName = process.env.NAMAO_LEGAL_NAME?.trim();
+  if (legalName) envs.NAMAO_LEGAL_NAME = legalName;
+
   return envs;
 }
 

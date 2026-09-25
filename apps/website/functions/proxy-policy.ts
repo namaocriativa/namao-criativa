@@ -6,6 +6,7 @@ export const API_PREFIXES = [
   '/dashboard/analytics',
   '/invite-requests',
   '/namao-chat',
+  '/proposal',
 ] as const;
 
 export const DEFAULT_WEBSITE_API_ORIGIN = 'https://api.namaocriativa.com.br';

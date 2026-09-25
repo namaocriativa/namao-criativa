@@ -1,0 +1,12 @@
+{
+  "projects": [
+    {
+      "id": "namaocriativa/paulinhocabelos",
+      "title": "paulinhocabelos",
+      "repo": "https://github.com/namaocriativa/paulinhocabelos",
+      "framework": "next",
+      "cloudflareProjectName": "paulinhocabelos",
+      "vercelProjectName": "paulinhocabelos"
+    }
+  ]
+}

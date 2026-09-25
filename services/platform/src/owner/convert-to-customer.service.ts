@@ -35,6 +35,11 @@ const LEAD_COPY_FIELDS = [
   'publishedOrigin',
   'vercelProjectId',
   'vercelDeploymentId',
+  'websiteProjectId',
+  'websiteDeployType',
+  'websiteRepo',
+  'websiteFramework',
+  'websiteDomain',
   'fromPublicSignup',
   'createdByUserId',
   'tenantId',
@@ -95,6 +100,11 @@ export class ConvertToCustomerService {
         publishedOrigin: existing.publishedOrigin,
         vercelProjectId: existing.vercelProjectId,
         vercelDeploymentId: existing.vercelDeploymentId,
+        websiteProjectId: existing.websiteProjectId,
+        websiteDeployType: existing.websiteDeployType,
+        websiteRepo: existing.websiteRepo,
+        websiteFramework: existing.websiteFramework,
+        websiteDomain: existing.websiteDomain,
         fromPublicSignup: existing.fromPublicSignup,
         createdByUserId: existing.createdByUserId,
         tenantId: existing.tenantId,
@@ -148,6 +158,10 @@ export class ConvertToCustomerService {
         data: reassign,
       });
       await tx.studioLeadShare.updateMany({
+        where: { leadId },
+        data: reassign,
+      });
+      await tx.proposal.updateMany({
         where: { leadId },
         data: reassign,
       });

@@ -4,6 +4,7 @@ import { LeadAccountModule } from '../lead-account/lead-account.module';
 import { LeadActivityModule } from '../lead-activity/lead-activity.module';
 import { LeadMailModule } from '../lead-mail/lead-mail.module';
 import { LeadWhatsAppModule } from '../lead-whatsapp/lead-whatsapp.module';
+import { ProposalModule } from '../proposal/proposal.module';
 import { StorageModule } from '../storage/storage.module';
 import { CustomerController } from './customer.controller';
 import { CustomerService } from './customer.service';
@@ -16,6 +17,7 @@ import { CustomerService } from './customer.service';
     LeadMailModule,
     LeadWhatsAppModule,
     LeadActivityModule,
+    ProposalModule,
   ],
   controllers: [CustomerController],
   providers: [CustomerService],

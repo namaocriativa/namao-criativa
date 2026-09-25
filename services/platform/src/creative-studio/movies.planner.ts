@@ -1,5 +1,9 @@
 import { MOVIES_ID } from './creative-features';
 import {
+  resolveMovieCamera,
+  resolveMovieFraming,
+} from './movies.direction';
+import {
   buildCharacterIdentityPrompt,
   type CharacterIdentityInput,
 } from './personagens.planner';
@@ -19,6 +23,8 @@ export type MovieShotPromptInput = {
   scene: string;
   action: string;
   dialogue?: string;
+  framing?: string;
+  camera?: string;
 };
 
 export function movieShotPrompt(input: MovieShotPromptInput): string {
@@ -43,23 +49,28 @@ export function movieShotPrompt(input: MovieShotPromptInput): string {
       ? 'o elenco respira e olha para a câmera'
       : 'o personagem respira e olha para a câmera');
   const dialogue = input.dialogue?.trim() || '';
+  const framing = resolveMovieFraming(input.framing).prompt;
+  const camera = resolveMovieCamera(input.camera).prompt;
   const lines = [
     ensemble,
     `Cenário: ${scene}.`,
     `Ação: ${action}.`,
-    identities,
-    names.length > 1
-      ? 'As imagens anexadas na ordem são os retratos do elenco. Cada pessoa precisa aparecer com o próprio rosto, sem fundir identidades.'
-      : 'Câmera cinematográfica, movimento natural, continuidade de identidade com o quadro inicial.',
-    'Não troque o elenco, não invente outro rosto e não coloque texto na tela.',
-    `Feature ${MOVIES_ID}.`,
   ];
   if (dialogue) {
-    lines.splice(
-      3,
-      0,
+    lines.push(
       `Fala em português brasileiro, áudio nativo e labial sincronizado: "${dialogue}".`,
     );
   }
+  lines.push(
+    framing,
+    camera,
+    identities,
+    'Continuidade de identidade com o quadro inicial.',
+    names.length > 1
+      ? 'As imagens anexadas na ordem são os retratos do elenco. Cada pessoa precisa aparecer com o próprio rosto, sem fundir identidades.'
+      : '',
+    'Não troque o elenco, não invente outro rosto e não coloque texto na tela.',
+    `Feature ${MOVIES_ID}.`,
+  );
   return lines.filter(Boolean).join(' ');
 }

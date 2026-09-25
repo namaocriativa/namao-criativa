@@ -4,6 +4,7 @@ import {
   isSendableEmail,
   normalizeEmail,
   publicLoginUrl,
+  publicProposalLoginUrl,
 } from './lead-account.util';
 
 describe('lead-account.util', () => {
@@ -33,6 +34,12 @@ describe('lead-account.util', () => {
   it('monta URL de login', () => {
     expect(publicLoginUrl('https://namao.com/')).toBe(
       'https://namao.com/login.html',
+    );
+  });
+
+  it('monta URL de login da proposta', () => {
+    expect(publicProposalLoginUrl('https://namao.com/')).toBe(
+      'https://namao.com/login.html?next=%2Fproposta.html',
     );
   });
 });

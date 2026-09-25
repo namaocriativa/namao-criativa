@@ -5,7 +5,12 @@ type WhatsAppKind =
   | "site-introduction"
   | "instagram-permission"
   | "credentials"
-  | "package-offer";
+  | "package-offer"
+  | "proposal";
+
+function needsPackage(kind: string): kind is "package-offer" | "proposal" {
+  return kind === "package-offer" || kind === "proposal";
+}
 
 type OfferPackage = {
   id: string;
@@ -97,6 +102,7 @@ export function initLeadWhatsAppModal(
   let preview: WhatsAppPreview | null = null;
   let sent = false;
   let selectedPackageId: string | null = null;
+  let packageKind: "package-offer" | "proposal" = "package-offer";
 
   host.innerHTML = `
     <div class="site-wizard-modal lead-emails-modal lead-whatsapp-modal" hidden>
@@ -193,10 +199,11 @@ export function initLeadWhatsAppModal(
   }
 
   function offerItem() {
-    return items.find((item) => item.id === "package-offer") || null;
+    return items.find((item) => item.id === packageKind) || null;
   }
 
-  function showPackagePicker() {
+  function showPackagePicker(kind: "package-offer" | "proposal") {
+    packageKind = kind;
     const offer = offerItem();
     const packages = offer?.packages || [];
     view = "packages";
@@ -321,7 +328,7 @@ export function initLeadWhatsAppModal(
     setStatus("Carregando prévia…");
     try {
       const query =
-        kind === "package-offer" && packageId
+        needsPackage(kind) && packageId
           ? `?packageId=${encodeURIComponent(packageId)}`
           : "";
       const res = await api(
@@ -433,7 +440,7 @@ export function initLeadWhatsAppModal(
       .wppPackage;
     if (packageId) {
       selectedPackageId = packageId;
-      void openPreview("package-offer", packageId);
+      void openPreview(packageKind, packageId);
       return;
     }
     const kind = target?.closest<HTMLElement>("[data-wpp-kind]")?.dataset.wppKind;
@@ -445,13 +452,14 @@ export function initLeadWhatsAppModal(
       void openPreview(kind);
       return;
     }
-    if (kind === "package-offer") {
+    if (needsPackage(kind)) {
+      packageKind = kind;
       const offer = offerItem();
       if (!offer?.available) {
         setStatus(offer?.unavailableReason || "Pacote indisponível.", true);
         return;
       }
-      showPackagePicker();
+      showPackagePicker(kind);
       setStatus("");
     }
   });
@@ -459,8 +467,8 @@ export function initLeadWhatsAppModal(
   backBtn.addEventListener("click", () => {
     if (busy) return;
     setStatus("");
-    if (view === "preview" && preview?.id === "package-offer") {
-      showPackagePicker();
+    if (view === "preview" && preview && needsPackage(preview.id)) {
+      showPackagePicker(preview.id);
       return;
     }
     showList();
@@ -471,8 +479,8 @@ export function initLeadWhatsAppModal(
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || modal.hidden || busy) return;
-    if (view === "preview" && preview?.id === "package-offer") {
-      showPackagePicker();
+    if (view === "preview" && preview && needsPackage(preview.id)) {
+      showPackagePicker(preview.id);
       setStatus("");
       return;
     }

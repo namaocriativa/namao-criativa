@@ -99,7 +99,7 @@ export const CREATIVE_FEATURES: CreativeFeatureDefinition[] = [
     kind: 'video',
     title: 'Filmes',
     description:
-      'Storyboard de takes com personagens, cenário, ação e fala.',
+      'Storyboard de takes com personagens, cenário, ação, direção e fala.',
     status: 'ready',
     composer: ['prompt'],
     projectKind: 'video',

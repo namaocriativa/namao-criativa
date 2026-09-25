@@ -41,6 +41,15 @@ form.addEventListener("submit", async (event) => {
       const raw = data.message;
       throw new Error(Array.isArray(raw) ? raw[0] : raw || `Erro ${res.status}`);
     }
+    const me = await fetch("/auth/me", { credentials: "include" });
+    if (!me.ok) {
+      const wrongAdminPort = location.port === "5175";
+      throw new Error(
+        wrongAdminPort
+          ? "Login gravou a sessão, mas a porta 5175 é do admin e ignora o cookie do Studio. Abra http://localhost:5173"
+          : "Login gravou a sessão, mas este endereço não a reconhece. Recarregue e tente de novo.",
+      );
+    }
     const next = new URLSearchParams(location.search).get("next");
     location.replace(safeNextPath(next, "/leads"));
   } catch (error) {

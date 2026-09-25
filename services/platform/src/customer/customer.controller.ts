@@ -27,6 +27,7 @@ import { type LeadUploadFile } from '../lead/lead.service';
 import { CreateStudioLeadShareDto } from '../studio-lead-access/dto/create-studio-lead-share.dto';
 import { StudioLeadShareService } from '../studio-lead-access/studio-lead-share.service';
 import { StudioProfileAccessGuard } from '../studio-lead-access/studio-profile-access.guard';
+import { ProposalService } from '../proposal/proposal.service';
 import { CustomerService } from './customer.service';
 
 @StudioAuth()
@@ -39,6 +40,7 @@ export class CustomerController {
     private readonly mail: LeadMailService,
     private readonly whatsapp: LeadWhatsAppService,
     private readonly activity: LeadActivityService,
+    private readonly proposals: ProposalService,
     private readonly shares: StudioLeadShareService,
   ) {}
 
@@ -134,6 +136,16 @@ export class CustomerController {
   @Get(':id/history')
   listHistory(@Param('id') id: string) {
     return this.activity.listHistory(id);
+  }
+
+  @Get(':id/proposal')
+  getProposal(@Param('id') id: string) {
+    return this.proposals.getForOwner(id);
+  }
+
+  @Post(':id/proposal/mark-paid')
+  markProposalPaid(@Param('id') id: string) {
+    return this.proposals.markPaid(id);
   }
 
   @Get(':id')
