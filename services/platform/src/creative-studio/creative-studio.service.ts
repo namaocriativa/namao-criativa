@@ -7,8 +7,8 @@ import {
 import { readFile } from 'fs/promises';
 import type { JwtUser } from '../auth/identity';
 import { ImageStudioService } from '../image-studio/image-studio.service';
-import { buildLeadBrief } from '../landing/lead-brief';
-import type { LeadLike } from '../landing/prompt.builder';
+import { buildLeadBrief } from '../owner/lead-brief';
+import type { LeadLike } from '../owner/lead-like';
 import { LlmService } from '../llm/llm.service';
 import { PackagesService } from '../packages/packages.service';
 import { LeadService } from '../lead/lead.service';
@@ -18,11 +18,13 @@ import {
   CAROUSEL_INSTAGRAM_ID,
   FLYER_VENDA_LANDING_ID,
   PLAYGROUND_IMAGEM_ID,
+  STATIC_INSTAGRAM_ID,
   findCreativeFeature,
   listCreativeFeatures,
 } from './creative-features';
 import { GenerateCarouselDto } from './dto/generate-carousel.dto';
 import { GenerateFlyerDto } from './dto/generate-flyer.dto';
+import { GenerateRepurposeDto } from './dto/generate-repurpose.dto';
 import {
   CAROUSEL_SYSTEM_INSTRUCTION,
   buildCarouselPlannerPrompt,
@@ -40,6 +42,13 @@ import {
   type FlyerSpec,
 } from './flyer-venda.planner';
 import { resolveNamaoLogoPath } from './namao-logo';
+import {
+  STATIC_SYSTEM_INSTRUCTION,
+  buildRepurposePlannerPrompt,
+  buildStaticPostPrompt,
+  parseRepurposeSpec,
+  type RepurposeSpec,
+} from './repurpose.planner';
 
 const MAX_LEAD_PHOTOS = 2;
 
@@ -264,6 +273,104 @@ export class CreativeStudioService {
       completedSlides: assets.length,
       error,
       assets,
+    };
+  }
+
+  async generateRepurpose(dto: GenerateRepurposeDto, user: JwtUser) {
+    const prompt = dto.prompt.trim();
+    if (!prompt) {
+      throw new BadRequestException('Informe o briefing do pack');
+    }
+    const notes = dto.notes?.trim() || '';
+    let brief: ReturnType<typeof buildLeadBrief> | undefined;
+    if (dto.leadId?.trim()) {
+      await this.access.assertCanAccess(user, dto.leadId);
+      const lead = (await this.leads.findById(dto.leadId, user)) as LeadLike;
+      brief = buildLeadBrief(lead);
+    }
+    const plannerContext = { prompt, notes, brief };
+
+    let spec: RepurposeSpec;
+    try {
+      spec = await this.llm.generateJson(
+        buildRepurposePlannerPrompt(plannerContext),
+        (value) => parseRepurposeSpec(value, plannerContext),
+        {
+          role: 'plan',
+          temperature: 0.2,
+          expectedShape: 'RepurposeSpec',
+        },
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Falha ao planejar o pack';
+      throw new BadGatewayException(message);
+    }
+
+    const carousel = await this.generateCarousel(
+      {
+        prompt: spec.carousel.prompt,
+        slideCount: 5,
+        notes: spec.carousel.notes,
+      },
+      user,
+    );
+
+    const staticFeature = findCreativeFeature(STATIC_INSTAGRAM_ID);
+    const defaults = staticFeature?.defaults || {};
+    const staticProject = await this.imageStudio.create(
+      {
+        name: `Estático · ${spec.static.headline.slice(0, 60)}`,
+        featureId: STATIC_INSTAGRAM_ID,
+        model: defaults.model,
+        aspectRatio: defaults.aspectRatio || '4:5',
+        imageSize: defaults.imageSize || '2K',
+        temperature: 0.4,
+        systemInstruction: STATIC_SYSTEM_INSTRUCTION,
+        googleSearch: false,
+        skillRun: {
+          prompt,
+          notes,
+          leadId: dto.leadId,
+          leadLabel: brief?.name,
+          spec: spec.static,
+        },
+      },
+      user.id,
+    );
+    const staticGenerated = await this.imageStudio.generate(staticProject.id, {
+      prompt: buildStaticPostPrompt(spec.static),
+      model: defaults.model,
+      aspectRatio: defaults.aspectRatio || '4:5',
+      imageSize: defaults.imageSize || '2K',
+      temperature: 0.4,
+      systemInstruction: STATIC_SYSTEM_INSTRUCTION,
+      googleSearch: false,
+    });
+
+    await this.imageStudio.update(carousel.projectId, {
+      skillRun: {
+        prompt: spec.carousel.prompt,
+        notes: spec.carousel.notes,
+        slideCount: 5,
+        completedSlides: carousel.completedSlides,
+        spec: carousel.spec,
+        error: carousel.error,
+        pack: {
+          staticProjectId: staticProject.id,
+          reel: spec.reel,
+          static: spec.static,
+        },
+      },
+    });
+
+    return {
+      spec,
+      carousel,
+      staticProjectId: staticProject.id,
+      staticAssets: staticGenerated.assets,
+      reel: spec.reel,
+      characterId: dto.characterId || null,
     };
   }
 

@@ -25,11 +25,8 @@ const LEAD_COPY_FIELDS = [
   'rating',
   'reviewCount',
   'metadata',
-  'generateConfig',
   'landingSlug',
   'landingStatus',
-  'landingBuiltAt',
-  'activeLandingJobId',
   'publicSiteId',
   'chatEnabled',
   'publishedOrigin',
@@ -90,11 +87,8 @@ export class ConvertToCustomerService {
         rating: existing.rating,
         reviewCount: existing.reviewCount,
         metadata: existing.metadata ?? Prisma.JsonNull,
-        generateConfig: existing.generateConfig ?? Prisma.JsonNull,
         landingSlug,
         landingStatus: existing.landingStatus,
-        landingBuiltAt: existing.landingBuiltAt,
-        activeLandingJobId: existing.activeLandingJobId,
         publicSiteId,
         chatEnabled: existing.chatEnabled,
         publishedOrigin: existing.publishedOrigin,
@@ -137,14 +131,6 @@ export class ConvertToCustomerService {
         where: { leadId },
         data: reassign,
       });
-      await tx.landingJob.updateMany({
-        where: { leadId },
-        data: reassign,
-      });
-      await tx.landingGeneration.updateMany({
-        where: { leadId },
-        data: reassign,
-      });
       await tx.chatSession.updateMany({
         where: { leadId },
         data: reassign,
@@ -162,6 +148,22 @@ export class ConvertToCustomerService {
         data: reassign,
       });
       await tx.proposal.updateMany({
+        where: { leadId },
+        data: reassign,
+      });
+      await tx.contentCalendarPost.updateMany({
+        where: { leadId },
+        data: reassign,
+      });
+      await tx.contentCalendarReminder.updateMany({
+        where: { leadId },
+        data: reassign,
+      });
+      await tx.siteSkillJob.updateMany({
+        where: { leadId },
+        data: reassign,
+      });
+      await tx.instagramSkillJob.updateMany({
         where: { leadId },
         data: reassign,
       });

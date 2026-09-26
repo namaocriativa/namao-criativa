@@ -87,9 +87,16 @@ export class InstagramService {
 
     try {
       const tokens = await this.graph.exchangeCode(code);
-      const account = await this.graph.findInstagramAccount(tokens.accessToken);
-      if (!account) {
-        return fail('no_instagram_business_account');
+      let account = await this.graph.findInstagramAccount(tokens.accessToken);
+      if (!account.found && tokens.igUserId) {
+        account = {
+          found: true,
+          igUserId: tokens.igUserId,
+          username: null,
+        };
+      }
+      if (!account.found) {
+        return fail(account.reason);
       }
 
       const kind = await this.owners.requireKind(ownerId);

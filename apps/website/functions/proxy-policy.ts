@@ -4,6 +4,7 @@ export const API_PREFIXES = [
   '/invites',
   '/leads',
   '/dashboard/analytics',
+  '/dashboard/calendar',
   '/invite-requests',
   '/namao-chat',
   '/proposal',

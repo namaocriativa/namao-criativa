@@ -8,6 +8,7 @@ import {
   UGC_SKILLS_ID,
 } from "./creative/features";
 import { navigate, type AppRoute } from "./router";
+import { takeRepurposeDraft } from "./repurpose-draft";
 import type { AgencyPackage, Lead } from "./types";
 
 function escapeHtml(value: unknown): string {
@@ -73,6 +74,7 @@ export function initCreativeTab(): {
   let selectedPackageIds: string[] = [];
   let busy = false;
   let catalogsLoaded = false;
+  let packLeadId = "";
 
   function setStatus(message: string, isError = false) {
     statusEl.textContent = message;
@@ -185,7 +187,7 @@ export function initCreativeTab(): {
         </div>
         <label>
           Briefing
-          <textarea id="criativo-carousel-prompt" rows="5" required placeholder="Ex.: 5 slides sobre hábitos de hidratação para quem treina de manhã. Tom direto, CTA para salvar."></textarea>
+          <textarea id="criativo-carousel-prompt" rows="5" required placeholder="Ex.: dor de quem treina de manhã e esquece de beber água. 5 dicas curtas. CTA: salve ou comenta ÁGUA."></textarea>
         </label>
         <label>
           Quantidade de slides
@@ -203,11 +205,23 @@ export function initCreativeTab(): {
         </label>
         <div class="criativo-composer-actions">
           <button type="submit" id="criativo-carousel-btn">Gerar carrossel</button>
+          <button type="button" class="outline" id="criativo-pack-btn">Gerar pack</button>
         </div>
       </form>`;
+    const draft = takeRepurposeDraft();
+    if (draft) {
+      packLeadId = draft.leadId || "";
+      const promptEl = composerEl.querySelector("#criativo-carousel-prompt") as HTMLTextAreaElement | null;
+      const notesEl = composerEl.querySelector("#criativo-carousel-notes") as HTMLTextAreaElement | null;
+      if (promptEl && !promptEl.value.trim()) promptEl.value = draft.prompt;
+      if (notesEl && draft.notes) notesEl.value = draft.notes;
+    }
     composerEl.querySelector("#criativo-carousel-form")?.addEventListener("submit", (event) => {
       event.preventDefault();
       void generateCarousel();
+    });
+    composerEl.querySelector("#criativo-pack-btn")?.addEventListener("click", () => {
+      void generatePack();
     });
   }
 
@@ -306,8 +320,7 @@ export function initCreativeTab(): {
     }
   }
 
-  async function generateCarousel() {
-    if (busy) return;
+  function readCarouselComposer(): { prompt: string; notes: string; slideCount: number } {
     const prompt = (
       composerEl.querySelector("#criativo-carousel-prompt") as HTMLTextAreaElement | null
     )?.value.trim();
@@ -318,6 +331,12 @@ export function initCreativeTab(): {
       (composerEl.querySelector("#criativo-carousel-count") as HTMLSelectElement | null)
         ?.value || 5,
     );
+    return { prompt: prompt || "", notes: notes || "", slideCount };
+  }
+
+  async function generateCarousel() {
+    if (busy) return;
+    const { prompt, notes, slideCount } = readCarouselComposer();
     if (!prompt) {
       setStatus("Escreva o briefing do carrossel", true);
       return;
@@ -345,6 +364,43 @@ export function initCreativeTab(): {
     } finally {
       busy = false;
       if (btn) btn.disabled = false;
+    }
+  }
+
+  async function generatePack() {
+    if (busy) return;
+    const { prompt, notes } = readCarouselComposer();
+    if (!prompt) {
+      setStatus("Escreva o briefing do pack", true);
+      return;
+    }
+    busy = true;
+    const btn = composerEl.querySelector("#criativo-pack-btn") as HTMLButtonElement | null;
+    const carouselBtn = composerEl.querySelector("#criativo-carousel-btn") as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    if (carouselBtn) carouselBtn.disabled = true;
+    setStatus("Gerando o pack (carrossel + estático + roteiro)…");
+    try {
+      const res = await api("/creative/features/repurpose/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          notes: notes.trim() || undefined,
+          leadId: packLeadId || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Falha ao gerar o pack"));
+      const payload = (await res.json()) as { carousel?: { projectId?: string } };
+      const projectId = payload.carousel?.projectId;
+      if (!projectId) throw new Error("Projeto do carrossel não retornado");
+      navigate({ name: "imagens-project", id: projectId });
+    } catch (error) {
+      setStatus(errorMessage(error, "Falha ao gerar o pack"), true);
+    } finally {
+      busy = false;
+      if (btn) btn.disabled = false;
+      if (carouselBtn) carouselBtn.disabled = false;
     }
   }
 

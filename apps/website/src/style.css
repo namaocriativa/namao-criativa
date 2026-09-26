@@ -1115,6 +1115,53 @@ a.clients-name:hover {
   color: var(--muted);
 }
 
+.dash-calendar {
+  margin-top: 2.2rem;
+}
+
+.dash-calendar h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.25rem;
+}
+
+.dash-cal-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.dash-cal-item {
+  border: 1px solid var(--line);
+  padding: 0.9rem 1rem;
+}
+
+.dash-cal-item .kicker {
+  margin-bottom: 0.2rem;
+}
+
+.dash-cal-item strong {
+  display: block;
+}
+
+.dash-cal-item span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.dash-cal-item p {
+  margin: 0.35rem 0 0;
+}
+
+.dash-cal-item--reminder {
+  border-left: 3px solid #c9a227;
+}
+
+.dash-cal-item--post {
+  border-left: 3px solid #e1306c;
+}
+
 .dash-stats {
   margin-top: 2.2rem;
 }

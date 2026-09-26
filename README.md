@@ -1,15 +1,15 @@
 # Namão — lead discovery & enrichment
 
-Monorepo para **descobrir leads** em uma região, **enriquecê-los** com dados e imagens reais (PostgreSQL + storage local) e gerar landing pages independentes.
+Monorepo para **descobrir leads** em uma região, **enriquecê-los** com dados e imagens reais (PostgreSQL + storage local) e gerar o site do lead (Vite no GitHub da Namão).
 
 ## Stack
 
 - Studio interno: Vite + TypeScript (`apps/studio/`)
 - Website Namão: Vite (`apps/website/`) — marketing + cadastro/login
-- API NestJS (`services/platform/`) — discovery, enrichment, geração de LP, chat Gemini, dashboard, convites
+- API NestJS (`services/platform/`) — discovery, enrichment, skill de site, chat Gemini, dashboard, convites
 - Prisma + PostgreSQL
 - Imagens em `services/platform/storage/leads/{leadId}/images`
-- Landings geradas em `leads/<slug>/` (independentes, fora dos workspaces)
+- Sites gerados no GitHub (`GITHUB_WEBSITES_ORG`, default `namaocriativa`) e, em dev, clonados em `websites/<slug>/`
 - Crawl4AI para enrichment quando o lead já tem website (`services/platform/crawler/`)
 
 O desenvolvimento roda direto na máquina: `npm run dev:local` sobe Postgres, Redis, API, studio e website. As portas (4000 e 5433) evitam conflito com stacks na 3000/5432.
@@ -26,10 +26,8 @@ services/
     crawler/           # script Python do Crawl4AI
     prisma/
     storage/
-packages/
-  landing-kit/         # componentes + PageSpec
+websites/              # catálogo + clones locais dos sites (best-effort)
 cloud/                 # IaC Coolify + Cloudflare Pages — ver cloud/README.md
-leads/                 # projetos Vite gerados (Root Directory na Vercel)
 Dockerfile             # imagem de produção da API (GHCR / Coolify)
 ```
 
@@ -81,7 +79,7 @@ Arquivo: `services/platform/.env`
 | `GTM_CONTAINER_ID` | Não | Container GTM compartilhado (ex. `GTM-XXXX`) injetado no HTML das landings |
 | `GA4_PROPERTY_ID` | Não | Property ID numérico do GA4 — dashboard do cliente |
 | `GA4_SERVICE_ACCOUNT_JSON` | Não | JSON da service account (Viewer na propriedade GA4) |
-| `LEADS_DIR` | Não | Pasta dos projetos Vite. Default: `<monorepo>/leads` |
+| `WEBSITES_DIR` | Não | Clone local dos sites. Default: `<monorepo>/websites` |
 | `JWT_SECRET` | Sim | Segredo JWT. Em produção a API recusa vazio ou placeholder de desenvolvimento |
 | `NAMAO_PUBLIC_URL` | Não | URL do site Namão. Default: `http://localhost:5174` |
 | `NAMAO_STUDIO_URL` | Não | URL do studio (CORS). Default local: `http://localhost:5173` |
@@ -127,17 +125,13 @@ Quando o lead já tem `website`, o enrichment usa o [Crawl4AI](https://github.co
 npm run crawler:setup
 ```
 
-### Gemini (geração de landing)
+### Gemini (skill de site e studio)
 
-Defina `GEMINI_API_KEY` em `services/platform/.env` (https://aistudio.google.com/apikey). Na aba Config do studio escolha o modelo por papel (default: `gemini-2.5-flash`).
+Defina `GEMINI_API_KEY` em `services/platform/.env` (https://aistudio.google.com/apikey). Na aba Config do studio escolha o modelo por papel (código do site: `gemini-2.5-pro`).
 
-Na UI, abra um lead e use **Gerar site** (um clique: scaffold se necessário + pipeline Gemini + build). Há preview embutido após build OK, cancelamento de job e badge de status na lista.
+Na UI, abra um lead e use **Skill site lead** (Vite + LLM + repo GitHub). **Configurar site** vincula um repo existente e publica depois.
 
 Enrichment faz **dedupe**: se já existir lead com o mesmo website (host) ou mesmo `nome+cidade+estado`, atualiza o existente em vez de criar outro.
-
-### Política de `leads/`
-
-Versionar fontes de exemplo (`index.html`, `src/`, `public/` sem binários pesados). **Não** versionar `node_modules/`, `dist/`, `.landing-pipeline/` nem `.vercel/` (já no `.gitignore`).
 
 ### Locations (autocomplete)
 
@@ -233,22 +227,15 @@ GET /leads/:id
 
 Retorna o lead persistido com imagens e fontes.
 
-### Landing (Gemini)
+### Skill site lead
 
 ```http
-GET /landing/status
-POST /landing/scaffold
-POST /landing/prompt
-POST /landing/generate
-POST /landing/publish
-GET /landing/jobs/:jobId
-POST /landing/jobs/:jobId/cancel
-GET /landing/jobs/:jobId/events
-GET /landing/preview/:leadId/
+POST /site-skill/generate
+GET  /site-skill/estimate
+GET  /site-skill/jobs/:id
 ```
 
-`scaffold` / `prompt` / `generate` / `publish` recebem `{ "leadId": "..." }`.  
-`generate` faz scaffold automático se a pasta não existir. Com `VERCEL_TOKEN`, o pipeline publica o `dist/` na Vercel e grava `publishedOrigin` (CORS do chat). Jobs e status ficam no Prisma; SSE em `/landing/jobs/:jobId/events` faz replay do log. Preview serve `leads/<slug>/dist` após build OK.
+`generate` recebe `leadId` ou `customerId` (multipart: modelo, notas, imagens). Cria um Vite, adapta o `prompt.md`, gera o código, sobe o repo na org Namão e vincula no perfil — **não publica**. Em dev, clona em `websites/<slug>/` se `WEBSITES_DIR` for gravável. Publicar fica no **Configurar site**.
 
 ## Providers
 
@@ -266,12 +253,12 @@ Falhas de um provider não interrompem o enrichment.
 
 | Script | Descrição |
 |--------|-----------|
-| `npm run dev:local` | Postgres + Redis + kit + API + studio + website (hot reload) |
+| `npm run dev:local` | Postgres + Redis + API + studio + website (hot reload) |
 | `npm run dev` | Sobe platform + studio |
 | `npm run dev:platform` | Só a API |
 | `npm run dev:studio` | Só o studio Vite |
 | `npm run dev:website` | Só o site Namão (:5174) |
-| `npm run build` | Build de platform, studio e landing-kit |
+| `npm run build` | Build de platform e studio |
 | `npm run prisma:migrate` | Migrações Prisma |
 | `npm run crawler:setup` | Cria venv e instala Crawl4AI + Chromium |
 | `npm run cloud:bootstrap` | Resolve server/projeto no Coolify |
@@ -332,4 +319,4 @@ This project uses Crawl4AI (https://github.com/unclecode/crawl4ai) for web data 
 - Não inventa informações
 - Preserva origem em `LeadSource`
 - Imagens só como metadados + caminho local no banco
-- Landings em `leads/` são projetos Vite autônomos (não entram nos workspaces)
+- Sites do lead vivem no GitHub da Namão; clone local em `websites/` é best-effort

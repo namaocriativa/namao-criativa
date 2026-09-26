@@ -11,7 +11,8 @@ import { LeadModule } from './lead/lead.module';
 import { OwnerModule } from './owner/owner.module';
 import { LeadDiscoveryModule } from './lead-discovery/lead-discovery.module';
 import { LocationsModule } from './locations/locations.module';
-import { LandingModule } from './landing/landing.module';
+import { SiteSkillModule } from './site-skill/site-skill.module';
+import { IgSkillModule } from './ig-skill/ig-skill.module';
 import { AuthModule } from './auth/auth.module';
 import { InvitesModule } from './invites/invites.module';
 import { InstagramModule } from './instagram/instagram.module';
@@ -54,7 +55,8 @@ import { ProposalModule } from './proposal/proposal.module';
     EnrichmentModule,
     LeadModule,
     CustomerModule,
-    LandingModule,
+    SiteSkillModule,
+    IgSkillModule,
     PackagesModule,
     PublicChatModule,
     NamaoChatModule,

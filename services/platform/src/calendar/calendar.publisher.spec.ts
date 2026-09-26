@@ -71,7 +71,7 @@ describe('CalendarPublisher', () => {
     prisma.instagramConnection.findFirst.mockResolvedValue({
       igUserId: 'ig-1',
       accessToken: 'token',
-      scopes: INSTAGRAM_OAUTH_SCOPES.join(','),
+      scopes: [...INSTAGRAM_OAUTH_SCOPES, 'instagram_business_content_publish'].join(','),
     });
     graph.createMediaContainer.mockResolvedValue('container-1');
     graph.getContainerStatus.mockResolvedValue({ statusCode: 'FINISHED' });

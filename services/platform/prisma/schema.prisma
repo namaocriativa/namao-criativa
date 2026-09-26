@@ -31,6 +31,9 @@ model Tenant {
   creativeStartEndClips  CreativeStartEndClip[]
   creativeUgcClips       CreativeUgcClip[]
   calendarPosts          ContentCalendarPost[]
+  calendarReminders      ContentCalendarReminder[]
+  siteSkillJobs          SiteSkillJob[]
+  instagramSkillJobs     InstagramSkillJob[]
   proposals              Proposal[]
 
   @@index([status])
@@ -58,11 +61,8 @@ model Lead {
   rating      Float?
   reviewCount Int?
   metadata    Json?
-  generateConfig      Json?
   landingSlug         String?   @unique
   landingStatus       String    @default("none")
-  landingBuiltAt      DateTime?
-  activeLandingJobId  String?
   publicSiteId        String?   @unique
   chatEnabled         Boolean   @default(false)
   publishedOrigin     String?
@@ -86,13 +86,14 @@ model Lead {
   clientAccounts ClientAccount[]
   invites Invite[]
   instagramConnections InstagramConnection[]
-  landingJobs LandingJob[]
-  landingGenerations LandingGeneration[]
+  siteSkillJobs SiteSkillJob[]
+  instagramSkillJobs InstagramSkillJob[]
   chatSessions ChatSession[]
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
   studioShares StudioLeadShare[]
   calendarPosts ContentCalendarPost[]
+  calendarReminders ContentCalendarReminder[]
   proposals     Proposal[]
 
   @@index([fromPublicSignup])
@@ -122,11 +123,8 @@ model Customer {
   rating      Float?
   reviewCount Int?
   metadata    Json?
-  generateConfig      Json?
   landingSlug         String?   @unique
   landingStatus       String    @default("none")
-  landingBuiltAt      DateTime?
-  activeLandingJobId  String?
   publicSiteId        String?   @unique
   chatEnabled         Boolean   @default(false)
   publishedOrigin     String?
@@ -151,13 +149,14 @@ model Customer {
   clientAccounts ClientAccount[]
   invites Invite[]
   instagramConnections InstagramConnection[]
-  landingJobs LandingJob[]
-  landingGenerations LandingGeneration[]
+  siteSkillJobs SiteSkillJob[]
+  instagramSkillJobs InstagramSkillJob[]
   chatSessions ChatSession[]
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
   studioShares StudioLeadShare[]
   calendarPosts ContentCalendarPost[]
+  calendarReminders ContentCalendarReminder[]
   proposals     Proposal[]
 
   @@index([fromPublicSignup])
@@ -242,51 +241,58 @@ model ChatEvent {
   @@index([sessionId])
 }
 
-model LandingJob {
-  id               String   @id @default(cuid())
-  leadId           String?
-  customerId       String?
-  slug             String
-  status           String   @default("queued")
-  log              Json     @default("[]")
-  error            String?
-  cancelRequested  Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+model SiteSkillJob {
+  id         String   @id @default(cuid())
+  tenantId   String
+  leadId     String?
+  customerId String?
+  slug       String
+  status     String   @default("queued")
+  stage      String   @default("queued")
+  log        Json     @default("[]")
+  error      String?
+  model      String   @default("")
+  notes      String   @default("")
+  repo       String   @default("")
+  createdByUserId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  generations LandingGeneration[]
 
   @@index([leadId])
   @@index([customerId])
   @@index([status])
+  @@index([tenantId])
 }
 
-model LandingGeneration {
-  id             String   @id @default(cuid())
-  leadId         String?
-  customerId     String?
-  jobId          String   @unique
-  pageSpec       Json
-  componentIds   String
-  themeStyle     String
-  category       String?
-  visualScore    Int?
-  screenshotPath String?
-  humanRating    Int?
-  conversion     Float?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+model InstagramSkillJob {
+  id         String   @id @default(cuid())
+  tenantId   String
+  leadId     String?
+  customerId String?
+  status     String   @default("queued")
+  stage      String   @default("queued")
+  log        Json     @default("[]")
+  error      String?
+  model      String   @default("")
+  notes      String   @default("")
+  days       Int      @default(30)
+  report     Json?
+  createdByUserId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  lead     Lead?      @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  job      LandingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@index([customerId])
-  @@index([themeStyle])
-  @@index([category])
+  @@index([status])
+  @@index([tenantId])
 }
 
 /// Staff do Studio (`ROOT` | `ADMIN` | `OPERATOR`). Login do portal é `ClientAccount`.
@@ -315,6 +321,7 @@ model User {
   createdStartEndClips      CreativeStartEndClip[] @relation("CreativeStartEndClipCreatedBy")
   createdUgcClips           CreativeUgcClip[]      @relation("CreativeUgcClipCreatedBy")
   createdCalendarPosts      ContentCalendarPost[] @relation("ContentCalendarPostCreatedBy")
+  createdCalendarReminders  ContentCalendarReminder[] @relation("ContentCalendarReminderCreatedBy")
 
   @@index([tenantId])
 }
@@ -904,4 +911,30 @@ model ContentCalendarAsset {
   post ContentCalendarPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
+}
+
+model ContentCalendarReminder {
+  id              String   @id @default(cuid())
+  tenantId        String
+  title           String
+  notes           String   @default("")
+  scheduledAt     DateTime
+  status          String   @default("open")
+  leadId          String?
+  customerId      String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lead      Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  createdBy User?     @relation("ContentCalendarReminderCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([leadId])
+  @@index([customerId])
+  @@index([createdByUserId])
+  @@index([tenantId])
 }

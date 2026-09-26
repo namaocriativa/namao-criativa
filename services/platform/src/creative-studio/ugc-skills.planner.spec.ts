@@ -19,6 +19,20 @@ describe('ugc-skills.planner', () => {
     expect(prompt).toContain(UGC_SKILLS_ID);
   });
 
+  it('estrutura o Reel e libera overlay quando o prompt traz beats', () => {
+    const prompt = ugcSkillsPrompt({
+      name: 'Luma',
+      appearance: 'cabelo ruivo',
+      prompt: 'Hook: Sua terça está vazia?\nHistória: Mostre a agenda lotando\nCTA: Comenta AGENDA\nOverlay: Salve este Reel',
+      duration: '8s',
+    });
+    expect(prompt).toContain('Hook (0–2s): Sua terça está vazia?');
+    expect(prompt).toContain('CTA falado no fecho: Comenta AGENDA');
+    expect(prompt).toContain('Salve este Reel');
+    expect(prompt).toContain('canto inferior');
+    expect(prompt).not.toContain('Sem texto na tela.');
+  });
+
   it('usa o CTA padrão quando o texto vem vazio', () => {
     const prompt = ugcSkillsPrompt({
       name: 'Luma',

@@ -124,4 +124,29 @@ describe('image-models', () => {
       spec: { caption: 'Salve o post' },
     });
   });
+
+  it('preserva o pack 1→N no skillRun', () => {
+    const settings = normalizeImageProjectSettings(
+      {
+        model: 'gemini-3-pro-image',
+        temperature: 0.4,
+      },
+      {
+        ...defaultImageProjectSettings(),
+        featureId: 'carousel-instagram',
+        skillRun: {
+          prompt: 'Dor da água',
+          spec: { caption: 'Salve' },
+          pack: {
+            staticProjectId: 'static-1',
+            reel: { hook: 'Esqueceu a água?', cta: 'Comenta ÁGUA' },
+          },
+        },
+      },
+    );
+    expect(settings.skillRun?.pack).toEqual({
+      staticProjectId: 'static-1',
+      reel: { hook: 'Esqueceu a água?', cta: 'Comenta ÁGUA' },
+    });
+  });
 });

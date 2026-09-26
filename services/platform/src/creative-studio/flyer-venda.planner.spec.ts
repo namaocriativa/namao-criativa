@@ -1,4 +1,4 @@
-import type { LeadBrief } from '../landing/pipeline.types';
+import type { LeadBrief } from '../owner/lead-brief';
 import {
   audienceNounFromCategory,
   buildFlyerImagePrompt,

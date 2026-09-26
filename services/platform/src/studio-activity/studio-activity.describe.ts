@@ -692,74 +692,20 @@ const RULES: Rule[] = [
   },
   {
     method: 'POST',
-    pattern: /^\/landing\/scaffold$/,
+    pattern: /^\/site-skill\/generate$/,
     describe: () => ({
-      kind: 'landing.scaffold',
-      title: 'Gerou estrutura do site',
-      summary: 'Scaffold da landing',
+      kind: 'site-skill.generate',
+      title: 'Gerou site do lead',
+      summary: 'Skill site lead',
     }),
   },
   {
     method: 'POST',
-    pattern: /^\/landing\/prompt$/,
+    pattern: /^\/ig-skill\/analyze$/,
     describe: () => ({
-      kind: 'landing.prompt',
-      title: 'Gerou prompt do site',
-      summary: 'Prompt da landing',
-    }),
-  },
-  {
-    method: 'POST',
-    pattern: /^\/landing\/publish$/,
-    describe: () => ({
-      kind: 'landing.publish',
-      title: 'Publicou site',
-      summary: 'Publicação da landing',
-    }),
-  },
-  {
-    method: 'POST',
-    pattern: /^\/landing\/generate$/,
-    describe: () => ({
-      kind: 'landing.generate',
-      title: 'Gerou site',
-      summary: 'Job de geração da landing',
-    }),
-  },
-  {
-    method: 'POST',
-    pattern: /^\/landing\/generations\/([^/]+)\/rating$/,
-    describe: () => ({
-      kind: 'landing.rating',
-      title: 'Avaliou geração do site',
-      summary: 'Nota na landing',
-    }),
-  },
-  {
-    method: 'POST',
-    pattern: /^\/landing\/jobs\/([^/]+)\/cancel$/,
-    describe: (match) => ({
-      kind: 'landing.cancel',
-      title: 'Cancelou geração do site',
-      summary: `Job ${match[1]}`,
-    }),
-  },
-  {
-    method: 'POST',
-    pattern: /^\/landing\/local\/([^/]+)$/,
-    describe: (match) => ({
-      kind: 'landing.local',
-      title: 'Abriu site local',
-      summary: `Lead ${match[1]}`,
-    }),
-  },
-  {
-    method: 'DELETE',
-    pattern: /^\/landing\/site\/([^/]+)$/,
-    describe: (match) => ({
-      kind: 'landing.delete',
-      title: 'Removeu site',
-      summary: `Lead ${match[1]}`,
+      kind: 'ig-skill.analyze',
+      title: 'Analisou Instagram do lead',
+      summary: 'Skill Instagram',
     }),
   },
   {

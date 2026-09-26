@@ -55,7 +55,6 @@ export class LeadService {
         createdBy: { select: STUDIO_CREATOR_SELECT },
         studioShares: { select: { userId: true } },
       },
-      omit: { generateConfig: true },
     });
     return leads.map((lead) => this.access.present(actor, lead));
   }

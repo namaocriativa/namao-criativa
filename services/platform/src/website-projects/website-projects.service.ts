@@ -60,6 +60,19 @@ export class WebsiteProjectsService {
     return this.github.listRepos().then((projects) => ({ projects }));
   }
 
+  async attachGeneratedRepo(
+    kind: 'lead' | 'customer',
+    id: string,
+    repo: string,
+  ) {
+    return this.persistLink(kind, id, {
+      repo,
+      deployType: 'cloudflare',
+      framework: 'vite',
+      deployNow: false,
+    });
+  }
+
   async linkLead(leadId: string, dto: LinkWebsiteInput, user: JwtUser) {
     await this.access.assertCanAccess(user, leadId);
     const linked = await this.persistLink('lead', leadId, dto);

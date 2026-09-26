@@ -1,19 +1,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  copyFileSync,
-  createReadStream,
-  existsSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { copyFileSync, createReadStream, existsSync } from 'node:fs';
 import { defineConfig, type Plugin, type ProxyOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { resolveLocalApiUrl } from '../local-api-url';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
-const kitSrc = path.resolve(rootDir, '../../packages/landing-kit/src');
 const api = resolveLocalApiUrl(path.resolve(rootDir, '../..'));
 
 function namaoLogoPlugin(): Plugin {
@@ -44,60 +37,6 @@ function namaoLogoPlugin(): Plugin {
       if (!output.dir || !existsSync(logoFile)) return;
       copyFileSync(logoFile, path.join(output.dir, 'logo.png'));
       copyFileSync(logoFile, path.join(output.dir, 'logo-mark.png'));
-    },
-  };
-}
-
-function kitRenamePlugin(): Plugin {
-  const catalogFile = path.join(kitSrc, 'catalog/variants.ts');
-  return {
-    name: 'kit-rename',
-    configureServer(server) {
-      server.middlewares.use('/__kit-rename', (req, res, next) => {
-        if (req.method !== 'POST') {
-          next();
-          return;
-        }
-        const chunks: Buffer[] = [];
-        req.on('data', (chunk) => {
-          chunks.push(Buffer.from(chunk));
-        });
-        req.on('end', () => {
-          try {
-            const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
-              id?: string;
-              name?: string;
-            };
-            const id = String(body.id || '').trim();
-            const name = String(body.name || '').trim().slice(0, 80);
-            if (!id || !name || !/^[a-z0-9.-]+$/i.test(id)) {
-              res.statusCode = 400;
-              res.end('invalid');
-              return;
-            }
-            const source = readFileSync(catalogFile, 'utf8');
-            const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const escapedName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            const pattern = new RegExp(
-              `(id: '${escapedId}',\\s*\\n\\s*name: )'(?:\\\\'|[^'])*'`,
-            );
-            if (!pattern.test(source)) {
-              res.statusCode = 404;
-              res.end('not found');
-              return;
-            }
-            writeFileSync(
-              catalogFile,
-              source.replace(pattern, `$1'${escapedName}'`),
-            );
-            res.statusCode = 204;
-            res.end();
-          } catch (error) {
-            res.statusCode = 500;
-            res.end(error instanceof Error ? error.message : 'error');
-          }
-        });
-      });
     },
   };
 }
@@ -145,28 +84,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     namaoLogoPlugin(),
-    kitRenamePlugin(),
   ],
-  resolve: {
-    alias: [
-      {
-        find: '@namao/landing-kit/renderer',
-        replacement: path.join(kitSrc, 'renderer/index.tsx'),
-      },
-      {
-        find: '@namao/landing-kit/theme.css',
-        replacement: path.join(kitSrc, 'theme/tailwind.css'),
-      },
-      {
-        find: '@namao/landing-kit/styles.css',
-        replacement: path.join(kitSrc, 'styles.css'),
-      },
-      {
-        find: '@namao/landing-kit',
-        replacement: path.join(kitSrc, 'index.ts'),
-      },
-    ],
-  },
   server: {
     port: 5173,
     strictPort: true,
@@ -185,7 +103,8 @@ export default defineConfig({
       '/creative': apiProxy(),
       '/locations': apiProxy(),
       '/storage': apiProxy(),
-      '/landing': apiProxy(),
+      '/site-skill': apiProxy(),
+      '/ig-skill': apiProxy(),
       '/website-projects': apiProxy(),
       '/config': apiProxy(),
       '/auth': apiProxy(),
@@ -198,7 +117,6 @@ export default defineConfig({
       input: {
         main: path.join(rootDir, 'index.html'),
         login: path.join(rootDir, 'login.html'),
-        'kit-preview': path.join(rootDir, 'kit-preview.html'),
       },
     },
   },

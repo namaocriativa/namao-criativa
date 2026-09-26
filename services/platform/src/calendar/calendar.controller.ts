@@ -18,7 +18,14 @@ import { CalendarService, type CalendarUploadFile } from './calendar.service';
 import { CalendarPublisher } from './calendar.publisher';
 import { CreateCalendarPostDto } from './dto/create-calendar-post.dto';
 import { UpdateCalendarPostDto } from './dto/update-calendar-post.dto';
+import { CreateCalendarReminderDto } from './dto/create-calendar-reminder.dto';
+import { UpdateCalendarReminderDto } from './dto/update-calendar-reminder.dto';
 import { AttachStudioAssetDto } from './dto/attach-studio-asset.dto';
+import {
+  CalendarIdeasQueryDto,
+  CalendarPostsFromIdeasDto,
+} from './dto/calendar-ideas.dto';
+import type { CalendarOwnerQuery } from './calendar.service';
 
 @StudioAuth()
 @Controller('calendar')
@@ -33,9 +40,73 @@ export class CalendarController {
     return this.publisher.capabilities();
   }
 
+  @Get('items')
+  findItems(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('leadId') leadId?: string,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.calendar.findItems(from, to, ownerQuery(leadId, customerId));
+  }
+
   @Get('posts')
-  findAll(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.calendar.findRange(from, to);
+  findAll(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('leadId') leadId?: string,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.calendar.findRange(from, to, ownerQuery(leadId, customerId));
+  }
+
+  @Get('reminders')
+  findReminders(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('leadId') leadId?: string,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.calendar.findReminders(from, to, ownerQuery(leadId, customerId));
+  }
+
+  @Post('reminders')
+  createReminder(
+    @Body() dto: CreateCalendarReminderDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.calendar.createReminder(dto, user.id);
+  }
+
+  @Get('reminders/:id')
+  findReminder(@Param('id') id: string) {
+    return this.calendar.findReminderById(id);
+  }
+
+  @Patch('reminders/:id')
+  updateReminder(
+    @Param('id') id: string,
+    @Body() dto: UpdateCalendarReminderDto,
+  ) {
+    return this.calendar.updateReminder(id, dto);
+  }
+
+  @Delete('reminders/:id')
+  removeReminder(@Param('id') id: string) {
+    return this.calendar.removeReminder(id);
+  }
+
+  @Post('ideas')
+  generateIdeas(@Body() dto: CalendarIdeasQueryDto) {
+    return this.calendar.generateIdeas(dto);
+  }
+
+  @Post('posts/from-ideas')
+  createFromIdeas(
+    @Body() dto: CalendarPostsFromIdeasDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.calendar.createFromIdeas(dto, user.id);
   }
 
   @Post('posts')
@@ -99,4 +170,8 @@ export class CalendarController {
   ) {
     return this.calendar.markTargetPublished(id, targetId, body?.permalink);
   }
+}
+
+function ownerQuery(leadId?: string, customerId?: string): CalendarOwnerQuery {
+  return { leadId, customerId };
 }

@@ -25,7 +25,6 @@
   },
   "dependencies": {
     "@google-analytics/data": "^7.0.0",
-    "@namao/landing-kit": "*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
@@ -89,9 +88,6 @@
       "<rootDir>/../test/setup-env.ts"
     ],
     "testRegex": ".*\\.spec\\.ts$",
-    "moduleNameMapper": {
-      "^@namao/landing-kit$": "<rootDir>/../../../packages/landing-kit/dist/index.js"
-    },
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },

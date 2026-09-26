@@ -1,13 +1,29 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { LlmService } from '../llm/llm.service';
+import { buildLeadBrief } from '../owner/lead-brief';
+import type { LeadLike } from '../owner/lead-like';
 import { CreateCalendarPostDto } from './dto/create-calendar-post.dto';
 import { UpdateCalendarPostDto } from './dto/update-calendar-post.dto';
+import { CreateCalendarReminderDto } from './dto/create-calendar-reminder.dto';
+import { UpdateCalendarReminderDto } from './dto/update-calendar-reminder.dto';
 import { AttachStudioAssetDto } from './dto/attach-studio-asset.dto';
+import { isCalendarReminderStatus } from './calendar.reminders';
+import {
+  CalendarIdeasQueryDto,
+  CalendarPostsFromIdeasDto,
+} from './dto/calendar-ideas.dto';
+import {
+  buildCalendarIdeasPrompt,
+  parseCalendarIdeasSpec,
+  type CalendarIdeasSpec,
+} from './calendar-ideas.planner';
 import {
   CALENDAR_POST_STATUS,
   CALENDAR_TARGET_STATUS,
@@ -31,6 +47,16 @@ const POST_INCLUDE = {
   customer: { select: { id: true, name: true } },
 };
 
+const REMINDER_INCLUDE = {
+  lead: { select: { id: true, name: true } },
+  customer: { select: { id: true, name: true } },
+};
+
+export type CalendarOwnerQuery = {
+  leadId?: string;
+  customerId?: string;
+};
+
 const UPLOAD_MIME = new Set([
   'image/jpeg',
   'image/jpg',
@@ -47,20 +73,99 @@ export class CalendarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly llm: LlmService,
   ) {}
 
-  async findRange(from?: string, to?: string) {
-    const where: { scheduledAt?: { gte?: Date; lte?: Date } } = {};
-    if (from || to) {
-      where.scheduledAt = {};
-      if (from) where.scheduledAt.gte = this.parseDate(from, 'from');
-      if (to) where.scheduledAt.lte = this.parseDate(to, 'to');
-    }
+  async findRange(from?: string, to?: string, owner?: CalendarOwnerQuery) {
+    const ownerFilter = await this.ownerFilter(owner);
     return this.prisma.contentCalendarPost.findMany({
-      where: { ...where, ...tenantWhere() },
+      where: {
+        ...this.scheduledWhere(from, to),
+        ...ownerFilter,
+        ...tenantWhere(),
+      },
       orderBy: { scheduledAt: 'asc' },
       include: POST_INCLUDE,
     });
+  }
+
+  async findItems(from?: string, to?: string, owner?: CalendarOwnerQuery) {
+    const [posts, reminders] = await Promise.all([
+      this.findRange(from, to, owner),
+      this.findReminders(from, to, owner),
+    ]);
+    return { posts, reminders };
+  }
+
+  async findReminders(from?: string, to?: string, owner?: CalendarOwnerQuery) {
+    const ownerFilter = await this.ownerFilter(owner);
+    return this.prisma.contentCalendarReminder.findMany({
+      where: {
+        ...this.scheduledWhere(from, to),
+        ...ownerFilter,
+        ...tenantWhere(),
+      },
+      orderBy: { scheduledAt: 'asc' },
+      include: REMINDER_INCLUDE,
+    });
+  }
+
+  async findReminderById(id: string) {
+    const reminder = await this.prisma.contentCalendarReminder.findUnique({
+      where: { id },
+      include: REMINDER_INCLUDE,
+    });
+    if (!reminder) throw new NotFoundException('Lembrete não encontrado');
+    return assertSameTenant(reminder, 'Lembrete não encontrado');
+  }
+
+  async createReminder(dto: CreateCalendarReminderDto, userId: string) {
+    const owner = await this.requireOwner(dto.leadId, dto.customerId);
+    return this.prisma.contentCalendarReminder.create({
+      data: {
+        tenantId: requireTenantId(),
+        title: dto.title.trim(),
+        notes: (dto.notes || '').trim(),
+        scheduledAt: this.parseDate(dto.scheduledAt, 'scheduledAt'),
+        status: 'open',
+        leadId: owner.leadId,
+        customerId: owner.customerId,
+        createdByUserId: userId,
+      },
+      include: REMINDER_INCLUDE,
+    });
+  }
+
+  async updateReminder(id: string, dto: UpdateCalendarReminderDto) {
+    await this.requireReminder(id);
+    const data: {
+      title?: string;
+      notes?: string;
+      scheduledAt?: Date;
+      status?: string;
+    } = {};
+    if (dto.title !== undefined) data.title = dto.title.trim();
+    if (dto.notes !== undefined) data.notes = dto.notes.trim();
+    if (dto.scheduledAt !== undefined) {
+      data.scheduledAt = this.parseDate(dto.scheduledAt, 'scheduledAt');
+    }
+    if (dto.status !== undefined) {
+      if (!isCalendarReminderStatus(dto.status)) {
+        throw new BadRequestException('Status do lembrete inválido');
+      }
+      data.status = dto.status;
+    }
+    await this.prisma.contentCalendarReminder.update({
+      where: { id },
+      data,
+    });
+    return this.findReminderById(id);
+  }
+
+  async removeReminder(id: string) {
+    await this.requireReminder(id);
+    await this.prisma.contentCalendarReminder.delete({ where: { id } });
+    return { ok: true };
   }
 
   async findById(id: string) {
@@ -70,6 +175,58 @@ export class CalendarService {
     });
     if (!post) throw new NotFoundException('Post do calendário não encontrado');
     return assertSameTenant(post, 'Post do calendário não encontrado');
+  }
+
+  async generateIdeas(dto: CalendarIdeasQueryDto): Promise<CalendarIdeasSpec> {
+    const owner = await this.requireOwner(dto.leadId, dto.customerId);
+    const profile = await this.loadOwnerProfile(owner);
+    const notes = dto.notes?.trim() || '';
+    const plannerContext = { brief: buildLeadBrief(profile), notes };
+    try {
+      return await this.llm.generateJson(
+        buildCalendarIdeasPrompt(plannerContext),
+        (value) => parseCalendarIdeasSpec(value, plannerContext),
+        {
+          role: 'plan',
+          temperature: 0.2,
+          expectedShape: 'CalendarIdeasSpec',
+        },
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Falha ao planejar as ideias';
+      throw new BadGatewayException(message);
+    }
+  }
+
+  async createFromIdeas(dto: CalendarPostsFromIdeasDto, userId: string) {
+    const owner = await this.requireOwner(dto.leadId, dto.customerId);
+    const platforms = uniquePlatforms(dto.platforms?.length ? dto.platforms : ['instagram']);
+    if (!platforms.length) {
+      throw new BadRequestException('Escolha pelo menos uma plataforma');
+    }
+    const start = dto.startAt
+      ? this.parseDate(dto.startAt, 'startAt')
+      : nextMorning();
+    const posts: Awaited<ReturnType<CalendarService['create']>>[] = [];
+    for (let i = 0; i < dto.ideas.length; i += 1) {
+      const idea = dto.ideas[i];
+      const scheduledAt = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+      posts.push(
+        await this.create(
+          {
+            title: idea.title.trim(),
+            caption: idea.caption.trim(),
+            scheduledAt: scheduledAt.toISOString(),
+            platforms,
+            leadId: owner.leadId || undefined,
+            customerId: owner.customerId || undefined,
+          },
+          userId,
+        ),
+      );
+    }
+    return { posts };
   }
 
   async create(dto: CreateCalendarPostDto, userId: string) {
@@ -348,6 +505,68 @@ export class CalendarService {
     }
   }
 
+  private scheduledWhere(
+    from?: string,
+    to?: string,
+  ): { scheduledAt?: { gte?: Date; lte?: Date } } {
+    if (!from && !to) return {};
+    const scheduledAt: { gte?: Date; lte?: Date } = {};
+    if (from) scheduledAt.gte = this.parseDate(from, 'from');
+    if (to) scheduledAt.lte = this.parseDate(to, 'to');
+    return { scheduledAt };
+  }
+
+  private async ownerFilter(
+    owner?: CalendarOwnerQuery,
+  ): Promise<{ leadId?: string; customerId?: string }> {
+    const leadId = owner?.leadId?.trim() || '';
+    const customerId = owner?.customerId?.trim() || '';
+    if (leadId && customerId) {
+      throw new BadRequestException('Filtre por lead ou cliente, não os dois');
+    }
+    if (leadId) {
+      await this.requireOwner(leadId, undefined);
+      return { leadId };
+    }
+    if (customerId) {
+      await this.requireOwner(undefined, customerId);
+      return { customerId };
+    }
+    return {};
+  }
+
+  private async requireOwner(
+    leadId?: string | null,
+    customerId?: string | null,
+  ): Promise<{ leadId: string | null; customerId: string | null }> {
+    const owner = await this.resolveOwner(leadId, customerId);
+    if (!owner.leadId && !owner.customerId) {
+      throw new BadRequestException('Escolha um lead ou um cliente');
+    }
+    return owner;
+  }
+
+  private async loadOwnerProfile(owner: {
+    leadId: string | null;
+    customerId: string | null;
+  }): Promise<LeadLike> {
+    if (owner.leadId) {
+      const found = await this.prisma.lead.findUnique({
+        where: { id: owner.leadId },
+      });
+      if (!found) throw new NotFoundException('Lead não encontrado');
+      return assertSameTenant(found, 'Lead não encontrado') as LeadLike;
+    }
+    if (owner.customerId) {
+      const found = await this.prisma.customer.findUnique({
+        where: { id: owner.customerId },
+      });
+      if (!found) throw new NotFoundException('Cliente não encontrado');
+      return assertSameTenant(found, 'Cliente não encontrado') as LeadLike;
+    }
+    throw new BadRequestException('Escolha um lead ou um cliente');
+  }
+
   private async resolveOwner(
     leadId?: string | null,
     customerId?: string | null,
@@ -385,4 +604,15 @@ export class CalendarService {
   private async requirePost(id: string) {
     return this.findById(id);
   }
+
+  private async requireReminder(id: string) {
+    return this.findReminderById(id);
+  }
+}
+
+function nextMorning(): Date {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(10, 0, 0, 0);
+  return date;
 }

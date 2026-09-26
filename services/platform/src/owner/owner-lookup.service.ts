@@ -26,11 +26,8 @@ export type OwnerProfile = {
   linkedin: string | null;
   services: Prisma.JsonValue;
   metadata: Prisma.JsonValue;
-  generateConfig: Prisma.JsonValue;
   landingSlug: string | null;
   landingStatus: string;
-  landingBuiltAt: Date | null;
-  activeLandingJobId: string | null;
   publicSiteId: string | null;
   chatEnabled: boolean;
   publishedOrigin: string | null;

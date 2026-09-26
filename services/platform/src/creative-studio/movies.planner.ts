@@ -7,6 +7,7 @@ import {
   buildCharacterIdentityPrompt,
   type CharacterIdentityInput,
 } from './personagens.planner';
+import { extractOverlayLine, overlayRule } from './reel-script';
 
 export const MOVIE_SHOT_STATUS = {
   DRAFT: 'draft',
@@ -25,6 +26,7 @@ export type MovieShotPromptInput = {
   dialogue?: string;
   framing?: string;
   camera?: string;
+  overlayText?: string;
 };
 
 export function movieShotPrompt(input: MovieShotPromptInput): string {
@@ -42,13 +44,17 @@ export function movieShotPrompt(input: MovieShotPromptInput): string {
         : identity;
     })
     .join(' ');
+  const fromAction = extractOverlayLine(input.action);
+  const fromDialogue = extractOverlayLine(input.dialogue);
+  const overlayText =
+    input.overlayText?.trim() || fromAction.overlayText || fromDialogue.overlayText;
   const scene = input.scene.trim() || 'cenário cinematográfico limpo';
   const action =
-    input.action.trim() ||
+    fromAction.clean ||
     (names.length > 1
       ? 'o elenco respira e olha para a câmera'
       : 'o personagem respira e olha para a câmera');
-  const dialogue = input.dialogue?.trim() || '';
+  const dialogue = fromDialogue.clean;
   const framing = resolveMovieFraming(input.framing).prompt;
   const camera = resolveMovieCamera(input.camera).prompt;
   const lines = [
@@ -69,7 +75,7 @@ export function movieShotPrompt(input: MovieShotPromptInput): string {
     names.length > 1
       ? 'As imagens anexadas na ordem são os retratos do elenco. Cada pessoa precisa aparecer com o próprio rosto, sem fundir identidades.'
       : '',
-    'Não troque o elenco, não invente outro rosto e não coloque texto na tela.',
+    `Não troque o elenco, não invente outro rosto. ${overlayRule(overlayText)}`,
     `Feature ${MOVIES_ID}.`,
   );
   return lines.filter(Boolean).join(' ');

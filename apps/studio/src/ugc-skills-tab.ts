@@ -7,8 +7,12 @@ import type {
   CreativeUgcClip,
   ImageLibraryProject,
 } from "./types";
+import { formatReelPrompt, hasReelBeats, parseReelPrompt } from "./reel-script";
+import { takeRepurposeDraft } from "./repurpose-draft";
 import {
   appendVideoRunSettings,
+  notifyVideoRunSettings,
+  persistVideoRunSettings,
   readVideoRunSettings,
   subscribeVideoRunSettings,
   videoRunSettingsPayload,
@@ -118,6 +122,11 @@ export function initUgcSkillsTab(): {
   let selectedCharacterId = "";
   let product: ProductSelection | null = null;
   let prompt = "";
+  let reelMode = false;
+  let hook = "";
+  let story = "";
+  let cta = "";
+  let overlayText = "";
   let busy = false;
   let active = false;
   let routeSeq = 0;
@@ -330,10 +339,31 @@ export function initUgcSkillsTab(): {
           ${productSlotMarkup()}
         </div>
         <form id="ugc-skills-form" class="inicio-fim-composer">
-          <label class="inicio-fim-prompt">
+          <div class="movies-direction-chips" role="group" aria-label="Modo do clipe">
+            <button type="button" class="movies-direction-chip${!reelMode ? " is-active" : ""}" data-reel-mode="off">Livre</button>
+            <button type="button" class="movies-direction-chip${reelMode ? " is-active" : ""}" data-reel-mode="on">Modo Reel</button>
+          </div>
+          ${
+            reelMode
+              ? `<div class="ugc-reel-beats">
+                  <label>Hook (0–2s)
+                    <input id="ugc-skills-hook" maxlength="120" placeholder="Dor em até 10 palavras" value="${escapeHtml(hook)}" />
+                  </label>
+                  <label>História
+                    <textarea id="ugc-skills-story" rows="2" maxlength="280" placeholder="História curta, até 20 palavras">${escapeHtml(story)}</textarea>
+                  </label>
+                  <label>CTA falado
+                    <input id="ugc-skills-cta" maxlength="120" placeholder="Comenta X ou salve" value="${escapeHtml(cta)}" />
+                  </label>
+                  <label>Texto na tela (opcional)
+                    <input id="ugc-skills-overlay" maxlength="80" placeholder="Uma linha de prova social" value="${escapeHtml(overlayText)}" />
+                  </label>
+                </div>`
+              : `<label class="inicio-fim-prompt">
             Prompt
             <textarea id="ugc-skills-prompt" rows="3" maxlength="8000" placeholder="Hook, oferta e CTA. Ex.: abre falando do problema, mostra o produto e fecha com compre agora.">${escapeHtml(prompt)}</textarea>
-          </label>
+          </label>`
+          }
           <div class="inicio-fim-toolbar">
             ${
               showGenerate
@@ -430,6 +460,14 @@ export function initUgcSkillsTab(): {
       event.stopPropagation();
       applyProduct(files);
     });
+    composerEl.querySelectorAll<HTMLButtonElement>("[data-reel-mode]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        syncPromptFromForm();
+        reelMode = btn.dataset.reelMode === "on";
+        if (reelMode) applyBeatsFromPrompt();
+        render();
+      });
+    });
     composerEl.querySelector("#ugc-skills-form")?.addEventListener("submit", (event) => {
       event.preventDefault();
       void generate();
@@ -438,6 +476,10 @@ export function initUgcSkillsTab(): {
     promptEl?.addEventListener("input", () => {
       prompt = promptEl.value;
     });
+    composerEl.querySelector("#ugc-skills-hook")?.addEventListener("input", syncPromptFromForm);
+    composerEl.querySelector("#ugc-skills-story")?.addEventListener("input", syncPromptFromForm);
+    composerEl.querySelector("#ugc-skills-cta")?.addEventListener("input", syncPromptFromForm);
+    composerEl.querySelector("#ugc-skills-overlay")?.addEventListener("input", syncPromptFromForm);
     composerEl.querySelector("#ugc-skills-new")?.addEventListener("click", () => {
       resetCanvas();
       navigate({ name: "criativo-skill", id: UGC_SKILLS_ID });
@@ -560,11 +602,45 @@ export function initUgcSkillsTab(): {
     }
   }
 
+  function syncPromptFromForm() {
+    if (!reelMode) {
+      const promptEl = composerEl.querySelector("#ugc-skills-prompt") as HTMLTextAreaElement | null;
+      if (promptEl) prompt = promptEl.value;
+      return;
+    }
+    hook = (composerEl.querySelector("#ugc-skills-hook") as HTMLInputElement | null)?.value || hook;
+    story = (composerEl.querySelector("#ugc-skills-story") as HTMLTextAreaElement | null)?.value || story;
+    cta = (composerEl.querySelector("#ugc-skills-cta") as HTMLInputElement | null)?.value || cta;
+    overlayText =
+      (composerEl.querySelector("#ugc-skills-overlay") as HTMLInputElement | null)?.value ||
+      overlayText;
+    prompt = formatReelPrompt({ hook, story, cta, overlayText });
+  }
+
+  function applyBeatsFromPrompt(next = prompt) {
+    const parsed = parseReelPrompt(next);
+    hook = parsed.hook || "";
+    story = parsed.story || parsed.extra;
+    cta = parsed.cta || "";
+    overlayText = parsed.overlayText || "";
+    reelMode = hasReelBeats(parsed);
+  }
+
+  function forcePortraitAspect() {
+    const select = document.getElementById("videos-aspect") as HTMLSelectElement | null;
+    if (!select || select.value === "9:16") return;
+    if (![...select.options].some((option) => option.value === "9:16")) return;
+    select.value = "9:16";
+    persistVideoRunSettings(readVideoRunSettings());
+    notifyVideoRunSettings();
+  }
+
   function showClip(clip: CreativeUgcClip) {
     revokeProduct();
     selectedCharacterId = clip.characterId;
     product = clip.productPath ? { previewSrc: assetSrc(clip.productPath) } : null;
     prompt = clip.prompt || "";
+    applyBeatsFromPrompt(prompt);
     current = clip;
     render();
     schedulePoll();
@@ -575,6 +651,11 @@ export function initUgcSkillsTab(): {
     revokeProduct();
     product = null;
     prompt = "";
+    hook = "";
+    story = "";
+    cta = "";
+    overlayText = "";
+    reelMode = false;
     current = null;
     selectedCharacterId =
       characters.find((item) => heroOf(item))?.id || characters[0]?.id || "";
@@ -630,6 +711,7 @@ export function initUgcSkillsTab(): {
       setStatus("Envie a foto do produto", true);
       return;
     }
+    syncPromptFromForm();
     const shouldCreate = productFresh || characterChanged || !current?.id;
     if (current?.status === "ready" && !shouldCreate) return;
     const targetId = current?.id;
@@ -741,6 +823,8 @@ export function initUgcSkillsTab(): {
     }
     const seq = ++routeSeq;
     setStatus("");
+    forcePortraitAspect();
+    const draft = route.clipId ? null : takeRepurposeDraft();
     try {
       await Promise.all([loadCharacters(), loadClips()]);
       if (seq !== routeSeq) return;
@@ -748,6 +832,19 @@ export function initUgcSkillsTab(): {
         await loadClip(route.clipId);
       } else if (!product && !current) {
         resetCanvas();
+        if (draft) {
+          prompt = formatReelPrompt(
+            {
+              hook: draft.hook,
+              story: draft.story,
+              cta: draft.cta,
+              overlayText: draft.overlayText,
+            },
+            draft.prompt,
+          );
+          applyBeatsFromPrompt(prompt);
+          reelMode = true;
+        }
         render();
       } else {
         render();

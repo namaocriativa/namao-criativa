@@ -52,6 +52,21 @@ export type ImageSkillRunPackage = {
   currency?: string | null;
 };
 
+export type ImageSkillRunPack = {
+  staticProjectId?: string;
+  reel?: {
+    hook?: string;
+    story?: string;
+    cta?: string;
+    overlayText?: string;
+  };
+  static?: {
+    headline?: string;
+    body?: string;
+    caption?: string;
+  };
+};
+
 export type ImageSkillRun = {
   leadId?: string;
   leadLabel?: string;
@@ -63,6 +78,7 @@ export type ImageSkillRun = {
   completedSlides?: number;
   error?: string;
   spec?: unknown;
+  pack?: ImageSkillRunPack;
 };
 
 export type ImageProjectSettings = {
@@ -373,6 +389,10 @@ function pickSkillRun(
     typeof raw.completedSlides === 'number' && Number.isFinite(raw.completedSlides)
       ? raw.completedSlides
       : undefined;
+  const pack =
+    raw.pack && typeof raw.pack === 'object' && !Array.isArray(raw.pack)
+      ? (raw.pack as ImageSkillRunPack)
+      : undefined;
   const leadId = typeof raw.leadId === 'string' ? raw.leadId.trim() : '';
   if (!leadId) {
     if (!spec && !prompt && !fallback) return undefined;
@@ -384,6 +404,7 @@ function pickSkillRun(
       ...(completedSlides != null ? { completedSlides } : {}),
       ...(error ? { error } : {}),
       ...(spec ? { spec } : {}),
+      ...(pack ? { pack } : {}),
     };
   }
   const packageIds = Array.isArray(raw.packageIds)
@@ -421,5 +442,6 @@ function pickSkillRun(
     packages,
     notes,
     ...(spec ? { spec } : {}),
+    ...(pack ? { pack } : {}),
   };
 }

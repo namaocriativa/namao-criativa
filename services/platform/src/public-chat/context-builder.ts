@@ -1,7 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type ChatTrustedContext = {
@@ -45,16 +42,10 @@ const EMPTY_TRUSTED: ChatTrustedContext = {
 
 @Injectable()
 export class ChatContextBuilder {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async build(leadId: string): Promise<ChatPromptContext> {
-    const include = {
-      sources: true,
-      landingGenerations: { orderBy: { createdAt: 'desc' as const }, take: 1 },
-    };
+    const include = { sources: true };
     const lead =
       (await this.prisma.lead.findUnique({
         where: { id: leadId },
@@ -73,38 +64,17 @@ export class ChatContextBuilder {
       };
     }
 
-    const spec = await this.loadSpec(
-      lead.landingSlug,
-      lead.landingGenerations[0]?.pageSpec,
-    );
+    const trusted = extractTrusted(lead);
     return {
       leadId: lead.id,
-      trusted: extractTrusted(lead),
-      lp: extractLpContent(spec),
+      trusted,
+      lp: {
+        titles: trusted.name ? [trusted.name] : [],
+        faq: [],
+        features: trusted.services || [],
+      },
       untrusted: extractUntrusted(lead.sources),
     };
-  }
-
-  private async loadSpec(
-    slug: string | null,
-    generationSpec: unknown,
-  ): Promise<unknown> {
-    if (generationSpec) return generationSpec;
-    const leadsDir = this.leadsDir();
-    if (!slug || !leadsDir) return null;
-    try {
-      const file = path.join(leadsDir, slug, 'page-spec.json');
-      const raw = await fs.readFile(file, 'utf8');
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  private leadsDir(): string | null {
-    const configured = this.config.get<string>('LEADS_DIR')?.trim();
-    if (configured) return path.resolve(configured);
-    return null;
   }
 }
 

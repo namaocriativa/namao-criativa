@@ -69,6 +69,35 @@ describe('GithubWebsitesClient', () => {
     ]);
   });
 
+  it('cria repo na org e cai para user se a org não existir', async () => {
+    request
+      .mockRejectedValueOnce(axiosError(404))
+      .mockResolvedValueOnce({
+        data: {
+          full_name: 'lleonesouza/novo-site',
+          name: 'novo-site',
+          html_url: 'https://github.com/lleonesouza/novo-site',
+          default_branch: 'main',
+        },
+      });
+    const repo = await makeClient('ghp_test').createRepo('novo-site');
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        method: 'POST',
+        url: 'https://api.github.com/orgs/namaocriativa/repos',
+      }),
+    );
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        method: 'POST',
+        url: 'https://api.github.com/user/repos',
+      }),
+    );
+    expect(repo.id).toBe('lleonesouza/novo-site');
+  });
+
   it('falha com 503 sem token', async () => {
     await expect(makeClient('').listRepos()).rejects.toBeInstanceOf(
       ServiceUnavailableException,

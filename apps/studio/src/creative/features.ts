@@ -6,6 +6,7 @@ export const INICIO_FIM_ID = "inicio-fim";
 export const UGC_SKILLS_ID = "ugc-skills";
 export const PLAYGROUND_IMAGEM_ID = "playground-imagem";
 export const PLAYGROUND_VIDEO_ID = "playground-video";
+export const STATIC_INSTAGRAM_ID = "static-instagram";
 
 export type CreativeFeatureKind = "image" | "video";
 export type CreativeFeatureStatus = "ready" | "soon";
@@ -50,6 +51,15 @@ export const CREATIVE_FEATURES: CreativeFeatureDefinition[] = [
       "Série de slides 4:5 para o feed: um briefing vira capa, dicas e CTA com a mesma identidade visual.",
     status: "ready",
     composer: ["prompt", "notes"],
+    projectKind: "image",
+  },
+  {
+    id: STATIC_INSTAGRAM_ID,
+    kind: "image",
+    title: "Post estático",
+    description: "Uma frase poderosa em 4:5. Gerado pelo pack, sem aba no rail.",
+    status: "soon",
+    composer: ["prompt"],
     projectKind: "image",
   },
   {

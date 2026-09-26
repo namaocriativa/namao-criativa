@@ -8,10 +8,15 @@ describe('DashboardService', () => {
     configured: jest.fn(),
     runReport: jest.fn(),
   };
+  const prisma = {
+    contentCalendarPost: { findMany: jest.fn() },
+    contentCalendarReminder: { findMany: jest.fn() },
+  };
   const service = new DashboardService(
     owners as never,
     redis as never,
     ga4 as unknown as Ga4Client,
+    prisma as never,
   );
   const user = {
     id: 'u1',

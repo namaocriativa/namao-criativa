@@ -12,4 +12,13 @@ export class DashboardController {
   analytics(@CurrentUser() user: JwtUser, @Query() query: AnalyticsQueryDto) {
     return this.dashboard.analytics(user, query.range || '7d');
   }
+
+  @Get('calendar')
+  calendar(
+    @CurrentUser() user: JwtUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.dashboard.calendar(user, from, to);
+  }
 }

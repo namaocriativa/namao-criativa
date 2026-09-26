@@ -2,13 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
-export const INSTAGRAM_OAUTH_SCOPES = [
-  'instagram_basic',
-  'pages_show_list',
-  'pages_read_engagement',
-  'instagram_manage_insights',
-  'instagram_content_publish',
-] as const;
+/** Instagram Login — lê mídia sem Facebook Page. */
+export const INSTAGRAM_OAUTH_SCOPES = ['instagram_business_basic'] as const;
+
+export const INSTAGRAM_PUBLISH_SCOPE = 'instagram_business_content_publish';
 
 export type IgMediaItem = {
   id: string;
@@ -16,11 +13,28 @@ export type IgMediaItem = {
   url: string;
   permalink?: string;
   caption?: string;
+  timestamp?: string;
 };
+
+export type IgAccountFound = {
+  found: true;
+  igUserId: string;
+  username: string | null;
+};
+
+export type IgAccountLookup =
+  | IgAccountFound
+  | { found: false; reason: 'no_instagram_account' | 'not_professional' };
 
 export type IgContainerStatus = {
   statusCode: string;
   status?: string;
+};
+
+export type IgTokenExchange = {
+  accessToken: string;
+  expiresAt: Date | null;
+  igUserId: string | null;
 };
 
 @Injectable()
@@ -34,11 +48,19 @@ export class InstagramGraphClient {
   }
 
   get appId(): string {
-    return this.config.get<string>('META_APP_ID')?.trim() || '';
+    return (
+      this.config.get<string>('META_INSTAGRAM_APP_ID')?.trim() ||
+      this.config.get<string>('META_APP_ID')?.trim() ||
+      ''
+    );
   }
 
   get appSecret(): string {
-    return this.config.get<string>('META_APP_SECRET')?.trim() || '';
+    return (
+      this.config.get<string>('META_INSTAGRAM_APP_SECRET')?.trim() ||
+      this.config.get<string>('META_APP_SECRET')?.trim() ||
+      ''
+    );
   }
 
   get redirectUri(): string {
@@ -59,121 +81,130 @@ export class InstagramGraphClient {
       state,
       response_type: 'code',
       scope: INSTAGRAM_OAUTH_SCOPES.join(','),
+      enable_fb_login: 'false',
     });
-    return `https://www.facebook.com/${this.version}/dialog/oauth?${params.toString()}`;
+    return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
   }
 
-  async exchangeCode(code: string): Promise<{
-    accessToken: string;
-    expiresAt: Date | null;
-  }> {
-    const shortRes = await axios.get(
-      `https://graph.facebook.com/${this.version}/oauth/access_token`,
+  async exchangeCode(code: string): Promise<IgTokenExchange> {
+    const cleanCode = code.replace(/#_$/, '');
+    const shortRes = await axios.post(
+      'https://api.instagram.com/oauth/access_token',
+      new URLSearchParams({
+        client_id: this.appId,
+        client_secret: this.appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: this.redirectUri,
+        code: cleanCode,
+      }),
       {
-        params: {
-          client_id: this.appId,
-          client_secret: this.appSecret,
-          redirect_uri: this.redirectUri,
-          code,
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         timeout: 15000,
       },
     );
-    const shortToken = String(shortRes.data?.access_token || '');
-    if (!shortToken) {
-      throw new Error('Meta não retornou access_token');
+    const short = this.readTokenPayload(shortRes.data);
+    if (!short.accessToken) {
+      throw new Error('Instagram não retornou access_token');
     }
 
     try {
-      const longRes = await axios.get(
-        `https://graph.facebook.com/${this.version}/oauth/access_token`,
-        {
-          params: {
-            grant_type: 'fb_exchange_token',
-            client_id: this.appId,
-            client_secret: this.appSecret,
-            fb_exchange_token: shortToken,
-          },
-          timeout: 15000,
+      const longRes = await axios.get('https://graph.instagram.com/access_token', {
+        params: {
+          grant_type: 'ig_exchange_token',
+          client_secret: this.appSecret,
+          access_token: short.accessToken,
         },
-      );
-      const accessToken = String(longRes.data?.access_token || shortToken);
+        timeout: 15000,
+      });
+      const longToken = String(longRes.data?.access_token || short.accessToken);
       const expiresIn = Number(longRes.data?.expires_in || 0);
       return {
-        accessToken,
+        accessToken: longToken,
         expiresAt: expiresIn
           ? new Date(Date.now() + expiresIn * 1000)
           : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+        igUserId: short.igUserId,
       };
     } catch (error) {
       this.logger.warn(
-        `Long-lived token exchange failed: ${
+        `Long-lived Instagram token failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      return { accessToken: shortToken, expiresAt: null };
+      return {
+        accessToken: short.accessToken,
+        expiresAt: null,
+        igUserId: short.igUserId,
+      };
     }
   }
 
-  async findInstagramAccount(accessToken: string): Promise<{
-    igUserId: string;
-    username: string | null;
-  } | null> {
-    const pages = await axios.get(
-      `https://graph.facebook.com/${this.version}/me/accounts`,
-      {
-        params: {
-          fields: 'id,name,instagram_business_account{id,username}',
-          access_token: accessToken,
-        },
-        timeout: 15000,
+  async findInstagramAccount(accessToken: string): Promise<IgAccountLookup> {
+    const res = await axios.get(`https://graph.instagram.com/${this.version}/me`, {
+      params: {
+        fields: 'user_id,id,username,account_type',
+        access_token: accessToken,
       },
-    );
-    const data = Array.isArray(pages.data?.data) ? pages.data.data : [];
-    for (const page of data) {
-      const ig = page?.instagram_business_account;
-      if (ig?.id) {
-        return {
-          igUserId: String(ig.id),
-          username: ig.username ? String(ig.username) : null,
-        };
-      }
+      timeout: 15000,
+    });
+    const igUserId = String(res.data?.user_id || res.data?.id || '');
+    if (!igUserId) {
+      return { found: false, reason: 'no_instagram_account' };
     }
-    return null;
+    const accountType = String(res.data?.account_type || '').toUpperCase();
+    if (accountType === 'PERSONAL') {
+      return { found: false, reason: 'not_professional' };
+    }
+    return {
+      found: true,
+      igUserId,
+      username: res.data?.username ? String(res.data.username) : null,
+    };
   }
 
   async listMedia(opts: {
     igUserId: string;
     accessToken: string;
     limit?: number;
+    since?: Date;
   }): Promise<IgMediaItem[]> {
-    const res = await axios.get(
-      `https://graph.facebook.com/${this.version}/${opts.igUserId}/media`,
-      {
-        params: {
-          fields: 'id,caption,media_type,media_url,permalink,thumbnail_url,timestamp',
-          limit: opts.limit ?? 12,
-          access_token: opts.accessToken,
-        },
-        timeout: 20000,
-      },
-    );
-    const data = Array.isArray(res.data?.data) ? res.data.data : [];
+    const max = Math.min(Math.max(opts.limit ?? 12, 1), 40);
     const items: IgMediaItem[] = [];
-    for (const item of data) {
-      const mediaType = String(item.media_type || '');
-      const url =
-        mediaType === 'VIDEO'
-          ? String(item.thumbnail_url || item.media_url || '')
-          : String(item.media_url || item.thumbnail_url || '');
-      if (!url) continue;
-      items.push({
-        id: String(item.id),
-        mediaType,
-        url,
-        permalink: item.permalink ? String(item.permalink) : undefined,
-        caption: item.caption ? String(item.caption) : undefined,
-      });
+    let after: string | undefined;
+    let olderThanWindow = false;
+    while (items.length < max && !olderThanWindow) {
+      const pageSize = Math.min(25, max - items.length);
+      const res = await axios.get(
+        `https://graph.instagram.com/${this.version}/${opts.igUserId}/media`,
+        {
+          params: {
+            fields:
+              'id,caption,media_type,media_url,permalink,thumbnail_url,timestamp',
+            limit: pageSize,
+            after,
+            access_token: opts.accessToken,
+          },
+          timeout: 20000,
+        },
+      );
+      const data = Array.isArray(res.data?.data) ? res.data.data : [];
+      if (!data.length) break;
+      for (const item of data) {
+        const parsed = parseMediaItem(item as Record<string, unknown>);
+        if (!parsed) continue;
+        if (opts.since && parsed.timestamp) {
+          const at = Date.parse(parsed.timestamp);
+          if (!Number.isNaN(at) && at < opts.since.getTime()) {
+            olderThanWindow = true;
+            break;
+          }
+        }
+        items.push(parsed);
+        if (items.length >= max) break;
+      }
+      const nextAfter = pagingAfter(res.data?.paging);
+      if (!nextAfter || nextAfter === after) break;
+      after = nextAfter;
     }
     return items;
   }
@@ -200,7 +231,7 @@ export class InstagramGraphClient {
     }
     try {
       const res = await axios.post(
-        `https://graph.facebook.com/${this.version}/${opts.igUserId}/media`,
+        `https://graph.instagram.com/${this.version}/${opts.igUserId}/media`,
         null,
         { params, timeout: 30000 },
       );
@@ -218,7 +249,7 @@ export class InstagramGraphClient {
   }): Promise<IgContainerStatus> {
     try {
       const res = await axios.get(
-        `https://graph.facebook.com/${this.version}/${opts.creationId}`,
+        `https://graph.instagram.com/${this.version}/${opts.creationId}`,
         {
           params: {
             fields: 'status_code,status',
@@ -245,7 +276,7 @@ export class InstagramGraphClient {
   }): Promise<{ id: string; permalink?: string }> {
     try {
       const res = await axios.post(
-        `https://graph.facebook.com/${this.version}/${opts.igUserId}/media_publish`,
+        `https://graph.instagram.com/${this.version}/${opts.igUserId}/media_publish`,
         null,
         {
           params: {
@@ -260,7 +291,7 @@ export class InstagramGraphClient {
       let permalink: string | undefined;
       try {
         const media = await axios.get(
-          `https://graph.facebook.com/${this.version}/${id}`,
+          `https://graph.instagram.com/${this.version}/${id}`,
           {
             params: {
               fields: 'permalink',
@@ -279,12 +310,54 @@ export class InstagramGraphClient {
     }
   }
 
+  private readTokenPayload(data: unknown): {
+    accessToken: string;
+    igUserId: string | null;
+  } {
+    const root = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+    const nested = Array.isArray(root.data) ? root.data[0] : null;
+    const payload =
+      nested && typeof nested === 'object'
+        ? (nested as Record<string, unknown>)
+        : root;
+    const accessToken = String(payload.access_token || '');
+    const igUserId = payload.user_id ? String(payload.user_id) : null;
+    return { accessToken, igUserId };
+  }
+
   private graphError(error: unknown, fallback: string): string {
     if (axios.isAxiosError(error)) {
-      const message = error.response?.data?.error?.message;
+      const body = error.response?.data as
+        | { error?: { message?: string }; error_message?: string }
+        | undefined;
+      const message = body?.error?.message || body?.error_message;
       if (typeof message === 'string' && message.trim()) return message;
       if (error.message) return error.message;
     }
     return error instanceof Error ? error.message : fallback;
   }
+}
+
+function parseMediaItem(item: Record<string, unknown>): IgMediaItem | null {
+  const id = String(item.id || '');
+  if (!id) return null;
+  const mediaType = String(item.media_type || '');
+  const url =
+    mediaType === 'VIDEO'
+      ? String(item.thumbnail_url || item.media_url || '')
+      : String(item.media_url || item.thumbnail_url || '');
+  return {
+    id,
+    mediaType,
+    url,
+    permalink: item.permalink ? String(item.permalink) : undefined,
+    caption: item.caption ? String(item.caption) : undefined,
+    timestamp: item.timestamp ? String(item.timestamp) : undefined,
+  };
+}
+
+function pagingAfter(paging: unknown): string {
+  if (!paging || typeof paging !== 'object') return '';
+  const cursors = (paging as { cursors?: { after?: unknown } }).cursors;
+  return typeof cursors?.after === 'string' ? cursors.after : '';
 }

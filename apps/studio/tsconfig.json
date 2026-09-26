@@ -12,12 +12,6 @@
     "moduleDetection": "force",
     "noEmit": true,
     "strict": true,
-    "paths": {
-      "@namao/landing-kit": ["../../packages/landing-kit/src/index.ts"],
-      "@namao/landing-kit/renderer": [
-        "../../packages/landing-kit/src/renderer/index.tsx"
-      ]
-    },
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,

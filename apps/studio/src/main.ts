@@ -39,12 +39,12 @@ import {
   titleForRoute,
   type AppRoute,
 } from "./router";
-import {
-  getGeneratePayload,
-  mountSiteWizard,
-  setWizardOnConfirm,
-} from "./site-config";
 import { entityKindOf, profileApi, type EntityKind } from "./profile-api";
+import { initSiteSkillModal } from "./site-skill-modal";
+import { initSiteSkillProgress } from "./site-skill-progress";
+import { initIgSkillModal } from "./ig-skill-modal";
+import { initIgSkillProgress } from "./ig-skill-progress";
+import { initIgSkillReport } from "./ig-skill-report";
 import { initLeadGallery } from "./lead-gallery";
 import { initLeadAccountModal } from "./lead-account-modal";
 import { initLeadShareModal } from "./lead-share-modal";
@@ -54,6 +54,7 @@ import {
   type WebsiteHealth,
 } from "./website-health-ui";
 import { initLeadEditModal } from "./lead-edit-modal";
+import { initLeadFichaModal } from "./lead-ficha-modal";
 import { initLeadEmailsModal } from "./lead-emails-modal";
 import { initLeadWhatsAppModal } from "./lead-whatsapp-modal";
 import { initUiLib } from "./ui-lib/playground";
@@ -132,12 +133,16 @@ const enrichStatus = el<HTMLElement>("enrich-status");
 const enrichBtn = el<HTMLButtonElement>("enrich-btn");
 
 const leadDetail = el<HTMLElement>("lead-detail");
-const leadDataExtra = el<HTMLElement>("lead-data-extra");
 const leadContext = el<HTMLElement>("lead-context");
 const leadContextSummary = el<HTMLElement>("lead-context-summary");
 const leadContextEditBtn = el<HTMLButtonElement>("lead-context-edit-btn");
+const leadContextFullBtn = el<HTMLButtonElement>("lead-context-full-btn");
 const leadContextActions = el<HTMLElement>("lead-context-actions");
 const leadContextHistory = el<HTMLElement>("lead-context-history");
+const leadHistoryCard = el<HTMLElement>("lead-history");
+const leadHistoryCount = leadHistoryCard.querySelector<HTMLElement>(
+  "[data-lead-history-count]",
+);
 const savedLeads = el<HTMLElement>("saved-leads");
 const savedLeadsStatus = el<HTMLElement>("saved-leads-status");
 const refreshLeadsBtn = el<HTMLButtonElement>("refresh-leads-btn");
@@ -165,18 +170,13 @@ let customersSearchDebounce: ReturnType<typeof setTimeout> | null = null;
 
 const detailHeading = el<HTMLElement>("detail-heading");
 const leadSitePanel = el<HTMLElement>("lead-site-panel");
+const leadQuickActions = el<HTMLElement>("lead-quick-actions");
 const siteAddBtn = el<HTMLButtonElement>("site-add-btn");
-const siteDeployBtn = el<HTMLButtonElement>("site-deploy-btn");
-const sitePromptBtn = el<HTMLButtonElement>("site-prompt-btn");
+const siteAgendaBtn = el<HTMLButtonElement>("site-agenda-btn");
+const siteSkillBtn = el<HTMLButtonElement>("site-skill-btn");
+const igSkillBtn = el<HTMLButtonElement>("ig-skill-btn");
 const siteStatus = el<HTMLElement>("site-status");
 const siteActions = el<HTMLElement>("site-actions");
-const siteProgressLog = el<HTMLElement>("site-progress-log");
-const siteProgressFill = el<HTMLElement>("site-progress-fill");
-const siteProgressLabel = el<HTMLElement>("site-progress-label");
-const siteProgressBar = el<HTMLElement>("site-progress-bar");
-const siteProgressCard = el<HTMLElement>("site-progress-card");
-const siteProgressToggle = el<HTMLButtonElement>("site-progress-toggle");
-const siteDownloadLogBtn = el<HTMLButtonElement>("site-download-log-btn");
 const heroHealth = el<HTMLElement>("lead-hero-health");
 const heroHealthSummary = el<HTMLElement>("lead-hero-health-summary");
 const heroHealthList = el<HTMLElement>("lead-hero-health-list");
@@ -187,20 +187,24 @@ let currentEntityKind: EntityKind = "lead";
 let currentLead: Lead | null = null;
 let historyLoadSeq = 0;
 let heroHealthSeq = 0;
-let activeJobId: string | null = null;
-let siteEventSource: EventSource | null = null;
+const contextWide = window.matchMedia("(min-width: 1100px)");
 
-const JOB_STORAGE_KEY = "landingActiveJob";
+function syncLeadContextFold(on = document.body.classList.contains("is-lead-view")) {
+  const fold = document.getElementById("lead-context-fold");
+  if (fold instanceof HTMLDetailsElement) {
+    // Em desktop o summary some (display:contents). Details fechado = coluna vazia.
+    fold.open = on && contextWide.matches;
+  }
+}
 
 function setLeadView(on: boolean) {
   document.body.classList.toggle("is-lead-view", on);
   leadContext.hidden = !on;
   if (!on) heroHealth.hidden = true;
-  const fold = document.getElementById("lead-context-fold");
-  if (fold instanceof HTMLDetailsElement) {
-    fold.open = on && window.matchMedia("(min-width: 1100px)").matches;
-  }
+  syncLeadContextFold(on);
 }
+
+contextWide.addEventListener("change", () => syncLeadContextFold());
 
 function nameFromImagensStudio(): string | undefined {
   const input = document.getElementById("imagens-project-name");
@@ -261,7 +265,16 @@ function applyRoute(route: AppRoute) {
   document.body.classList.toggle("is-criativo-gallery", isCriativoGalleryRoute(route));
   showTab(tabForRoute(route));
   syncNav(route);
-  if (route.name !== "lead" && route.name !== "customer") setLeadView(false);
+  if (route.name === "lead" || route.name === "customer") {
+    const kind = route.name === "customer" ? "customer" : "lead";
+    if (currentLeadId !== route.id || currentEntityKind !== kind) {
+      void openSavedLead(route.id, kind);
+    } else {
+      setLeadView(true);
+    }
+  } else {
+    setLeadView(false);
+  }
   const titleHint =
     route.name === "lead" || route.name === "customer"
       ? detailHeading.textContent || undefined
@@ -271,15 +284,6 @@ function applyRoute(route: AppRoute) {
           ? nameFromVideosStudio()
           : undefined;
   document.title = titleForRoute(route, titleHint);
-  if (route.name === "lead") {
-    if (currentLeadId !== route.id || currentEntityKind !== "lead") {
-      void openSavedLead(route.id, "lead");
-    }
-  } else if (route.name === "customer") {
-    if (currentLeadId !== route.id || currentEntityKind !== "customer") {
-      void openSavedLead(route.id, "customer");
-    }
-  }
   if (
     route.name === "criativo" ||
     route.name === "criativo-skill" ||
@@ -371,9 +375,28 @@ function applyRoute(route: AppRoute) {
 }
 
 initUiLib(el<HTMLElement>("ui-lib-root"));
-initConfigTab({ onSaved: () => void refreshLlmStatus() });
-window.addEventListener("app:llm-saved", () => void refreshLlmStatus());
-mountSiteWizard(el<HTMLElement>("site-wizard-root"));
+initConfigTab({ onSaved: () => undefined });
+const siteSkillProgress = initSiteSkillProgress();
+const siteSkill = initSiteSkillModal(el<HTMLElement>("site-skill-root"), {
+  onStarted: (jobId) => siteSkillProgress.watch(jobId),
+});
+const igSkillReport = initIgSkillReport(el<HTMLElement>("ig-skill-report-root"));
+const igSkillProgress = initIgSkillProgress({
+  onDone: (job) => {
+    if (!currentLeadId || !job.report) return;
+    igSkillReport.open(job.report as never, {
+      id: currentLeadId,
+      kind: currentEntityKind,
+    });
+  },
+});
+const igSkill = initIgSkillModal(el<HTMLElement>("ig-skill-root"), {
+  onStarted: (jobId) => igSkillProgress.watch(jobId),
+  onOpenReport: () => {
+    if (!currentLeadId) return;
+    void igSkillReport.openLatest({ id: currentLeadId, kind: currentEntityKind });
+  },
+});
 const leadGallery = initLeadGallery(el<HTMLElement>("lead-gallery-root"), {
   onLeadUpdated: (lead) => {
     renderLead(lead);
@@ -391,7 +414,7 @@ const leadWebsite = initLeadWebsiteModal(el<HTMLElement>("lead-website-root"), {
     setStatus(
       siteStatus,
       repo
-        ? `${repo} vinculado. Push em main publica; use Publicar agora para disparar a Action.`
+        ? `${repo} vinculado. Push em main publica.`
         : "Site vinculado.",
     );
   },
@@ -412,6 +435,7 @@ const leadEdit = initLeadEditModal(el<HTMLElement>("lead-edit-root"), {
     void loadSavedLeads();
   },
 });
+const leadFicha = initLeadFichaModal(el<HTMLElement>("lead-ficha-root"));
 
 function studioAccessTagsHtml(lead: Lead): string {
   if (isStudioAdmin()) {
@@ -423,6 +447,19 @@ function studioAccessTagsHtml(lead: Lead): string {
     return `<span class="lead-tag lead-tag-shared">Compartilhado</span>`;
   }
   return "";
+}
+
+function hasInstagramConnection(lead: Lead): boolean {
+  return Boolean(lead.instagramConnections?.length);
+}
+
+function instagramConnectionTagHtml(lead: Lead): string {
+  if (!hasInstagramConnection(lead)) return "";
+  const username = lead.instagramConnections?.[0]?.username?.replace(/^@/, "");
+  const label = username
+    ? `Instagram conectado · @${username}`
+    : "Instagram conectado";
+  return `<span class="lead-tag lead-tag-ig-connected">${escapeHtml(label)}</span>`;
 }
 
 function formatDate(value: string | Date | null | undefined) {
@@ -727,14 +764,6 @@ function linkOrText(value: unknown) {
   return escapeHtml(text);
 }
 
-function field(label: string, value: unknown) {
-  if (!hasValue(value)) {
-    return `<dt>${label}</dt><dd class="missing">Não encontrado</dd>`;
-  }
-  const display = Array.isArray(value) ? value.join(", ") : value;
-  return `<dt>${label}</dt><dd>${linkOrText(display)}</dd>`;
-}
-
 function fillEnrichForm(lead: Lead) {
   formInput(enrichForm, "name").value = lead.name || "";
   formInput(enrichForm, "city").value = lead.city || formInput(discoveryForm, "city").value || "";
@@ -779,6 +808,8 @@ function renderLeadContext(lead: Lead) {
   }
   leadContextEditBtn.hidden = !lead.id;
   leadContextEditBtn.onclick = () => leadEdit.open(lead);
+  leadContextFullBtn.hidden = !lead.id;
+  leadContextFullBtn.onclick = () => leadFicha.open(lead);
   leadContextSummary.innerHTML = `
     <div><dt>ID</dt><dd><code>${escapeHtml(lead.id || "—")}</code></dd></div>
     <div><dt>Cidade / UF</dt><dd>${contextValue(place)}</dd></div>
@@ -791,12 +822,12 @@ function renderLeadContext(lead: Lead) {
     <div id="lead-proposal-status"><dt>Proposta</dt><dd><span class="missing">—</span></dd></div>
   `;
 
-  const previewHref = lead.id
-    ? `/landing/preview/${encodeURIComponent(lead.id)}/`
-    : "";
-  const canPreview = Boolean(
-    lead.id && (lead.landingStatus === "built" || lead.landingSlug),
-  );
+  const previewHref = lead.publishedOrigin
+    ? lead.publishedOrigin
+    : lead.websiteRepo
+      ? `https://github.com/${lead.websiteRepo}`
+      : "";
+  const canPreview = Boolean(previewHref);
   leadContextActions.innerHTML = `
     ${
       lead.id
@@ -807,7 +838,7 @@ function renderLeadContext(lead: Lead) {
     }
     ${
       canPreview
-        ? `<a href="${escapeHtml(previewHref)}" target="_blank" rel="noopener noreferrer">Visualizar site gerado</a>`
+        ? `<a href="${escapeHtml(previewHref)}" target="_blank" rel="noopener noreferrer">${lead.publishedOrigin ? "Abrir site" : "Abrir repo"}</a>`
         : ""
     }
     ${
@@ -874,40 +905,82 @@ type HistoryItem = {
   title: string;
   summary?: string | null;
   at?: string;
+  atLabel?: string;
+  kind?: string;
+  channel?: string;
+  payload?: Record<string, unknown> | null;
 };
 
+function historyChannelLabel(channel?: string): string {
+  const labels: Record<string, string> = {
+    instagram: "Instagram",
+    skill: "Skill",
+    email: "E-mail",
+    whatsapp: "WhatsApp",
+    calendar: "Agenda",
+    account: "Conta",
+    invite: "Convite",
+    enrichment: "Dados",
+    media: "Mídia",
+    studio: "Studio",
+    system: "Sistema",
+    chat: "Chat",
+  };
+  return labels[channel || ""] || channel || "Evento";
+}
+
 function renderHistoryItems(items: HistoryItem[]) {
+  if (leadHistoryCount) {
+    leadHistoryCount.textContent = items.length
+      ? `${items.length} evento${items.length === 1 ? "" : "s"}`
+      : "";
+  }
   leadContextHistory.innerHTML = items.length
     ? items
-        .map(
-          (item) =>
-            `<li><strong>${escapeHtml(item.title)}</strong>${
-              item.summary
-                ? `<p class="meta">${escapeHtml(item.summary)}</p>`
-                : ""
-            }${
-              item.at ? `<p class="meta">${escapeHtml(item.at)}</p>` : ""
-            }</li>`,
-        )
+        .map((item) => {
+          const payload = item.payload
+            ? JSON.stringify(item.payload, null, 2)
+            : "";
+          return `<li class="lead-history__item" data-channel="${escapeHtml(item.channel || "system")}">
+            <span class="lead-history__channel">${escapeHtml(historyChannelLabel(item.channel))}</span>
+            <div class="lead-history__body">
+              <strong>${escapeHtml(item.title)}</strong>
+              ${
+                item.summary
+                  ? `<p class="meta">${escapeHtml(item.summary)}</p>`
+                  : ""
+              }
+              ${
+                item.atLabel || item.at
+                  ? `<p class="meta">${escapeHtml(item.atLabel || item.at || "")}</p>`
+                  : ""
+              }
+              ${
+                item.kind
+                  ? `<p class="lead-history__kind"><code>${escapeHtml(item.kind)}</code></p>`
+                  : ""
+              }
+              ${
+                payload
+                  ? `<details class="lead-history__payload"><summary>payload</summary><pre>${escapeHtml(payload)}</pre></details>`
+                  : ""
+              }
+            </div>
+          </li>`;
+        })
         .join("")
-    : `<li><strong>Sem histórico</strong></li>`;
+    : `<li class="lead-history__empty">Sem histórico</li>`;
 }
 
 function fallbackHistory(lead: Lead): HistoryItem[] {
   const history: HistoryItem[] = [];
-  if (lead.landingBuiltAt) {
-    history.push({ title: "Site gerado", at: formatDate(lead.landingBuiltAt) });
-  }
-  if (lead.updatedAt) {
-    history.push({
-      title: entityKindOf(lead) === "customer" ? "Cliente atualizado" : "Lead atualizado",
-      at: formatDate(lead.updatedAt),
-    });
-  }
   if (lead.createdAt) {
     history.push({
       title: entityKindOf(lead) === "customer" ? "Cliente criado" : "Lead criado",
-      at: formatDate(lead.createdAt),
+      at: lead.createdAt,
+      atLabel: formatDate(lead.createdAt),
+      kind: entityKindOf(lead) === "customer" ? "customer.created" : "lead.created",
+      channel: "system",
     });
   }
   return history;
@@ -990,7 +1063,14 @@ async function loadLeadHistory(lead: Lead) {
       profileApi(entityKindOf(lead), lead.id, "/history"),
     );
     const data = (await res.json().catch(() => ({}))) as {
-      items?: Array<{ title?: string; summary?: string | null; at?: string }>;
+      items?: Array<{
+        title?: string;
+        summary?: string | null;
+        at?: string;
+        kind?: string;
+        channel?: string;
+        payload?: Record<string, unknown> | null;
+      }>;
     };
     if (seq !== historyLoadSeq) return;
     if (!res.ok || !Array.isArray(data.items)) {
@@ -1001,7 +1081,11 @@ async function loadLeadHistory(lead: Lead) {
       data.items.map((item) => ({
         title: item.title || "Evento",
         summary: item.summary,
-        at: item.at ? formatDate(item.at) : undefined,
+        at: item.at,
+        atLabel: item.at ? formatDate(item.at) : undefined,
+        kind: item.kind,
+        channel: item.channel,
+        payload: item.payload ?? null,
       })),
     );
   } catch {
@@ -1028,19 +1112,23 @@ function renderLead(lead: Lead) {
   const sources = (lead.sources || [])
     .map((s) => s.provider)
     .filter(Boolean);
-  const coords =
-    lead.latitude != null && lead.longitude != null
-      ? `${lead.latitude}, ${lead.longitude}`
-      : null;
   const place =
     lead.city && lead.state
       ? `${lead.city}/${lead.state}`
       : lead.city || lead.state || "";
+  const igConnected = hasInstagramConnection(lead);
   const tags = [
     imageList.length ? `${imageList.length} imagens` : null,
-    ...sources.slice(0, 4),
+    ...sources
+      .slice(0, 4)
+      .filter(
+        (source) =>
+          !(igConnected && String(source).toLowerCase() === "instagram"),
+      ),
     lead.category,
   ].filter(Boolean) as string[];
+  const heroPrefixTags =
+    studioAccessTagsHtml(lead) + instagramConnectionTagHtml(lead);
 
   leadDetail.innerHTML = `
     <div class="lead-summary">
@@ -1059,8 +1147,8 @@ function renderLead(lead: Lead) {
           ${lead.website ? `<span>${linkOrText(lead.website)}</span>` : ""}
         </p>
         ${
-          tags.length || studioAccessTagsHtml(lead)
-            ? `<div class="lead-tags lead-hero-tags">${studioAccessTagsHtml(lead)}${tags
+          tags.length || heroPrefixTags
+            ? `<div class="lead-tags lead-hero-tags">${heroPrefixTags}${tags
                 .map((tag) => `<span class="lead-tag">${escapeHtml(tag)}</span>`)
                 .join("")}</div>`
             : ""
@@ -1070,117 +1158,33 @@ function renderLead(lead: Lead) {
     </div>
     <div class="status" id="detail-status"></div>
   `;
-
-  leadDataExtra.innerHTML = `
-    <details class="lead-data-fold">
-      <summary>${entityKindOf(lead) === "customer" ? "Dados do cliente" : "Dados do lead"}</summary>
-      <div class="lead-data-body">
-        <dl>
-          ${field("Categoria", lead.category)}
-          ${field("Descrição", lead.description)}
-          ${field("Telefone", lead.phone)}
-          ${field("WhatsApp", lead.whatsapp)}
-          ${field("E-mail", lead.email)}
-          ${field("Website", lead.website)}
-          ${field("Endereço", lead.address)}
-          ${field("Cidade", lead.city)}
-          ${field("Estado", lead.state)}
-          ${field("País", lead.country)}
-          ${field("Coordenadas", coords)}
-          ${field("Instagram", lead.instagram)}
-          ${field("Facebook", lead.facebook)}
-          ${field("LinkedIn", lead.linkedin)}
-          ${field("Serviços", lead.services)}
-          ${field("Rating", lead.rating)}
-          ${field("Reviews", lead.reviewCount)}
-        </dl>
-        <div class="sources lead-gallery-summary">
-          <strong>Imagens:</strong> ${
-            imageList.length
-              ? `${imageList.length} arquivo(s)`
-              : '<span class="missing">Não encontrado</span>'
-          }
-          ${
-            lead.id
-              ? `<button type="button" class="outline" id="open-lead-gallery-fold">Abrir galeria</button>`
-              : ""
-          }
-        </div>
-        <div class="sources"><strong>Fontes:</strong> ${
-          sources.length
-            ? escapeHtml(sources.join(", "))
-            : '<span class="missing">Não encontrado</span>'
-        }</div>
-        <div class="invite-box">
-          <p><strong>Convite Namão</strong></p>
-          <p class="meta">
-            ${
-              (lead.instagramConnections || []).length
-                ? `Instagram conectado: ${escapeHtml(lead.instagramConnections?.[0]?.username || lead.instagramConnections?.[0]?.igUserId || "")}`
-                : "Instagram ainda não autorizado pelo lead."
-            }
-          </p>
-          <p class="meta">
-            ${
-              (lead.users || []).length
-                ? `Conta: ${escapeHtml(lead.users?.[0]?.email || "")}`
-                : "Nenhuma conta registrada ainda."
-            }
-          </p>
-          <div class="actions" id="invite-actions"></div>
-          <pre class="invite-output" id="invite-output" hidden></pre>
-        </div>
-      </div>
-    </details>
-  `;
   const detailActions = document.getElementById("detail-actions");
   if (detailActions && lead.id && entityKindOf(lead) !== "customer") {
     const refreshBtn = document.createElement("button");
     refreshBtn.type = "button";
-    refreshBtn.textContent = "Enriquecer novamente";
+    refreshBtn.className = "outline detail-refresh-btn";
+    refreshBtn.textContent = "buscar dados novamente";
     refreshBtn.addEventListener("click", () => void reenrichLead(lead.id!, refreshBtn));
     detailActions.appendChild(refreshBtn);
   }
 
-  const inviteActions = document.getElementById("invite-actions");
-  if (inviteActions && lead.id) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "secondary";
-    btn.textContent = "Gerar convite";
-    btn.addEventListener("click", () => void createLeadInvite(lead));
-    inviteActions.appendChild(btn);
-  }
-
-  const foldGalleryBtn = document.getElementById("open-lead-gallery-fold");
-  if (foldGalleryBtn && lead.id) {
-    foldGalleryBtn.addEventListener("click", () => leadGallery.open(lead));
-  }
-
   const nextId = lead.id ?? null;
   if (currentLeadId && nextId && currentLeadId !== nextId) {
-    siteProgressLog.textContent = "";
-    siteProgressFill.style.width = "0%";
-    siteProgressLabel.textContent = "Aguardando geração";
     setStatus(siteStatus, "");
-    setProgressGenerating(false);
   }
   currentLeadId = nextId;
   currentLead = lead;
   currentEntityKind = entityKindOf(lead);
   detailHeading.textContent = lead.name || (currentEntityKind === "customer" ? "Cliente" : "Lead");
   leadSitePanel.hidden = !currentLeadId;
+  leadQuickActions.hidden = !currentLeadId;
+  leadHistoryCard.hidden = !currentLeadId;
   siteActions.hidden = !currentLeadId;
   setSiteActionsEnabled(Boolean(currentLeadId));
-  updateLandingMeta(lead);
+  updateLandingMeta();
   void loadHeroHealth(lead);
   renderLeadContext(lead);
   setLeadView(Boolean(currentLeadId));
-  setProgressGenerating(
-    Boolean(lead.activeLandingJobId) || lead.landingStatus === "generating",
-  );
-  void refreshLlmStatus();
-  void maybeReconnectJob(lead);
   if (currentLeadId) {
     const routeName = currentEntityKind === "customer" ? "customer" : "lead";
     document.title = titleForRoute(
@@ -1192,6 +1196,7 @@ function renderLead(lead: Lead) {
     showTab("detail");
   }
   leadGallery.sync(lead);
+  leadFicha.sync(lead);
 }
 
 async function reenrichLead(id: string, button: HTMLButtonElement) {
@@ -1222,45 +1227,6 @@ async function reenrichLead(id: string, button: HTMLButtonElement) {
     if (detailStatus) {
       detailStatus.textContent = `Erro: ${(error as Error).message}`;
     }
-  }
-}
-
-async function createLeadInvite(lead: Lead) {
-  const output = document.getElementById("invite-output");
-  if (!lead.id || !output) return;
-  output.hidden = false;
-  output.textContent = "Gerando convite…";
-  try {
-    const res = await api("/invites", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leadId: lead.id,
-        phone: lead.whatsapp || lead.phone || undefined,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || "Falha ao gerar convite");
-    }
-    const text = data.whatsappPayload?.text || data.registerUrl;
-    output.textContent = [
-      data.registerUrl,
-      "",
-      text,
-      "",
-      data.evolution?.configured
-        ? "Evolution configurada — POST /invites/:id/send-whatsapp quando for ligar o envio."
-        : "Evolution ainda não configurada (envio WhatsApp preparado, não operacional).",
-    ].join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // ignore
-    }
-  } catch (error) {
-    output.textContent =
-      error instanceof Error ? error.message : "Erro ao gerar convite";
   }
 }
 
@@ -1690,13 +1656,16 @@ async function openSavedLead(id: string, kind: EntityKind = "lead") {
     currentLead = null;
     currentEntityKind = kind;
     leadSitePanel.hidden = true;
+    leadQuickActions.hidden = true;
+    leadHistoryCard.hidden = true;
+    siteActions.hidden = true;
     setSiteActionsEnabled(false);
     const label = kind === "customer" ? "Cliente" : "Lead";
     detailHeading.textContent = `${label} não encontrado`;
     leadDetail.innerHTML = `<p class="empty-detail">${escapeHtml(
       errorMessage(error, `Erro ao abrir ${label.toLowerCase()}`),
     )}</p>`;
-    leadDataExtra.innerHTML = "";
+    leadContextFullBtn.hidden = true;
     document.title = titleForRoute(
       { name: kind, id },
       `${label} não encontrado`,
@@ -2146,10 +2115,13 @@ void requireStudioSession()
 
 function setSiteActionsEnabled(enabled: boolean) {
   siteAddBtn.disabled = !enabled;
-  sitePromptBtn.disabled = !enabled;
-  const linked = Boolean(currentLead?.websiteRepo);
-  siteDeployBtn.hidden = !linked;
-  siteDeployBtn.disabled = !enabled || !linked;
+  siteAgendaBtn.disabled = !enabled;
+  siteSkillBtn.disabled = !enabled;
+  const connected = Boolean(currentLead?.instagramConnections?.length);
+  igSkillBtn.disabled = !enabled || !connected;
+  igSkillBtn.title = connected
+    ? "Analisar o feed conectado"
+    : "Conecte o Instagram do lead";
 }
 
 function landingBadgeHtml(lead: Pick<Lead, "landingStatus" | "publishedOrigin" | "websiteProjectId" | "websiteDeployType" | "websiteRepo" | "websiteDomain">) {
@@ -2190,10 +2162,8 @@ function landingBadgeHtml(lead: Pick<Lead, "landingStatus" | "publishedOrigin" |
   return `<span class="${cls}">${escapeHtml(labels[value] || value)}</span>`;
 }
 
-function updateLandingMeta(lead: Lead) {
+function updateLandingMeta() {
   siteAddBtn.textContent = "Configurar site";
-  siteDeployBtn.hidden = !lead.websiteRepo;
-  siteDeployBtn.disabled = !lead.websiteRepo;
 }
 
 function paintHeroHealth(health: WebsiteHealth | null, loading = false) {
@@ -2241,272 +2211,6 @@ async function loadHeroHealth(lead: Lead) {
   }
 }
 
-function appendSiteLog(line: string) {
-  const stamp = new Date().toLocaleTimeString("pt-BR");
-  siteProgressLog.textContent += `[${stamp}] ${line}\n`;
-  siteProgressLog.scrollTop = siteProgressLog.scrollHeight;
-}
-
-const STAGE_LABELS: Record<string, string> = {
-  queued: "Na fila",
-  briefing: "Brief factual",
-  vision: "Análise visual",
-  site_plan: "Plano da página",
-  art_director: "Art Director",
-  page_architect: "Page Architect",
-  pexels: "Vídeo Pexels",
-  design_system: "Design system",
-  section: "Seção",
-  copywriter: "Copywriter",
-  assembling: "Montagem",
-  reviewing: "Revisão",
-  visual_review: "Crítico visual",
-  screenshot: "Screenshot",
-  validating: "Validação",
-  saving: "Salvando arquivos",
-  copying_images: "Copiando imagens",
-  npm_install: "npm install",
-  npm_build: "npm run build",
-  publishing: "Vercel",
-  done: "Concluído",
-  done_with_warnings: "Concluído com avisos",
-  error: "Erro",
-  cancelled: "Cancelado",
-};
-
-function updateSiteProgress(payload: {
-  stage?: string;
-  message?: string;
-  step?: number;
-  totalSteps?: number;
-  sectionId?: string;
-}) {
-  const label = STAGE_LABELS[payload.stage || ""] || payload.stage || "…";
-  const section = payload.sectionId ? ` · ${payload.sectionId}` : "";
-  const stepText =
-    payload.step && payload.totalSteps
-      ? `${payload.step}/${payload.totalSteps} · `
-      : "";
-  siteProgressLabel.textContent = `${stepText}${label}${section}`;
-  if (payload.step && payload.totalSteps) {
-    const pct = Math.min(
-      100,
-      Math.round((payload.step / payload.totalSteps) * 100),
-    );
-    siteProgressFill.style.width = `${pct}%`;
-    siteProgressBar.setAttribute("aria-valuenow", String(pct));
-  }
-  if (payload.stage === "done" || payload.stage === "done_with_warnings") {
-    siteProgressFill.style.width = "100%";
-    siteProgressBar.setAttribute("aria-valuenow", "100");
-  }
-  if (payload.stage === "error" || payload.stage === "cancelled") {
-    siteProgressBar.setAttribute("aria-valuenow", "0");
-  }
-}
-
-function rememberJob(leadId: string, jobId: string) {
-  activeJobId = jobId;
-  sessionStorage.setItem(
-    JOB_STORAGE_KEY,
-    JSON.stringify({ leadId, jobId }),
-  );
-  setSiteActionsEnabled(Boolean(currentLeadId));
-  setProgressGenerating(true);
-}
-
-function clearRememberedJob() {
-  activeJobId = null;
-  sessionStorage.removeItem(JOB_STORAGE_KEY);
-  setSiteActionsEnabled(Boolean(currentLeadId));
-  setProgressGenerating(false);
-}
-
-function setProgressCollapsed(collapsed: boolean) {
-  siteProgressCard.classList.toggle("is-collapsed", collapsed);
-  siteProgressToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-}
-
-function setProgressGenerating(on: boolean) {
-  siteProgressCard.classList.toggle("is-generating", on);
-}
-
-function handleJobTerminal(payload: {
-  stage?: string;
-  message?: string;
-  path?: string;
-  error?: string;
-  warnings?: string[];
-}) {
-  if (payload.warnings?.length) {
-    payload.warnings.forEach((w) => appendSiteLog(`aviso: ${w}`));
-  }
-  if (payload.stage === "done" || payload.stage === "done_with_warnings") {
-    setStatus(
-      siteStatus,
-      payload.path
-        ? `Concluído: ${payload.path}`
-        : payload.message || "Concluído",
-    );
-    void reloadCurrentLead();
-  } else if (payload.stage === "error") {
-    setStatus(
-      siteStatus,
-      payload.error || payload.message || "Erro na geração",
-      true,
-    );
-    void reloadCurrentLead();
-  } else if (payload.stage === "cancelled") {
-    setStatus(siteStatus, payload.message || "Geração cancelada");
-    void reloadCurrentLead();
-  }
-  siteEventSource?.close();
-  siteEventSource = null;
-  clearRememberedJob();
-}
-
-async function reloadCurrentLead() {
-  if (!currentLeadId) return;
-  try {
-    const res = await api(currentProfileApi());
-    const data = await res.json();
-    if (res.ok) {
-      updateLandingMeta(data as Lead);
-      loadSavedLeads();
-    }
-  } catch {
-    // ignore
-  }
-}
-
-function subscribeJobEvents(jobId: string, leadId: string, replayLog = false) {
-  if (siteEventSource) {
-    siteEventSource.close();
-    siteEventSource = null;
-  }
-  if (replayLog) {
-    siteProgressLog.textContent = "";
-  }
-  rememberJob(leadId, jobId);
-  siteEventSource = new EventSource(
-    `/landing/jobs/${encodeURIComponent(jobId)}/events`,
-  );
-
-  siteEventSource.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(event.data) as {
-        stage?: string;
-        message?: string;
-        path?: string;
-        warnings?: string[];
-        error?: string;
-        step?: number;
-        totalSteps?: number;
-        sectionId?: string;
-      };
-      updateSiteProgress(payload);
-      appendSiteLog(
-        `[${payload.stage || "?"}] ${payload.message || event.data}`,
-      );
-      if (
-        payload.stage === "done" ||
-        payload.stage === "done_with_warnings" ||
-        payload.stage === "error" ||
-        payload.stage === "cancelled"
-      ) {
-        handleJobTerminal(payload);
-      }
-    } catch {
-      appendSiteLog(event.data);
-    }
-  };
-
-  siteEventSource.onerror = () => {
-    appendSiteLog("SSE desconectado — tentando recuperar job…");
-    siteEventSource?.close();
-    siteEventSource = null;
-    void recoverJob(jobId, leadId);
-  };
-}
-
-async function recoverJob(jobId: string, leadId: string) {
-  try {
-    const res = await api(`/landing/jobs/${encodeURIComponent(jobId)}`);
-    const data = await res.json();
-    if (!res.ok) {
-      clearRememberedJob();
-      return;
-    }
-    const status = String(data.status || "");
-    if (
-      status === "done" ||
-      status === "done_with_warnings" ||
-      status === "error" ||
-      status === "cancelled"
-    ) {
-      handleJobTerminal({
-          stage: status,
-          message: data.error || data.status,
-          error: data.error,
-          path: data.slug ? `leads/${data.slug}` : undefined,
-        });
-      return;
-    }
-    appendSiteLog("Reconectando SSE…");
-    subscribeJobEvents(jobId, leadId);
-  } catch {
-    setSiteActionsEnabled(Boolean(currentLeadId));
-  }
-}
-
-async function maybeReconnectJob(lead: Lead) {
-  if (!lead.id) return;
-  const fromLead = lead.activeLandingJobId;
-  let stored: { leadId?: string; jobId?: string } | null = null;
-  try {
-    stored = JSON.parse(sessionStorage.getItem(JOB_STORAGE_KEY) || "null");
-  } catch {
-    stored = null;
-  }
-  const jobId =
-    fromLead ||
-    (stored?.leadId === lead.id ? stored.jobId : null) ||
-    null;
-  if (!jobId) return;
-  if (activeJobId === jobId && siteEventSource) return;
-  appendSiteLog(`Reconectando job ${jobId}…`);
-  await recoverJob(jobId, lead.id);
-}
-
-async function refreshLlmStatus() {
-  try {
-    const res = await api("/landing/status");
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || "Falha ao checar LLM");
-    }
-    setSiteActionsEnabled(Boolean(currentLeadId));
-  } catch {
-    setSiteActionsEnabled(Boolean(currentLeadId));
-  }
-}
-
-siteProgressToggle.addEventListener("click", () => {
-  setProgressCollapsed(!siteProgressCard.classList.contains("is-collapsed"));
-});
-
-siteDownloadLogBtn.addEventListener("click", () => {
-  const blob = new Blob([siteProgressLog.textContent || ""], {
-    type: "text/plain;charset=utf-8",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${currentLeadId || "lead"}-pipeline.log`;
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
 heroHealthRefresh.addEventListener("click", () => {
   if (currentLead) void loadHeroHealth(currentLead);
 });
@@ -2516,107 +2220,22 @@ siteAddBtn.addEventListener("click", () => {
   leadWebsite.open(currentLeadId, currentEntityKind, currentLead);
 });
 
-siteDeployBtn.addEventListener("click", async () => {
-  const leadId = currentLeadId;
-  if (!leadId || !currentLead?.websiteRepo) return;
-  if (!window.confirm(`Disparar a Action de ${currentLead.websiteRepo} agora?`)) {
-    return;
-  }
-  siteDeployBtn.disabled = true;
-  try {
-    const res = await api(profileApi(currentEntityKind, leadId, "/website/deploy"), {
-      method: "POST",
-    });
-    const data = (await res.json().catch(() => ({}))) as Lead & { message?: string | string[] };
-    if (!res.ok) {
-      const message = Array.isArray(data.message)
-        ? data.message.join(" ")
-        : data.message;
-      throw new Error(message || "Falha ao disparar a Action");
-    }
-    renderLead({ ...data, _entityKind: currentEntityKind });
-    setStatus(siteStatus, `Action disparada em ${data.websiteRepo || currentLead.websiteRepo}.`);
-  } catch (error) {
-    setStatus(siteStatus, errorMessage(error, "Falha ao disparar a Action"), true);
-  } finally {
-    setSiteActionsEnabled(Boolean(currentLeadId));
-  }
+siteAgendaBtn.addEventListener("click", () => {
+  if (!currentLeadId) return;
+  navigate(
+    currentEntityKind === "customer"
+      ? { name: "customer-calendar", id: currentLeadId }
+      : { name: "lead-calendar", id: currentLeadId },
+  );
 });
 
-sitePromptBtn.addEventListener("click", async () => {
-  const leadId = currentLeadId;
-  if (!leadId) return;
-  sitePromptBtn.disabled = true;
-  try {
-    const res = await api("/landing/prompt", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || "Falha ao gerar prompt");
-    }
-    const text = String(data.cursorPrompt || data.prompt || "");
-    await navigator.clipboard.writeText(text);
-    setStatus(siteStatus, "Prompt Cursor copiado.");
-  } catch (error) {
-    setStatus(siteStatus, errorMessage(error, "Erro ao copiar prompt"), true);
-  } finally {
-    setSiteActionsEnabled(Boolean(currentLeadId));
-  }
+siteSkillBtn.addEventListener("click", () => {
+  if (!currentLeadId) return;
+  siteSkill.open(currentLeadId, currentEntityKind, currentLead);
 });
 
-setWizardOnConfirm(() => {
-  void startLandingGenerate();
+igSkillBtn.addEventListener("click", () => {
+  if (!currentLeadId || !currentLead?.instagramConnections?.length) return;
+  igSkill.open(currentLeadId, currentEntityKind, currentLead);
 });
-
-async function startLandingGenerate() {
-  const leadId = currentLeadId;
-  if (!leadId) return;
-
-  if (siteEventSource) {
-    siteEventSource.close();
-    siteEventSource = null;
-  }
-
-  setStatus(siteStatus, "Iniciando geração Gemini...");
-  siteProgressFill.style.width = "0%";
-  siteProgressLabel.textContent = "Iniciando pipeline…";
-  siteProgressLog.textContent = "";
-  appendSiteLog("Generate iniciado...");
-
-  try {
-    const res = await api("/landing/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leadId,
-        ...getGeneratePayload(),
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || "Falha ao iniciar geração");
-    }
-
-    const jobId = data.jobId as string;
-    setStatus(
-      siteStatus,
-      data.scaffoldCreated
-        ? `Scaffold criado · Job ${jobId} em andamento...`
-        : `Job ${jobId} em andamento...`,
-    );
-    appendSiteLog(`Job ${jobId} · slug ${data.slug || "?"}`);
-    if (Array.isArray(data.sections) && data.sections.length) {
-      appendSiteLog(`Seções: ${data.sections.join(" → ")}`);
-    }
-    subscribeJobEvents(jobId, leadId);
-  } catch (error) {
-    const msg = errorMessage(error, "Erro ao gerar landing");
-    setStatus(siteStatus, msg, true);
-    appendSiteLog(`ERRO generate: ${msg}`);
-    clearRememberedJob();
-  }
-}
 

@@ -2,10 +2,14 @@ import { api } from "./api";
 import { formatChatMarkdown } from "./chat-markdown";
 import {
   CAROUSEL_INSTAGRAM_ID,
+  MOVIES_ID,
+  UGC_SKILLS_ID,
   creativeSkillFeatures,
   findCreativeFeature,
   isPlaygroundFeature,
 } from "./creative/features";
+import { formatReelPrompt } from "./reel-script";
+import { saveRepurposeDraft } from "./repurpose-draft";
 import {
   creativeKindFromRoute,
   renderCreativeKinds,
@@ -387,6 +391,7 @@ const THINKING_LEVEL_LABELS: Record<string, string> = {
           : ""
       }
       ${headlines ? `<ol class="imagens-carousel-headlines">${headlines}</ol>` : ""}
+      ${renderPackRecap(run)}
       <div class="imagens-carousel" data-carousel>
         ${imagesHtml || `<p class="imagens-empty">Nenhum slide gerado ainda.</p>`}
         <div class="imagens-carousel-nav">
@@ -396,6 +401,31 @@ const THINKING_LEVEL_LABELS: Record<string, string> = {
         </div>
       </div>
     </article>`;
+  }
+
+  function renderPackRecap(run: ImageSkillRun | undefined): string {
+    const pack = run?.pack;
+    if (!pack?.reel && !pack?.staticProjectId) return "";
+    const reel = pack.reel || {};
+    const script = formatReelPrompt(reel);
+    return `<div class="imagens-pack-recap">
+      <p class="criativo-field-label">Pack 1→N</p>
+      ${
+        script
+          ? `<pre data-pack-script>${escapeHtml(script)}</pre>
+             <button type="button" data-copy-reel>Copiar roteiro</button>`
+          : ""
+      }
+      <div class="cal-idea-actions">
+        ${
+          pack.staticProjectId
+            ? `<a class="videos-text-btn" href="${hrefFor({ name: "imagens-project", id: pack.staticProjectId })}">Ver estático</a>`
+            : ""
+        }
+        <button type="button" data-open-ugc>Abrir no UGC</button>
+        <button type="button" data-open-movies>Abrir nos Filmes</button>
+      </div>
+    </div>`;
   }
 
   function bindCarousel() {
@@ -1110,6 +1140,42 @@ const THINKING_LEVEL_LABELS: Record<string, string> = {
     const cancelBtn = target?.closest("[data-proposal-cancel]") as HTMLElement | null;
     if (cancelBtn?.dataset.proposalCancel) {
       void cancelProposal(cancelBtn.dataset.proposalCancel);
+      return;
+    }
+    const copyReel = target?.closest("[data-copy-reel]") as HTMLElement | null;
+    if (copyReel) {
+      const script = threadEl.querySelector("[data-pack-script]")?.textContent || "";
+      if (script) {
+        void navigator.clipboard.writeText(script).then(
+          () => {
+            copyReel.textContent = "Copiado";
+            setTimeout(() => {
+              copyReel.textContent = "Copiar roteiro";
+            }, 1600);
+          },
+          () => setStatus("Não deu para copiar o roteiro", true),
+        );
+      }
+      return;
+    }
+    const openUgc = target?.closest("[data-open-ugc]") as HTMLElement | null;
+    const openMovies = target?.closest("[data-open-movies]") as HTMLElement | null;
+    if (openUgc || openMovies) {
+      const run = current?.settings?.skillRun as ImageSkillRun | undefined;
+      const reel = run?.pack?.reel || {};
+      saveRepurposeDraft({
+        prompt: formatReelPrompt(reel) || current?.name || "Reel",
+        hook: reel.hook,
+        story: reel.story,
+        cta: reel.cta,
+        overlayText: reel.overlayText,
+      });
+      if (openMovies) {
+        sessionStorage.setItem("namao-movies-reel", "1");
+        navigate({ name: "criativo-skill", id: MOVIES_ID });
+      } else {
+        navigate({ name: "criativo-skill", id: UGC_SKILLS_ID });
+      }
       return;
     }
     const copyBtn = target?.closest("[data-copy-caption]") as HTMLElement | null;

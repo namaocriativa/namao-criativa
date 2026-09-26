@@ -1,4 +1,4 @@
-import type { LeadBrief } from '../landing/pipeline.types';
+import type { LeadBrief } from '../owner/lead-brief';
 import { FLYER_VENDA_LANDING_ID } from './creative-features';
 
 export type FlyerPackageInput = {

@@ -3,6 +3,7 @@ import {
   CAROUSEL_INSTAGRAM_ID,
   FLYER_VENDA_LANDING_ID,
   PLAYGROUND_IMAGEM_ID,
+  STATIC_INSTAGRAM_ID,
 } from './creative-features';
 import { CAROUSEL_SYSTEM_INSTRUCTION } from './carousel-instagram.planner';
 import { FLYER_SYSTEM_INSTRUCTION } from './flyer-venda.planner';
@@ -274,6 +275,71 @@ describe('CreativeStudioService', () => {
         skillRun: expect.objectContaining({
           completedSlides: 1,
           error: 'Gemini timeout',
+        }),
+      }),
+    );
+  });
+
+  it('planeja o pack, gera carrossel e um estático 4:5', async () => {
+    llm.generateJson
+      .mockImplementationOnce(async (_prompt, validate) =>
+        validate({
+          reel: {
+            hook: 'Esqueceu a água?',
+            story: 'Mostre o copo na mesa',
+            cta: 'Comenta ÁGUA',
+          },
+          carousel: {
+            prompt: 'Dor de esquecer a água no treino',
+            notes: 'Salve ou comenta ÁGUA',
+          },
+          static: { headline: 'Beba agora', caption: 'Salve este post' },
+        }),
+      )
+      .mockImplementationOnce(async (_prompt, validate) =>
+        validate({
+          caption: 'Salve este carrossel',
+          slides: [
+            { role: 'cover', headline: 'Esqueceu a água?' },
+            { role: 'tip', headline: 'Deixe o copo na mesa' },
+            { role: 'tip', headline: 'Beba 500 ml' },
+            { role: 'proof', headline: 'Treino rende mais' },
+            { role: 'cta', headline: 'Comenta ÁGUA' },
+          ],
+        }),
+      );
+    imageStudio.create
+      .mockResolvedValueOnce({ id: 'carousel-pack' })
+      .mockResolvedValueOnce({ id: 'static-pack' });
+    imageStudio.update.mockResolvedValue({});
+    imageStudio.generate.mockResolvedValue({
+      assets: [{ id: 'asset-1', kind: 'generated' }],
+    });
+
+    const result = await service.generateRepurpose(
+      { prompt: 'Dor de esquecer a água no treino' },
+      {
+        id: 'user-1',
+        email: 'a@b.c',
+        name: 'Ana',
+        role: 'ADMIN',
+        leadId: null,
+        customerId: null,
+      },
+    );
+
+    expect(result.carousel.projectId).toBe('carousel-pack');
+    expect(result.staticProjectId).toBe('static-pack');
+    expect(result.reel.hook).toContain('água');
+    expect(imageStudio.create).toHaveBeenCalledWith(
+      expect.objectContaining({ featureId: STATIC_INSTAGRAM_ID, aspectRatio: '4:5' }),
+      'user-1',
+    );
+    expect(imageStudio.update).toHaveBeenCalledWith(
+      'carousel-pack',
+      expect.objectContaining({
+        skillRun: expect.objectContaining({
+          pack: expect.objectContaining({ staticProjectId: 'static-pack' }),
         }),
       }),
     );

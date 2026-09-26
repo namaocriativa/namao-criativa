@@ -30,7 +30,6 @@ jobs:
           filters: |
             studio:
               - 'apps/studio/**'
-              - 'packages/landing-kit/**'
               - 'cloud/stacks/studio-pages.ts'
               - 'cloud/scripts/studio.ts'
               - 'cloud/scripts/check-studio-pages-env.ts'
@@ -59,9 +58,6 @@ jobs:
             @rollup/rollup-linux-x64-gnu@4.62.4 \
             lightningcss-linux-x64-gnu@1.32.0 \
             @tailwindcss/oxide-linux-x64-gnu@4.3.3
-
-      - name: Build landing-kit
-        run: npm run build -w @namao/landing-kit
 
       - name: Build
         run: npm run build -w @namao/studio

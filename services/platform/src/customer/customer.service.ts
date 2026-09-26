@@ -35,7 +35,6 @@ export class CustomerService {
       where: { AND: [tenantWhere(), this.access.visibleWhere(actor)] },
       orderBy: { updatedAt: 'desc' },
       include: PROFILE_LIST_INCLUDE,
-      omit: { generateConfig: true },
     });
     return customers.map((customer) => this.access.present(actor, customer));
   }

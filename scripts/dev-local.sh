@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sobe Postgres, Redis, landing-kit, API, studio e website na máquina.
+# Sobe Postgres, Redis, API, studio e website na máquina.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -176,22 +176,18 @@ echo "dev-local: prisma migrate deploy"
 npx prisma migrate deploy --schema=services/platform/prisma/schema.prisma
 npx prisma generate --schema=services/platform/prisma/schema.prisma
 
-echo "dev-local: build inicial do landing-kit"
-npm run build -w @namao/landing-kit
-
 echo
 echo "dev-local: API      http://localhost:${PLATFORM_PORT}"
 echo "dev-local: Studio   http://localhost:5173"
 echo "dev-local: Website  http://localhost:5174"
-echo "dev-local: logs     [kit] [platform] [studio] [website] (Postgres/Redis em .local/log/)"
+echo "dev-local: logs     [platform] [studio] [website] (Postgres/Redis em .local/log/)"
 echo "dev-local: Evolution mock (EVOLUTION_MOCK=1). Ctrl+C encerra os processos deste script."
 echo
 
 npx concurrently \
   --kill-others-on-fail \
-  -n kit,platform,studio,website \
-  -c cyan,blue,green,magenta \
-  "npm run watch -w @namao/landing-kit" \
+  -n platform,studio,website \
+  -c blue,green,magenta \
   "npm run start:dev -w @namao/platform" \
   "npm run dev -w @namao/studio" \
   "npm run dev -w @namao/website" &

@@ -39,6 +39,19 @@ describe('movies.planner', () => {
     expect(prompt).toContain('dolly in lento');
   });
 
+  it('troca o ban de texto por overlay travado', () => {
+    const prompt = movieShotPrompt({
+      characters: [{ name: 'Luma', appearance: 'cabelo ruivo' }],
+      scene: 'sala',
+      action: 'olha para a câmera\nOverlay: Salve este Reel',
+      dialogue: 'Comenta EU QUERO',
+    });
+    expect(prompt).toContain('Salve este Reel');
+    expect(prompt).toContain('canto inferior');
+    expect(prompt).not.toContain('Sem texto na tela.');
+    expect(prompt).toContain('olha para a câmera');
+  });
+
   it('lista o elenco quando há mais de um personagem', () => {
     const prompt = movieShotPrompt({
       characters: [

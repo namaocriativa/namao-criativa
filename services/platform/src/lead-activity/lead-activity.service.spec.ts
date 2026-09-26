@@ -2,9 +2,20 @@ import { NotFoundException } from '@nestjs/common';
 import { LeadActivityService } from './lead-activity.service';
 
 describe('LeadActivityService', () => {
+  const empty = [] as never[];
   const prisma = {
-    lead: { findUnique: jest.fn() },
     leadActivity: { create: jest.fn(), findMany: jest.fn() },
+    instagramConnection: { findMany: jest.fn() },
+    siteSkillJob: { findMany: jest.fn() },
+    instagramSkillJob: { findMany: jest.fn() },
+    invite: { findMany: jest.fn() },
+    clientAccount: { findMany: jest.fn() },
+    studioLeadShare: { findMany: jest.fn() },
+    contentCalendarPost: { findMany: jest.fn() },
+    contentCalendarReminder: { findMany: jest.fn() },
+    leadImage: { findMany: jest.fn() },
+    leadSource: { findMany: jest.fn() },
+    chatSession: { findMany: jest.fn() },
   };
   const owners = {
     requireKind: jest.fn().mockResolvedValue('lead'),
@@ -15,6 +26,18 @@ describe('LeadActivityService', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     owners.requireKind.mockResolvedValue('lead');
+    prisma.leadActivity.findMany.mockResolvedValue(empty);
+    prisma.instagramConnection.findMany.mockResolvedValue(empty);
+    prisma.siteSkillJob.findMany.mockResolvedValue(empty);
+    prisma.instagramSkillJob.findMany.mockResolvedValue(empty);
+    prisma.invite.findMany.mockResolvedValue(empty);
+    prisma.clientAccount.findMany.mockResolvedValue(empty);
+    prisma.studioLeadShare.findMany.mockResolvedValue(empty);
+    prisma.contentCalendarPost.findMany.mockResolvedValue(empty);
+    prisma.contentCalendarReminder.findMany.mockResolvedValue(empty);
+    prisma.leadImage.findMany.mockResolvedValue(empty);
+    prisma.leadSource.findMany.mockResolvedValue(empty);
+    prisma.chatSession.findMany.mockResolvedValue(empty);
   });
 
   it('grava uma atividade', async () => {
@@ -47,12 +70,13 @@ describe('LeadActivityService', () => {
     );
   });
 
-  it('mistura atividades persistidas com eventos de sistema, do mais novo ao mais antigo', async () => {
+  it('monta timeline com atividades, Instagram, skills e criação', async () => {
     owners.findProfile.mockResolvedValue({
       id: 'lead-1',
+      kind: 'lead',
+      name: 'Firma',
       createdAt: new Date('2026-01-01T10:00:00.000Z'),
       updatedAt: new Date('2026-01-03T10:00:00.000Z'),
-      landingBuiltAt: new Date('2026-01-02T10:00:00.000Z'),
     });
     prisma.leadActivity.findMany.mockResolvedValue([
       {
@@ -61,21 +85,58 @@ describe('LeadActivityService', () => {
         summary: 'Enviado para +5511999999999',
         channel: 'whatsapp',
         kind: 'credentials',
+        payload: { to: '+5511999999999' },
         createdAt: new Date('2026-01-04T10:00:00.000Z'),
+      },
+    ]);
+    prisma.instagramConnection.findMany.mockResolvedValue([
+      {
+        id: 'ig-1',
+        username: 'firma',
+        igUserId: '1784',
+        scopes: 'instagram_business_basic',
+        tokenExpiresAt: null,
+        createdAt: new Date('2026-01-05T10:00:00.000Z'),
+      },
+    ]);
+    prisma.instagramSkillJob.findMany.mockResolvedValue([
+      {
+        id: 'job-1',
+        status: 'done',
+        stage: 'report',
+        days: 30,
+        model: 'gpt',
+        error: null,
+        createdByUserId: 'op-1',
+        createdAt: new Date('2026-01-06T09:00:00.000Z'),
+        updatedAt: new Date('2026-01-06T10:00:00.000Z'),
+      },
+    ]);
+    prisma.leadImage.findMany.mockResolvedValue([
+      {
+        id: 'img-1',
+        source: 'instagram',
+        filename: 'a.jpg',
+        createdAt: new Date('2026-01-05T11:00:00.000Z'),
       },
     ]);
 
     const result = await service.listHistory('lead-1');
-    expect(result.items.map((item) => item.id)).toEqual([
-      'act-1',
-      'system:updated',
-      'system:site-built',
-      'system:created',
+    expect(result.items.map((item) => item.kind)).toEqual([
+      'skill.instagram',
+      'image.instagram',
+      'instagram.connected',
+      'credentials',
+      'lead.created',
     ]);
     expect(result.items[0]).toMatchObject({
-      channel: 'whatsapp',
-      kind: 'credentials',
-      summary: 'Enviado para +5511999999999',
+      channel: 'skill',
+      source: 'instagram_skill_job',
+      payload: { jobId: 'job-1', status: 'done' },
+    });
+    expect(result.items.find((item) => item.kind === 'instagram.connected')).toMatchObject({
+      summary: '@firma',
+      payload: { igUserId: '1784' },
     });
   });
 });

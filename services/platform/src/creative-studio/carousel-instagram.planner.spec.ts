@@ -32,6 +32,28 @@ describe('carousel-instagram.planner', () => {
     expect(prompt).toContain('Exatamente 5 slides');
     expect(prompt).toContain(context.prompt);
     expect(prompt).toContain(context.notes);
+    expect(prompt).toContain('DOR virada em hook');
+    expect(prompt).toContain('save OU');
+  });
+
+  it('corta headline e body em palavras e força CTA de save na legenda', () => {
+    const spec = parseCarouselSpec(
+      {
+        caption: 'Beba água todo dia.',
+        slides: [
+          {
+            role: 'cover',
+            headline: 'Uma duas três quatro cinco seis sete oito nove dez onze',
+            body: 'Corpo um dois três quatro cinco seis sete oito nove dez onze doze treze',
+          },
+        ],
+      },
+      context,
+    );
+    expect(spec.slides[0].headline.split(/\s+/)).toHaveLength(10);
+    expect(spec.slides[0].body.split(/\s+/)).toHaveLength(12);
+    expect(spec.caption).toMatch(/salv/i);
+    expect(spec.slides[4].headline).toMatch(/salv|coment/i);
   });
 
   it('completa slides faltantes e trava o count pedido', () => {

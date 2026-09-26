@@ -11,6 +11,10 @@ export type AppRoute =
   | { name: "package"; id: string }
   | { name: "calendar" }
   | { name: "calendar-post"; id: string }
+  | { name: "lead-calendar"; id: string }
+  | { name: "lead-calendar-post"; id: string; postId: string }
+  | { name: "customer-calendar"; id: string }
+  | { name: "customer-calendar-post"; id: string; postId: string }
   | { name: "criativo"; kind: "image" | "video" }
   | { name: "criativo-skill"; id: string; characterId?: string; movieId?: string; clipId?: string }
   | { name: "criativo-gallery" }
@@ -32,6 +36,26 @@ let started = false;
 export function parsePath(pathname: string): AppRoute {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/" || path === "/leads") return { name: "leads" };
+  const leadCalendarPost = path.match(/^\/leads\/([^/]+)\/calendario\/([^/]+)$/);
+  if (leadCalendarPost?.[1] && leadCalendarPost[2]) {
+    try {
+      return {
+        name: "lead-calendar-post",
+        id: decodeURIComponent(leadCalendarPost[1]),
+        postId: decodeURIComponent(leadCalendarPost[2]),
+      };
+    } catch {
+      return { name: "not-found" };
+    }
+  }
+  const leadCalendar = path.match(/^\/leads\/([^/]+)\/calendario$/);
+  if (leadCalendar?.[1]) {
+    try {
+      return { name: "lead-calendar", id: decodeURIComponent(leadCalendar[1]) };
+    } catch {
+      return { name: "not-found" };
+    }
+  }
   const lead = path.match(/^\/leads\/([^/]+)$/);
   if (lead?.[1]) {
     try {
@@ -41,6 +65,31 @@ export function parsePath(pathname: string): AppRoute {
     }
   }
   if (path === "/customers") return { name: "customers" };
+  const customerCalendarPost = path.match(
+    /^\/customers\/([^/]+)\/calendario\/([^/]+)$/,
+  );
+  if (customerCalendarPost?.[1] && customerCalendarPost[2]) {
+    try {
+      return {
+        name: "customer-calendar-post",
+        id: decodeURIComponent(customerCalendarPost[1]),
+        postId: decodeURIComponent(customerCalendarPost[2]),
+      };
+    } catch {
+      return { name: "not-found" };
+    }
+  }
+  const customerCalendar = path.match(/^\/customers\/([^/]+)\/calendario$/);
+  if (customerCalendar?.[1]) {
+    try {
+      return {
+        name: "customer-calendar",
+        id: decodeURIComponent(customerCalendar[1]),
+      };
+    } catch {
+      return { name: "not-found" };
+    }
+  }
   const customer = path.match(/^\/customers\/([^/]+)$/);
   if (customer?.[1]) {
     try {
@@ -168,10 +217,18 @@ export function hrefFor(route: AppRoute): string {
       return "/leads";
     case "lead":
       return `/leads/${encodeURIComponent(route.id)}`;
+    case "lead-calendar":
+      return `/leads/${encodeURIComponent(route.id)}/calendario`;
+    case "lead-calendar-post":
+      return `/leads/${encodeURIComponent(route.id)}/calendario/${encodeURIComponent(route.postId)}`;
     case "customers":
       return "/customers";
     case "customer":
       return `/customers/${encodeURIComponent(route.id)}`;
+    case "customer-calendar":
+      return `/customers/${encodeURIComponent(route.id)}/calendario`;
+    case "customer-calendar-post":
+      return `/customers/${encodeURIComponent(route.id)}/calendario/${encodeURIComponent(route.postId)}`;
     case "discovery":
       return "/discovery";
     case "enrichment":
@@ -226,10 +283,16 @@ export function tabForRoute(route: AppRoute): string {
       return "leads";
     case "lead":
       return "detail";
+    case "lead-calendar":
+    case "lead-calendar-post":
+      return "calendar";
     case "customers":
       return "customers";
     case "customer":
       return "detail";
+    case "customer-calendar":
+    case "customer-calendar-post":
+      return "calendar";
     case "discovery":
       return "discovery";
     case "enrichment":
@@ -270,8 +333,16 @@ export function tabForRoute(route: AppRoute): string {
 
 export function navRouteFor(route: AppRoute): string | null {
   if (route.name === "not-found") return null;
-  if (route.name === "lead") return "leads";
-  if (route.name === "customer") return "customers";
+  if (route.name === "lead" || route.name === "lead-calendar" || route.name === "lead-calendar-post") {
+    return "leads";
+  }
+  if (
+    route.name === "customer" ||
+    route.name === "customer-calendar" ||
+    route.name === "customer-calendar-post"
+  ) {
+    return "customers";
+  }
   if (route.name === "package") return "packages";
   if (route.name === "calendar" || route.name === "calendar-post") {
     return "calendar";
@@ -297,10 +368,16 @@ export function titleForRoute(route: AppRoute, leadName?: string): string {
       return `Leads · ${APP_TITLE}`;
     case "lead":
       return `${leadName || "Lead"} · ${APP_TITLE}`;
+    case "lead-calendar":
+    case "lead-calendar-post":
+      return `${leadName || "Agenda"} · ${APP_TITLE}`;
     case "customers":
       return `Clientes · ${APP_TITLE}`;
     case "customer":
       return `${leadName || "Cliente"} · ${APP_TITLE}`;
+    case "customer-calendar":
+    case "customer-calendar-post":
+      return `${leadName || "Agenda"} · ${APP_TITLE}`;
     case "discovery":
       return `Descobrir · ${APP_TITLE}`;
     case "enrichment":
@@ -369,7 +446,19 @@ export function currentRoute(): AppRoute {
 function sameRoute(a: AppRoute, b: AppRoute): boolean {
   if (a.name !== b.name) return false;
   if (a.name === "lead" && b.name === "lead") return a.id === b.id;
+  if (a.name === "lead-calendar" && b.name === "lead-calendar") {
+    return a.id === b.id;
+  }
+  if (a.name === "lead-calendar-post" && b.name === "lead-calendar-post") {
+    return a.id === b.id && a.postId === b.postId;
+  }
   if (a.name === "customer" && b.name === "customer") return a.id === b.id;
+  if (a.name === "customer-calendar" && b.name === "customer-calendar") {
+    return a.id === b.id;
+  }
+  if (a.name === "customer-calendar-post" && b.name === "customer-calendar-post") {
+    return a.id === b.id && a.postId === b.postId;
+  }
   if (a.name === "package" && b.name === "package") return a.id === b.id;
   if (a.name === "calendar-post" && b.name === "calendar-post") {
     return a.id === b.id;

@@ -10,13 +10,15 @@ describe('ConvertToCustomerService', () => {
     clientAccount: { updateMany: jest.fn() },
     invite: { updateMany: jest.fn() },
     instagramConnection: { updateMany: jest.fn() },
-    landingJob: { updateMany: jest.fn() },
-    landingGeneration: { updateMany: jest.fn() },
     chatSession: { updateMany: jest.fn() },
     chatEvent: { updateMany: jest.fn() },
     leadActivity: { updateMany: jest.fn(), create: jest.fn() },
     studioLeadShare: { updateMany: jest.fn() },
     proposal: { updateMany: jest.fn() },
+    contentCalendarPost: { updateMany: jest.fn() },
+    contentCalendarReminder: { updateMany: jest.fn() },
+    siteSkillJob: { updateMany: jest.fn() },
+    instagramSkillJob: { updateMany: jest.fn() },
   };
 
   const prisma = {
@@ -72,11 +74,8 @@ describe('ConvertToCustomerService', () => {
       rating: 4,
       reviewCount: 2,
       metadata: { k: 1 },
-      generateConfig: { sections: [] },
       landingSlug: 'firma',
       landingStatus: 'built',
-      landingBuiltAt: new Date('2026-01-02'),
-      activeLandingJobId: null,
       publicSiteId: 'site-1',
       chatEnabled: true,
       publishedOrigin: 'https://firma.vercel.app',
@@ -120,6 +119,22 @@ describe('ConvertToCustomerService', () => {
         data: { customerId: 'lead-1', leadId: null },
       });
     expect(tx.proposal.updateMany).toHaveBeenCalledWith({
+      where: { leadId: 'lead-1' },
+      data: { customerId: 'lead-1', leadId: null },
+    });
+    expect(tx.contentCalendarPost.updateMany).toHaveBeenCalledWith({
+      where: { leadId: 'lead-1' },
+      data: { customerId: 'lead-1', leadId: null },
+    });
+    expect(tx.contentCalendarReminder.updateMany).toHaveBeenCalledWith({
+      where: { leadId: 'lead-1' },
+      data: { customerId: 'lead-1', leadId: null },
+    });
+    expect(tx.siteSkillJob.updateMany).toHaveBeenCalledWith({
+      where: { leadId: 'lead-1' },
+      data: { customerId: 'lead-1', leadId: null },
+    });
+    expect(tx.instagramSkillJob.updateMany).toHaveBeenCalledWith({
       where: { leadId: 'lead-1' },
       data: { customerId: 'lead-1', leadId: null },
     });

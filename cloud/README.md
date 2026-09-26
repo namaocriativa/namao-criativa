@@ -76,11 +76,11 @@ O Coolify **não** faz build do monorepo — ele puxa a imagem `ghcr.io/namaocri
 
 Em push/merge em `main`, [`.github/workflows/cd-runtime.yml`](../.github/workflows/cd-runtime.yml):
 
-1. Detecta se a API mudou (`services/platform/**`, `packages/landing-kit/**`, `Dockerfile`, lockfile)
+1. Detecta se a API mudou (`services/platform/**`, `Dockerfile`, lockfile)
 2. Se sim: build (`Dockerfile` target `production`) e push `:latest` + `:sha-<commit>`
 3. Dispara `GET /api/v1/deploy?uuid=...&force=true` no Coolify
 
-`workflow_dispatch` força build + deploy mesmo sem mudanças nesses paths. Mudanças em `apps/`, `cloud/` ou `leads/` **não** disparam a API.
+`workflow_dispatch` força build + deploy mesmo sem mudanças nesses paths. Mudanças em `apps/`, `cloud/` ou `websites/` **não** disparam a API.
 
 A Action **não** roda `cloud:apply` / `cloud:deploy` (isso redeployaria Evolution e depende de `state.json` gitignored). O app `namao-api` precisa existir antes (`npm run cloud:apply`).
 
@@ -199,8 +199,8 @@ Isso cria (ou atualiza) o projeto `namao-studio`, grava o `*.pages.dev` em `stat
 
 Em push/merge em `main`, [`.github/workflows/cd-studio.yml`](../.github/workflows/cd-studio.yml):
 
-1. Detecta mudanças em `apps/studio/**` e `packages/landing-kit/**`
-2. `npm run build -w @namao/landing-kit` + `npm run build -w @namao/studio`
+1. Detecta mudanças em `apps/studio/**`
+2. `npm run build -w @namao/studio`
 3. Confere se o projeto Pages já tem `JWT_SECRET` e `STUDIO_API_ORIGIN` (`npm run studio:check-env -w @namao/cloud`)
 4. `wrangler pages deploy` (inclui `functions/_middleware.ts`)
 
@@ -229,7 +229,6 @@ Incluído em `npm run cloud:pages` / `cloud:studio` (`STUDIO_DOMAIN=studio.namao
 ### Deploy local (opcional)
 
 ```bash
-npm run build -w @namao/landing-kit
 npm run build -w @namao/studio
 npx wrangler pages deploy apps/studio/dist --project-name=namao-studio
 ```

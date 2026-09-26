@@ -9,6 +9,7 @@ import { StudioAuth } from '../auth/studio-auth.decorator';
 import { CreativeStudioService } from './creative-studio.service';
 import { GenerateCarouselDto } from './dto/generate-carousel.dto';
 import { GenerateFlyerDto } from './dto/generate-flyer.dto';
+import { GenerateRepurposeDto } from './dto/generate-repurpose.dto';
 
 @StudioAuth()
 @Controller('creative')
@@ -36,5 +37,14 @@ export class CreativeStudioController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.creativeStudio.generateCarousel(dto, user);
+  }
+
+  @Post('features/repurpose/generate')
+  @StudioPermission(STUDIO_PERMISSION.IMAGES)
+  generateRepurpose(
+    @Body() dto: GenerateRepurposeDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.creativeStudio.generateRepurpose(dto, user);
   }
 }

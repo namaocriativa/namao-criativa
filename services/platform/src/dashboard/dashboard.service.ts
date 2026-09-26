@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
+import { PrismaService } from '../prisma/prisma.service';
 import type { JwtUser } from '../auth/jwt.strategy';
-import { jwtOwnerId } from '../owner/owner.util';
+import { jwtOwnerId, ownerWhere } from '../owner/owner.util';
 import { OwnerLookup } from '../owner/owner-lookup.service';
 import type { AnalyticsRange } from './dto/analytics-query.dto';
 import { Ga4Client } from './ga4.client';
@@ -50,7 +51,46 @@ export class DashboardService {
     private readonly owners: OwnerLookup,
     private readonly redis: RedisService,
     private readonly ga4: Ga4Client,
+    private readonly prisma: PrismaService,
   ) {}
+
+  async calendar(user: JwtUser, from?: string, to?: string) {
+    const ownerId = jwtOwnerId(user);
+    if (!ownerId) {
+      return { posts: [], reminders: [] };
+    }
+    const range = scheduledRange(from, to);
+    const where = { ...ownerWhere(ownerId), ...range };
+    const [posts, reminders] = await Promise.all([
+      this.prisma.contentCalendarPost.findMany({
+        where,
+        orderBy: { scheduledAt: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          caption: true,
+          scheduledAt: true,
+          status: true,
+          targets: {
+            select: { platform: true, status: true },
+            orderBy: { platform: 'asc' },
+          },
+        },
+      }),
+      this.prisma.contentCalendarReminder.findMany({
+        where,
+        orderBy: { scheduledAt: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          notes: true,
+          scheduledAt: true,
+          status: true,
+        },
+      }),
+    ]);
+    return { posts, reminders };
+  }
 
   async analytics(
     user: JwtUser,
@@ -172,4 +212,23 @@ export class DashboardService {
       });
     }
   }
+}
+
+function scheduledRange(
+  from?: string,
+  to?: string,
+): { scheduledAt?: { gte?: Date; lte?: Date } } {
+  if (!from && !to) return {};
+  const scheduledAt: { gte?: Date; lte?: Date } = {};
+  if (from) scheduledAt.gte = parseIso(from, 'from');
+  if (to) scheduledAt.lte = parseIso(to, 'to');
+  return { scheduledAt };
+}
+
+function parseIso(value: string, field: string): Date {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestException(`Data inválida em ${field}`);
+  }
+  return date;
 }

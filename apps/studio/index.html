@@ -426,14 +426,22 @@
       <section id="tab-calendar" class="tab-panel">
         <div class="cal-header">
           <div>
-            <h2>Calendário</h2>
-            <p class="prompt-hint">
+            <p class="cal-back" id="cal-back" hidden>
+              <a id="cal-back-link" href="/leads">← Voltar ao perfil</a>
+            </p>
+            <h2 id="cal-title">Calendário</h2>
+            <p class="prompt-hint" id="cal-hint">
               Planeje posts para Instagram, YouTube e TikTok. O Instagram
               publica sozinho se o cliente autorizou o Graph; as outras redes
               abrem o app na hora.
             </p>
           </div>
-          <button type="button" id="cal-new-btn">Novo post</button>
+          <div class="cal-header-actions">
+            <button type="button" class="secondary" id="cal-new-reminder-btn" hidden>
+              Novo lembrete
+            </button>
+            <button type="button" id="cal-new-btn">Novo post</button>
+          </div>
         </div>
         <div class="status" id="cal-status"></div>
         <p class="cal-automation" id="cal-automation"></p>
@@ -1254,58 +1262,33 @@
             <button type="button" id="site-add-btn" disabled>
               Configurar site
             </button>
-            <button type="button" class="secondary" id="site-deploy-btn" hidden disabled>
-              Publicar agora
+            <button type="button" class="secondary" id="site-agenda-btn">
+              Agenda
             </button>
-            <button type="button" class="secondary" id="site-prompt-btn" disabled>
-              Copiar prompt Cursor
+            <button type="button" class="secondary" id="site-skill-btn" disabled>
+              Skill site lead
+            </button>
+            <button type="button" class="secondary" id="ig-skill-btn" disabled title="Conecte o Instagram do lead">
+              Skill Instagram
             </button>
           </div>
           <div class="status" id="site-status"></div>
         </div>
 
-        <div id="lead-site-panel" class="lead-site-panel" hidden>
-          <section class="app-card site-progress-card is-collapsed" id="site-progress-card">
-            <button
-              type="button"
-              class="site-progress-summary"
-              id="site-progress-toggle"
-              aria-expanded="false"
-              aria-controls="site-progress-body"
-            >
-              Progresso
-            </button>
-            <div class="site-progress-meta">
-              <div
-                class="site-progress-bar"
-                role="progressbar"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow="0"
-                id="site-progress-bar"
-              >
-                <span id="site-progress-fill"></span>
-              </div>
-              <p class="site-progress-label" id="site-progress-label">
-                Aguardando geração
-              </p>
-            </div>
-            <div class="site-progress-body" id="site-progress-body">
-              <div class="site-progress-head-actions">
-                <button type="button" class="secondary" id="site-download-log-btn">
-                  Download log
-                </button>
-              </div>
-              <pre
-                id="site-progress-log"
-                class="site-progress-log"
-                aria-live="polite"
-              ></pre>
-            </div>
-          </section>
-        </div>
+        <section class="app-card lead-quick-actions" id="lead-quick-actions" hidden>
+          <h3>Ações rápidas</h3>
+          <div class="context-actions" id="lead-context-actions"></div>
+        </section>
 
-        <div id="lead-data-extra"></div>
+        <section class="app-card lead-history" id="lead-history" hidden>
+          <div class="lead-history__head">
+            <h3>Histórico</h3>
+            <span data-lead-history-count></span>
+          </div>
+          <ol class="lead-history__list" id="lead-context-history"></ol>
+        </section>
+
+        <div id="lead-site-panel" class="lead-site-panel" hidden></div>
       </section>
 
       <section id="tab-not-found" class="tab-panel">
@@ -1321,7 +1304,7 @@
       <details class="app-context-fold" id="lead-context-fold">
         <summary class="app-context-fold__summary">Contexto do lead</summary>
         <div class="app-context-body">
-          <section class="app-card">
+          <section class="app-card lead-context-summary-card">
             <div class="context-card-head">
               <h3>Resumo do lead</h3>
               <button type="button" class="outline" id="lead-context-edit-btn" hidden>
@@ -1329,26 +1312,24 @@
               </button>
             </div>
             <dl class="context-dl" id="lead-context-summary"></dl>
-          </section>
-          <section class="app-card">
-            <h3>Ações rápidas</h3>
-            <div class="context-actions" id="lead-context-actions"></div>
-          </section>
-          <section class="app-card">
-            <h3>Histórico</h3>
-            <ol class="context-history" id="lead-context-history"></ol>
+            <button type="button" class="lead-context-full-btn" id="lead-context-full-btn" hidden>
+              ver completo
+            </button>
           </section>
         </div>
       </details>
     </aside>
     </div>
 
-    <div id="site-wizard-root"></div>
+    <div id="site-skill-root"></div>
+    <div id="ig-skill-root"></div>
+    <div id="ig-skill-report-root"></div>
     <div id="lead-gallery-root"></div>
     <div id="lead-account-root"></div>
     <div id="lead-share-root"></div>
     <div id="lead-website-root"></div>
     <div id="lead-edit-root"></div>
+    <div id="lead-ficha-root"></div>
     <div id="lead-emails-root"></div>
     <div id="lead-whatsapp-root"></div>
     <script type="module" src="/src/main.ts"></script>

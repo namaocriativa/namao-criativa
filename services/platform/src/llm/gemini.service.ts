@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { buildJsonRepairPrompt } from '../landing/pipeline-prompts';
+import { buildJsonRepairPrompt } from './json-repair-prompt';
 import type { GenerateOptions } from './generate-options';
 import {
   extractGeminiText,

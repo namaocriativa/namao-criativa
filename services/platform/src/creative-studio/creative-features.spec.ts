@@ -2,6 +2,7 @@ import {
   CAROUSEL_INSTAGRAM_ID,
   CREATIVE_FEATURES,
   FLYER_VENDA_LANDING_ID,
+  STATIC_INSTAGRAM_ID,
   INICIO_FIM_ID,
   MOVIES_ID,
   PERSONAGENS_ID,
@@ -31,10 +32,12 @@ describe('creative-features', () => {
       '9:16',
     );
     expect(findCreativeFeature(UGC_SKILLS_ID)?.defaults?.duration).toBe('8s');
+    expect(findCreativeFeature(STATIC_INSTAGRAM_ID)?.status).toBe('soon');
     expect(creativeFeaturesByKind('image').map((item) => item.id)).toEqual([
       'playground-imagem',
       FLYER_VENDA_LANDING_ID,
       CAROUSEL_INSTAGRAM_ID,
+      STATIC_INSTAGRAM_ID,
       PERSONAGENS_ID,
     ]);
     expect(creativeFeaturesByKind('video').map((item) => item.id)).toEqual([

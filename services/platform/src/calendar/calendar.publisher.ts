@@ -7,7 +7,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { CalendarService } from './calendar.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { InstagramGraphClient } from '../instagram/instagram-graph.client';
+import {
+  INSTAGRAM_PUBLISH_SCOPE,
+  InstagramGraphClient,
+} from '../instagram/instagram-graph.client';
 import {
   CALENDAR_TARGET_STATUS,
 } from './calendar.platforms';
@@ -229,7 +232,7 @@ export class CalendarPublisher implements OnModuleInit, OnModuleDestroy {
     return String(scopes || '')
       .split(',')
       .map((item) => item.trim())
-      .includes('instagram_content_publish');
+      .includes(INSTAGRAM_PUBLISH_SCOPE);
   }
 
   private publicOrigin(): string {

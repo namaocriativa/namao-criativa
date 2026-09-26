@@ -34,7 +34,6 @@ jobs:
           filters: |
             api:
               - 'services/platform/**'
-              - 'packages/landing-kit/**'
               - 'Dockerfile'
               - 'package.json'
               - 'package-lock.json'

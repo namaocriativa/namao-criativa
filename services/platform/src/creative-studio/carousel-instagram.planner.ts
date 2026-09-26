@@ -1,4 +1,11 @@
 import { CAROUSEL_INSTAGRAM_ID } from './creative-features';
+import {
+  BODY_MAX_WORDS,
+  CTA_MAX_WORDS,
+  HEADLINE_MAX_WORDS,
+  clampWords,
+  withSaveOrCommentCta,
+} from './copy-limits';
 
 export const MIN_CAROUSEL_SLIDES = 3;
 export const MAX_CAROUSEL_SLIDES = 7;
@@ -85,20 +92,20 @@ function fallbackSlide(
   prompt: string,
 ): CarouselSlideSpec {
   const role = roleForIndex(index, total);
-  const topic = prompt.slice(0, 80) || 'o tema do carrossel';
+  const topic = clampWords(prompt, HEADLINE_MAX_WORDS, 'Essa dor some hoje');
   const headlines: Record<CarouselSlideRole, string> = {
     cover: topic,
-    tip: `O que muda na prática`,
-    proof: `Por que isso funciona`,
-    offer: `O próximo passo`,
-    cta: `Salve e siga`,
+    tip: 'Faça isto em 2 minutos',
+    proof: 'Por que isso funciona',
+    offer: 'O que você ganha agora',
+    cta: 'Salve este carrossel',
   };
   const bodies: Record<CarouselSlideRole, string> = {
-    cover: `Slide ${index + 1} de ${total}`,
-    tip: 'Uma ideia clara, em uma frase.',
+    cover: 'Nomeie a dor. Sem enrolação.',
+    tip: 'Uma dica curta, fácil de aplicar.',
     proof: 'Mostre o resultado sem inventar números.',
-    offer: 'Diga o que a pessoa ganha se continuar.',
-    cta: 'Convide a salvar, comentar ou chamar no Direct.',
+    offer: 'Diga o ganho se a pessoa continuar.',
+    cta: 'Comenta EU QUERO se quiser o passo a passo.',
   };
   return {
     index: index + 1,
@@ -121,11 +128,21 @@ export function parseCarouselSpec(
     const item = asRecord(fromModel[i]);
     const fallback = fallbackSlide(i, slideCount, context.prompt);
     const role = parseRole(item?.role, fallback.role);
+    const headlineMax =
+      role === 'cta' ? CTA_MAX_WORDS : HEADLINE_MAX_WORDS;
     slides.push({
       index: i + 1,
       role,
-      headline: text(item?.headline, fallback.headline).slice(0, 120),
-      body: text(item?.body, fallback.body).slice(0, 280),
+      headline: clampWords(
+        text(item?.headline, fallback.headline),
+        headlineMax,
+        fallback.headline,
+      ),
+      body: clampWords(
+        text(item?.body, fallback.body),
+        BODY_MAX_WORDS,
+        fallback.body,
+      ),
       visual: text(item?.visual, fallback.visual).slice(0, 400),
     });
   }
@@ -133,9 +150,11 @@ export function parseCarouselSpec(
     throw new Error('O planner do carrossel precisa de ao menos 3 slides');
   }
   return {
-    caption: text(
-      raw.caption,
-      `${context.prompt.slice(0, 140)}\n\nSalve para não perder.`.trim(),
+    caption: withSaveOrCommentCta(
+      text(
+        raw.caption,
+        `${clampWords(context.prompt, 18)}\n\nSalve este carrossel.`,
+      ),
     ).slice(0, 2200),
     artDirection: text(
       raw.artDirection,
@@ -170,11 +189,13 @@ Responda APENAS um JSON com este shape:
 
 Regras:
 - Exatamente ${slideCount} slides, na ordem de leitura.
-- Slide 1 é cover. O último é cta. Os do meio alternam tip, proof e offer.
-- Headline cabe em 2 linhas no celular. Sem parágrafo longo na arte.
+- Slide 1 é cover: uma DOR virada em hook (não o tema). Headline até ${HEADLINE_MAX_WORDS} palavras.
+- Slides do meio alternam tip, proof e offer: dicas aplicáveis, sem clichê, fáceis de salvar. Headline até ${HEADLINE_MAX_WORDS} palavras, body até ${BODY_MAX_WORDS}.
+- O último é cta: save OU "comenta X" com palavra-chave. Headline até ${CTA_MAX_WORDS} palavras.
+- Sem parágrafo longo na arte. Uma ideia por slide.
 - Não invente depoimentos, preços, WhatsApp, @ ou números que o briefing não trouxe.
 - Textos visíveis em português do Brasil.
-- Caption é a legenda do post (não vai na arte), até 2.200 caracteres.
+- Caption é a legenda do post (não vai na arte), até 2.200 caracteres, e PRECISA ter CTA de save ou comentário.
 - Feature id: ${CAROUSEL_INSTAGRAM_ID}
 
 BRIEFING

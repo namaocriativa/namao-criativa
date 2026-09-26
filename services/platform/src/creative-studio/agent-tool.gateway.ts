@@ -4,8 +4,8 @@ import {
 } from '@nestjs/common';
 import type { JwtUser } from '../auth/identity';
 import { estimatePromptTokens } from '../llm/gemini-usage';
-import { buildLeadBrief } from '../landing/lead-brief';
-import type { LeadLike } from '../landing/prompt.builder';
+import { buildLeadBrief } from '../owner/lead-brief';
+import type { LeadLike } from '../owner/lead-like';
 import { ImageStudioService } from '../image-studio/image-studio.service';
 import { LeadService } from '../lead/lead.service';
 import { PackagesService } from '../packages/packages.service';

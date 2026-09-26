@@ -10,5 +10,6 @@ import { WebsiteProjectsService } from './website-projects.service';
   imports: [LeadModule, CustomerModule],
   controllers: [WebsiteProjectsController],
   providers: [WebsiteProjectsService, GithubWebsitesClient, CloudflarePagesClient],
+  exports: [WebsiteProjectsService, GithubWebsitesClient],
 })
 export class WebsiteProjectsModule {}

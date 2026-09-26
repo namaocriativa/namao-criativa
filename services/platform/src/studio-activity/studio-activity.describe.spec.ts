@@ -200,6 +200,16 @@ describe('describeStudioAction', () => {
         summary: 'Perfil abc',
       },
     );
+    expect(describeStudioAction('POST', '/site-skill/generate')).toEqual({
+      kind: 'site-skill.generate',
+      title: 'Gerou site do lead',
+      summary: 'Skill site lead',
+    });
+    expect(describeStudioAction('POST', '/ig-skill/analyze')).toEqual({
+      kind: 'ig-skill.analyze',
+      title: 'Analisou Instagram do lead',
+      summary: 'Skill Instagram',
+    });
   });
 
   it('traduz o calendário de conteúdo', () => {

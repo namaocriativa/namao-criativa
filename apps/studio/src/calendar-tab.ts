@@ -3,13 +3,17 @@ import { canAccessImages, canAccessVideos } from "./session";
 import type {
   CalendarAsset,
   CalendarAutomation,
+  CalendarIdeasSpec,
+  CalendarItems,
   CalendarPlatform,
   CalendarPost,
+  CalendarReminder,
   ImageLibraryProject,
   Lead,
   VideoLibraryProject,
 } from "./types";
 import { hrefFor, navigate, titleForRoute, type AppRoute } from "./router";
+import { saveRepurposeDraft } from "./repurpose-draft";
 
 const PLATFORMS: { id: CalendarPlatform; label: string }[] = [
   { id: "instagram", label: "Instagram" },
@@ -97,6 +101,43 @@ function postDayKey(post: CalendarPost): string {
   return dayKey(new Date(post.scheduledAt));
 }
 
+function reminderDayKey(reminder: CalendarReminder): string {
+  return dayKey(new Date(reminder.scheduledAt));
+}
+
+function reminderStatusLabel(status: string): string {
+  return status === "done" ? "Feito" : "Aberto";
+}
+
+type ProfileLock = { kind: "lead" | "customer"; id: string };
+
+function profileLockOf(route: AppRoute): ProfileLock | null {
+  if (
+    route.name === "lead-calendar" ||
+    route.name === "lead-calendar-post"
+  ) {
+    return { kind: "lead", id: route.id };
+  }
+  if (
+    route.name === "customer-calendar" ||
+    route.name === "customer-calendar-post"
+  ) {
+    return { kind: "customer", id: route.id };
+  }
+  return null;
+}
+
+function isCalendarRoute(route: AppRoute): boolean {
+  return (
+    route.name === "calendar" ||
+    route.name === "calendar-post" ||
+    route.name === "lead-calendar" ||
+    route.name === "lead-calendar-post" ||
+    route.name === "customer-calendar" ||
+    route.name === "customer-calendar-post"
+  );
+}
+
 function statusLabel(status: string): string {
   switch (status) {
     case "draft":
@@ -144,15 +185,73 @@ export function initCalendarTab() {
   const monthLabel = requireEl<HTMLElement>("cal-month-label");
   const automation = requireEl<HTMLElement>("cal-automation");
   const newBtn = requireEl<HTMLButtonElement>("cal-new-btn");
+  const reminderBtn = requireEl<HTMLButtonElement>("cal-new-reminder-btn");
   const prevBtn = requireEl<HTMLButtonElement>("cal-prev-btn");
   const nextBtn = requireEl<HTMLButtonElement>("cal-next-btn");
+  const titleEl = requireEl<HTMLElement>("cal-title");
+  const hintEl = requireEl<HTMLElement>("cal-hint");
+  const backEl = requireEl<HTMLElement>("cal-back");
+  const backLink = requireEl<HTMLAnchorElement>("cal-back-link");
 
   let month = startOfMonth(new Date());
   let posts: CalendarPost[] = [];
+  let reminders: CalendarReminder[] = [];
   let selectedDay = dayKey(new Date());
   let editingId: string | null = null;
+  let editingReminderId: string | null = null;
   let creating = false;
+  let creatingKind: "post" | "reminder" = "post";
+  let profileLock: ProfileLock | null = null;
   let caps: CalendarAutomation | null = null;
+  let ideasPack: CalendarIdeasSpec | null = null;
+  let ideasNotes = "";
+  let ideasBusy = false;
+
+  function homeRoute(): AppRoute {
+    if (profileLock?.kind === "lead") {
+      return { name: "lead-calendar", id: profileLock.id };
+    }
+    if (profileLock?.kind === "customer") {
+      return { name: "customer-calendar", id: profileLock.id };
+    }
+    return { name: "calendar" };
+  }
+
+  function postRoute(postId: string): AppRoute {
+    if (profileLock?.kind === "lead") {
+      return { name: "lead-calendar-post", id: profileLock.id, postId };
+    }
+    if (profileLock?.kind === "customer") {
+      return { name: "customer-calendar-post", id: profileLock.id, postId };
+    }
+    return { name: "calendar-post", id: postId };
+  }
+
+  function ownerQuery(): string {
+    if (!profileLock) return "";
+    const key = profileLock.kind === "lead" ? "leadId" : "customerId";
+    return `&${key}=${encodeURIComponent(profileLock.id)}`;
+  }
+
+  function applyChrome() {
+    reminderBtn.hidden = !profileLock;
+    newBtn.textContent = profileLock ? "Novo post Instagram" : "Novo post";
+    if (profileLock) {
+      titleEl.textContent = "Agenda";
+      hintEl.textContent =
+        "Posts do Instagram e lembretes só deste perfil. A aba Calendário continua com a visão da agência.";
+      backEl.hidden = false;
+      backLink.href = hrefFor({
+        name: profileLock.kind === "customer" ? "customer" : "lead",
+        id: profileLock.id,
+      });
+    } else {
+      titleEl.textContent = "Calendário";
+      hintEl.textContent =
+        "Planeje posts para Instagram, YouTube e TikTok. O Instagram publica sozinho se o cliente autorizou o Graph; as outras redes abrem o app na hora.";
+      backEl.hidden = true;
+    }
+  }
 
   function setStatus(message: string, isError = false) {
     status.textContent = message;
@@ -163,10 +262,12 @@ export function initCalendarTab() {
     const from = new Date(month.getFullYear(), month.getMonth(), 1);
     const to = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59);
     const res = await api(
-      `/calendar/posts?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
+      `/calendar/items?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}${ownerQuery()}`,
     );
     if (!res.ok) throw new Error(await readError(res, "Não carregou o calendário"));
-    posts = (await res.json()) as CalendarPost[];
+    const data = (await res.json()) as CalendarItems;
+    posts = data.posts || [];
+    reminders = data.reminders || [];
   }
 
   async function loadCaps() {
@@ -192,23 +293,28 @@ export function initCalendarTab() {
       const date = new Date(month.getFullYear(), month.getMonth(), day);
       const key = dayKey(date);
       const dayPosts = posts.filter((post) => postDayKey(post) === key);
-      const chips = dayPosts
-        .slice(0, 3)
-        .map((post) => {
+      const dayReminders = reminders.filter((item) => reminderDayKey(item) === key);
+      const chips = [
+        ...dayPosts.map((post) => {
           const platforms = (post.targets || [])
             .map((target) => `<i class="cal-dot cal-dot--${escapeHtml(target.platform)}"></i>`)
             .join("");
           return `<span class="cal-chip cal-chip--${escapeHtml(post.status)}">${platforms}${escapeHtml(post.title)}</span>`;
-        })
-        .join("");
+        }),
+        ...dayReminders.map(
+          (item) =>
+            `<span class="cal-chip cal-chip--reminder cal-chip--${escapeHtml(item.status)}">${escapeHtml(item.title)}</span>`,
+        ),
+      ];
       const extra =
-        dayPosts.length > 3
-          ? `<span class="cal-more">+${dayPosts.length - 3}</span>`
+        chips.length > 3
+          ? `<span class="cal-more">+${chips.length - 3}</span>`
           : "";
+      const shown = chips.slice(0, 3).join("");
       cells.push(`
         <button type="button" class="cal-cell${key === selectedDay ? " is-selected" : ""}" data-day="${key}">
           <span class="cal-daynum">${day}</span>
-          <span class="cal-chips">${chips}${extra}</span>
+          <span class="cal-chips">${shown}${extra}</span>
         </button>
       `);
     }
@@ -216,12 +322,22 @@ export function initCalendarTab() {
   }
 
   function renderSide() {
-    if (creating || editingId) {
+    if (creating || editingId || editingReminderId) {
+      if (creatingKind === "reminder" || editingReminderId) {
+        void renderReminderEditor();
+        return;
+      }
       void renderEditor();
       return;
     }
     const dayPosts = posts
       .filter((post) => postDayKey(post) === selectedDay)
+      .sort(
+        (a, b) =>
+          new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
+      );
+    const dayReminders = reminders
+      .filter((item) => reminderDayKey(item) === selectedDay)
       .sort(
         (a, b) =>
           new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
@@ -237,12 +353,17 @@ export function initCalendarTab() {
     side.innerHTML = `
       <div class="cal-side-head">
         <h3>${escapeHtml(heading)}</h3>
-        <button type="button" data-cal-new-day>Novo neste dia</button>
+        <button type="button" data-cal-new-day>Novo post neste dia</button>
+        ${
+          profileLock
+            ? `<button type="button" class="secondary" data-cal-new-reminder-day>Novo lembrete</button>`
+            : ""
+        }
       </div>
       ${
-        dayPosts.length
-          ? `<ul class="cal-day-list">${dayPosts
-              .map((post) => {
+        dayPosts.length || dayReminders.length
+          ? `<ul class="cal-day-list">${[
+              ...dayPosts.map((post) => {
                 const time = new Date(post.scheduledAt).toLocaleTimeString("pt-BR", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -254,20 +375,33 @@ export function initCalendarTab() {
                   )
                   .join("");
                 return `<li>
-                  <a href="${hrefFor({ name: "calendar-post", id: post.id })}" data-open-post="${post.id}">
+                  <a href="${hrefFor(postRoute(post.id))}" data-open-post="${post.id}">
                     <strong>${escapeHtml(post.title)}</strong>
                     <span>${escapeHtml(time)} · ${escapeHtml(statusLabel(post.status))}</span>
                     <span class="cal-plats">${platforms}</span>
                   </a>
                 </li>`;
-              })
-              .join("")}</ul>`
-          : `<p class="prompt-hint">Nenhum post neste dia.</p>`
+              }),
+              ...dayReminders.map((item) => {
+                const time = new Date(item.scheduledAt).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+                return `<li>
+                  <button type="button" data-open-reminder="${item.id}">
+                    <strong>${escapeHtml(item.title)}</strong>
+                    <span>${escapeHtml(time)} · Lembrete · ${escapeHtml(reminderStatusLabel(item.status))}</span>
+                  </button>
+                </li>`;
+              }),
+            ].join("")}</ul>`
+          : `<p class="prompt-hint">${profileLock ? "Nada neste dia." : "Nenhum post neste dia."}</p>`
       }
     `;
   }
 
   async function renderEditor() {
+    rememberIdeasNotes();
     const post = editingId ? posts.find((item) => item.id === editingId) || (await fetchPost(editingId)) : null;
     const imageLib = canAccessImages() ? await fetchImageLibrary() : [];
     const videoLib = canAccessVideos() ? await fetchVideoLibrary() : [];
@@ -277,16 +411,22 @@ export function initCalendarTab() {
       (post?.targets || []).map((target) => target.platform),
     );
     if (!selectedPlatforms.size) selectedPlatforms.add("instagram");
+    const lockedOwner = profileLock
+      ? `${profileLock.kind}:${profileLock.id}`
+      : "";
     const ownerValue = post?.leadId
       ? `lead:${post.leadId}`
       : post?.customerId
         ? `customer:${post.customerId}`
-        : "";
+        : lockedOwner;
+    const platforms = profileLock
+      ? PLATFORMS.filter((platform) => platform.id === "instagram")
+      : PLATFORMS;
     side.innerHTML = `
       <form class="cal-editor" id="cal-editor">
         <div class="cal-side-head">
-          <h3>${post ? "Editar post" : "Novo post"}</h3>
-          <a href="/calendario" data-cal-cancel>Fechar</a>
+          <h3>${post ? "Editar post" : profileLock ? "Novo post Instagram" : "Novo post"}</h3>
+          <a href="${hrefFor(homeRoute())}" data-cal-cancel>Fechar</a>
         </div>
         <label>Título
           <input name="title" required maxlength="200" value="${escapeHtml(post?.title || "")}" placeholder="Ex.: Reel da cobertura" />
@@ -294,15 +434,22 @@ export function initCalendarTab() {
         <label>Quando
           <input name="scheduledAt" type="datetime-local" required value="${escapeHtml(scheduled)}" />
         </label>
-        <fieldset class="cal-platforms">
+        ${
+          profileLock
+            ? `<input type="hidden" name="platform" value="instagram" />
+               <input type="hidden" name="owner" value="${escapeHtml(ownerValue)}" />
+               <p class="prompt-hint">Instagram · perfil desta agenda.</p>`
+            : `<fieldset class="cal-platforms">
           <legend>Plataformas</legend>
-          ${PLATFORMS.map(
-            (platform) => `
+          ${platforms
+            .map(
+              (platform) => `
             <label class="cal-check">
               <input type="checkbox" name="platform" value="${platform.id}" ${selectedPlatforms.has(platform.id) ? "checked" : ""} />
               ${platform.label}
             </label>`,
-          ).join("")}
+            )
+            .join("")}
         </fieldset>
         <label>Perfil (opcional)
           <select name="owner">
@@ -314,10 +461,12 @@ export function initCalendarTab() {
               )
               .join("")}
           </select>
-        </label>
+        </label>`
+        }
         <label>Legenda
           <textarea name="caption" rows="5" maxlength="2200" placeholder="Texto do post">${escapeHtml(post?.caption || "")}</textarea>
         </label>
+        ${renderIdeasBlock()}
         ${post ? renderAssets(post) : `<p class="prompt-hint">Salve o post para anexar mídia.</p>`}
         ${post ? renderStudioPickers(imageLib, videoLib) : ""}
         ${post ? renderTargets(post) : ""}
@@ -326,12 +475,94 @@ export function initCalendarTab() {
           ${
             post
               ? `<button type="button" data-cal-schedule>Agendar</button>
-                 <button type="button" data-cal-publish>Publicar agora</button>
+                 ${profileLock ? "" : `<button type="button" data-cal-publish>Publicar agora</button>`}
                  <button type="button" class="danger" data-cal-delete>Excluir</button>`
               : ""
           }
         </div>
       </form>
+    `;
+  }
+
+  async function renderReminderEditor() {
+    const reminder = editingReminderId
+      ? reminders.find((item) => item.id === editingReminderId) ||
+        (await fetchReminder(editingReminderId))
+      : null;
+    const scheduled = reminder
+      ? toLocalInput(reminder.scheduledAt)
+      : defaultWhen(new Date(`${selectedDay}T00:00:00`));
+    side.innerHTML = `
+      <form class="cal-editor" id="cal-reminder-editor">
+        <div class="cal-side-head">
+          <h3>${reminder ? "Editar lembrete" : "Novo lembrete"}</h3>
+          <a href="${hrefFor(homeRoute())}" data-cal-cancel>Fechar</a>
+        </div>
+        <label>Título
+          <input name="title" required maxlength="200" value="${escapeHtml(reminder?.title || "")}" placeholder="Ex.: Filmar depoimento" />
+        </label>
+        <label>Quando
+          <input name="scheduledAt" type="datetime-local" required value="${escapeHtml(scheduled)}" />
+        </label>
+        <label>Notas
+          <textarea name="notes" rows="4" maxlength="4000" placeholder="Opcional">${escapeHtml(reminder?.notes || "")}</textarea>
+        </label>
+        <div class="actions cal-editor-actions">
+          <button type="submit">${reminder ? "Salvar" : "Criar"}</button>
+          ${
+            reminder
+              ? `<button type="button" data-cal-reminder-toggle>${reminder.status === "done" ? "Reabrir" : "Marcar feito"}</button>
+                 <button type="button" class="danger" data-cal-reminder-delete>Excluir</button>`
+              : ""
+          }
+        </div>
+      </form>
+    `;
+  }
+
+  function formatLabel(format: string): string {
+    if (format === "carousel") return "Carrossel";
+    if (format === "reel") return "Reel";
+    if (format === "static") return "Estático";
+    return format;
+  }
+
+  function renderIdeasBlock(): string {
+    const cards = ideasPack?.ideas.length
+      ? ideasPack.ideas
+          .map(
+            (idea, index) => `
+          <article class="cal-idea" data-idea-index="${index}">
+            <p class="cal-idea-kicker">${escapeHtml(formatLabel(idea.format))}${idea.commentKeyword ? ` · ${escapeHtml(idea.commentKeyword)}` : ""}</p>
+            <strong>${escapeHtml(idea.title)}</strong>
+            <p>${escapeHtml(idea.hook)}</p>
+            <div class="cal-idea-actions">
+              <button type="button" data-idea-use="${index}">Usar nesta peça</button>
+              <button type="button" data-idea-pack="${index}">Abrir pack</button>
+            </div>
+          </article>`,
+          )
+          .join("")
+      : `<p class="prompt-hint">Escolha um perfil e gere dores, hooks e 5 ideias. Copy only — sem mídia.</p>`;
+    const pains = ideasPack?.pains.length
+      ? `<p class="cal-idea-pains">${ideasPack.pains
+          .slice(0, 4)
+          .map((pain) => escapeHtml(pain))
+          .join(" · ")}</p>`
+      : "";
+    return `
+      <div class="cal-ideas" id="cal-ideas">
+        <strong>Ideias do perfil</strong>
+        <label>Notas
+          <textarea id="cal-ideas-notes" rows="2" maxlength="4000" placeholder="Tom, oferta ou palavra-chave do comentário.">${escapeHtml(ideasNotes)}</textarea>
+        </label>
+        <div class="cal-idea-actions">
+          <button type="button" data-cal-ideas ${ideasBusy ? "disabled" : ""}>${ideasBusy ? "Gerando…" : "Gerar ideias"}</button>
+          <button type="button" data-cal-ideas-drafts ${!ideasPack?.ideas.length || ideasBusy ? "disabled" : ""}>Criar rascunhos da semana</button>
+        </div>
+        ${pains}
+        <div class="cal-idea-list">${cards}</div>
+      </div>
     `;
   }
 
@@ -491,6 +722,122 @@ export function initCalendarTab() {
     }
   }
 
+  function rememberIdeasNotes() {
+    const notes = document.getElementById("cal-ideas-notes") as HTMLTextAreaElement | null;
+    if (notes) ideasNotes = notes.value;
+  }
+
+  function ownerFromEditor(): {
+    title: string;
+    caption: string;
+    scheduledAt: string;
+    platforms: CalendarPlatform[];
+    leadId: string | null;
+    customerId: string | null;
+  } {
+    try {
+      return readEditor();
+    } catch {
+      return {
+        title: "",
+        caption: "",
+        scheduledAt: "",
+        platforms: ["instagram"],
+        leadId: null,
+        customerId: null,
+      };
+    }
+  }
+
+  async function generateIdeas() {
+    rememberIdeasNotes();
+    const owner = ownerFromEditor();
+    if (!owner.leadId && !owner.customerId) {
+      setStatus("Escolha um perfil para gerar ideias.", true);
+      return;
+    }
+    ideasBusy = true;
+    setStatus("Gerando ideias…");
+    const res = await api("/calendar/ideas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: owner.leadId,
+        customerId: owner.customerId,
+        notes: ideasNotes,
+      }),
+    });
+    ideasBusy = false;
+    if (!res.ok) {
+      setStatus(await readError(res, "Não gerou as ideias"), true);
+      await renderEditor();
+      return;
+    }
+    ideasPack = (await res.json()) as CalendarIdeasSpec;
+    setStatus("Ideias prontas.");
+    await renderEditor();
+  }
+
+  async function createIdeaDrafts() {
+    rememberIdeasNotes();
+    const owner = ownerFromEditor();
+    if (!owner.leadId && !owner.customerId) {
+      setStatus("Escolha um perfil para criar os rascunhos.", true);
+      return;
+    }
+    if (!ideasPack?.ideas.length) {
+      setStatus("Gere as ideias primeiro.", true);
+      return;
+    }
+    ideasBusy = true;
+    setStatus("Criando rascunhos…");
+    const res = await api("/calendar/posts/from-ideas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: owner.leadId,
+        customerId: owner.customerId,
+        platforms: owner.platforms.length ? owner.platforms : ["instagram"],
+        startAt: owner.scheduledAt || undefined,
+        ideas: ideasPack.ideas,
+      }),
+    });
+    ideasBusy = false;
+    if (!res.ok) {
+      setStatus(await readError(res, "Não criou os rascunhos"), true);
+      return;
+    }
+    setStatus("Rascunhos da semana criados.");
+    await refresh();
+  }
+
+  function applyIdea(index: number) {
+    const idea = ideasPack?.ideas[index];
+    if (!idea) return;
+    const form = document.getElementById("cal-editor") as HTMLFormElement | null;
+    const title = form?.querySelector<HTMLInputElement>('input[name="title"]');
+    const caption = form?.querySelector<HTMLTextAreaElement>('textarea[name="caption"]');
+    if (title) title.value = idea.title;
+    if (caption) caption.value = idea.caption;
+    setStatus("Ideia aplicada no título e na legenda.");
+  }
+
+  function openIdeaPack(index: number) {
+    const idea = ideasPack?.ideas[index];
+    if (!idea) return;
+    const owner = ownerFromEditor();
+    saveRepurposeDraft({
+      prompt: `${idea.hook}\n\n${idea.caption}`,
+      notes: [ideasNotes, idea.commentKeyword ? `CTA: comenta ${idea.commentKeyword}` : ""]
+        .filter(Boolean)
+        .join("\n"),
+      leadId: owner.leadId || undefined,
+      hook: idea.hook,
+      cta: idea.commentKeyword ? `Comenta ${idea.commentKeyword}` : "Salve este post",
+    });
+    navigate({ name: "criativo-skill", id: "carousel-instagram" });
+  }
+
   function readEditor(): {
     title: string;
     caption: string;
@@ -505,15 +852,34 @@ export function initCalendarTab() {
     const caption = String(data.get("caption") || "").trim();
     const local = String(data.get("scheduledAt") || "");
     const scheduledAt = local ? new Date(local).toISOString() : "";
-    const platforms = [...form.querySelectorAll<HTMLInputElement>('input[name="platform"]:checked')].map(
+    let platforms = [...form.querySelectorAll<HTMLInputElement>('input[name="platform"]:checked')].map(
       (input) => input.value as CalendarPlatform,
     );
+    if (!platforms.length) {
+      const hidden = String(data.get("platform") || "");
+      if (hidden) platforms = [hidden as CalendarPlatform];
+    }
     const owner = String(data.get("owner") || "");
     let leadId: string | null = null;
     let customerId: string | null = null;
     if (owner.startsWith("lead:")) leadId = owner.slice(5);
     if (owner.startsWith("customer:")) customerId = owner.slice(9);
+    if (profileLock) {
+      platforms = ["instagram"];
+      leadId = profileLock.kind === "lead" ? profileLock.id : null;
+      customerId = profileLock.kind === "customer" ? profileLock.id : null;
+    }
     return { title, caption, scheduledAt, platforms, leadId, customerId };
+  }
+
+  async function fetchReminder(id: string): Promise<CalendarReminder> {
+    const res = await api(`/calendar/reminders/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error(await readError(res, "Lembrete não encontrado"));
+    const reminder = (await res.json()) as CalendarReminder;
+    const index = reminders.findIndex((item) => item.id === reminder.id);
+    if (index >= 0) reminders[index] = reminder;
+    else reminders.push(reminder);
+    return reminder;
   }
 
   async function saveEditor(event: SubmitEvent) {
@@ -542,8 +908,57 @@ export function initCalendarTab() {
     const post = (await res.json()) as CalendarPost;
     creating = false;
     editingId = post.id;
-    navigate({ name: "calendar-post", id: post.id });
+    editingReminderId = null;
+    navigate(postRoute(post.id));
     setStatus("Post salvo.");
+    await refresh();
+  }
+
+  async function saveReminderEditor(event: SubmitEvent) {
+    event.preventDefault();
+    if (!profileLock) {
+      setStatus("Lembretes só na agenda do perfil.", true);
+      return;
+    }
+    const form = requireEl<HTMLFormElement>("cal-reminder-editor");
+    const data = new FormData(form);
+    const title = String(data.get("title") || "").trim();
+    const notes = String(data.get("notes") || "").trim();
+    const local = String(data.get("scheduledAt") || "");
+    const scheduledAt = local ? new Date(local).toISOString() : "";
+    if (!title || !scheduledAt) {
+      setStatus("Título e data são obrigatórios.", true);
+      return;
+    }
+    const body = {
+      title,
+      notes,
+      scheduledAt,
+      leadId: profileLock.kind === "lead" ? profileLock.id : undefined,
+      customerId: profileLock.kind === "customer" ? profileLock.id : undefined,
+    };
+    setStatus(editingReminderId ? "Salvando…" : "Criando…");
+    const res = editingReminderId
+      ? await api(`/calendar/reminders/${encodeURIComponent(editingReminderId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+      : await api("/calendar/reminders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+    if (!res.ok) {
+      setStatus(await readError(res, "Não salvou o lembrete"), true);
+      return;
+    }
+    const reminder = (await res.json()) as CalendarReminder;
+    creating = false;
+    creatingKind = "post";
+    editingReminderId = reminder.id;
+    editingId = null;
+    setStatus("Lembrete salvo.");
     await refresh();
   }
 
@@ -557,6 +972,14 @@ export function initCalendarTab() {
         creating = false;
       }
     }
+    if (editingReminderId) {
+      try {
+        await fetchReminder(editingReminderId);
+      } catch {
+        editingReminderId = null;
+        creating = false;
+      }
+    }
     renderGrid();
     renderSide();
   }
@@ -566,8 +989,10 @@ export function initCalendarTab() {
     if (!target?.dataset.day) return;
     selectedDay = target.dataset.day;
     creating = false;
+    creatingKind = "post";
     editingId = null;
-    navigate({ name: "calendar" });
+    editingReminderId = null;
+    navigate(homeRoute());
     renderGrid();
     renderSide();
   });
@@ -577,32 +1002,85 @@ export function initCalendarTab() {
     if (node?.closest("[data-cal-new-day]")) {
       event.preventDefault();
       creating = true;
+      creatingKind = "post";
       editingId = null;
+      editingReminderId = null;
       void renderEditor();
+      return;
+    }
+    if (node?.closest("[data-cal-new-reminder-day]")) {
+      event.preventDefault();
+      creating = true;
+      creatingKind = "reminder";
+      editingId = null;
+      editingReminderId = null;
+      void renderReminderEditor();
       return;
     }
     const open = node?.closest("[data-open-post]") as HTMLElement | null;
     if (open?.dataset.openPost) {
       event.preventDefault();
       creating = false;
+      creatingKind = "post";
       editingId = open.dataset.openPost;
-      navigate({ name: "calendar-post", id: editingId });
+      editingReminderId = null;
+      navigate(postRoute(editingId));
       void renderEditor();
+      return;
+    }
+    const openReminder = node?.closest("[data-open-reminder]") as HTMLElement | null;
+    if (openReminder?.dataset.openReminder) {
+      event.preventDefault();
+      creating = false;
+      creatingKind = "reminder";
+      editingId = null;
+      editingReminderId = openReminder.dataset.openReminder;
+      navigate(homeRoute());
+      void renderReminderEditor();
       return;
     }
     if (node?.closest("[data-cal-cancel]")) {
       event.preventDefault();
       creating = false;
+      creatingKind = "post";
       editingId = null;
-      navigate({ name: "calendar" });
+      editingReminderId = null;
+      navigate(homeRoute());
       renderSide();
       return;
+    }
+    if (node?.closest("[data-cal-ideas]")) {
+      event.preventDefault();
+      void generateIdeas();
+      return;
+    }
+    if (node?.closest("[data-cal-ideas-drafts]")) {
+      event.preventDefault();
+      void createIdeaDrafts();
+      return;
+    }
+    const useIdea = node?.closest("[data-idea-use]") as HTMLElement | null;
+    if (useIdea?.dataset.ideaUse != null) {
+      event.preventDefault();
+      applyIdea(Number(useIdea.dataset.ideaUse));
+      return;
+    }
+    const packIdea = node?.closest("[data-idea-pack]") as HTMLElement | null;
+    if (packIdea?.dataset.ideaPack != null) {
+      event.preventDefault();
+      openIdeaPack(Number(packIdea.dataset.ideaPack));
     }
   });
 
   side.addEventListener("submit", (event) => {
-    if ((event.target as HTMLElement).id !== "cal-editor") return;
-    void saveEditor(event as SubmitEvent);
+    const id = (event.target as HTMLElement).id;
+    if (id === "cal-editor") {
+      void saveEditor(event as SubmitEvent);
+      return;
+    }
+    if (id === "cal-reminder-editor") {
+      void saveReminderEditor(event as SubmitEvent);
+    }
   });
 
   side.addEventListener("change", (event) => {
@@ -646,7 +1124,7 @@ export function initCalendarTab() {
         }
         editingId = null;
         creating = false;
-        navigate({ name: "calendar" });
+        navigate(homeRoute());
         setStatus("Post excluído.");
         await refresh();
       })();
@@ -732,11 +1210,61 @@ export function initCalendarTab() {
     setStatus(okMessage);
   }
 
+  side.addEventListener("click", (event) => {
+    const btn = (event.target as HTMLElement | null)?.closest("button") as HTMLButtonElement | null;
+    if (!btn || !editingReminderId) return;
+    if (btn.dataset.calReminderToggle !== undefined) {
+      const reminder = reminders.find((item) => item.id === editingReminderId);
+      const next = reminder?.status === "done" ? "open" : "done";
+      void (async () => {
+        const res = await api(`/calendar/reminders/${encodeURIComponent(editingReminderId!)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: next }),
+        });
+        if (!res.ok) {
+          setStatus(await readError(res, "Não atualizou o lembrete"), true);
+          return;
+        }
+        await refresh();
+        setStatus(next === "done" ? "Lembrete concluído." : "Lembrete reaberto.");
+      })();
+      return;
+    }
+    if (btn.dataset.calReminderDelete !== undefined) {
+      if (!window.confirm("Excluir este lembrete?")) return;
+      void (async () => {
+        const res = await api(`/calendar/reminders/${encodeURIComponent(editingReminderId!)}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          setStatus(await readError(res, "Não excluiu"), true);
+          return;
+        }
+        editingReminderId = null;
+        creating = false;
+        navigate(homeRoute());
+        setStatus("Lembrete excluído.");
+        await refresh();
+      })();
+    }
+  });
+
   newBtn.addEventListener("click", () => {
     creating = true;
+    creatingKind = "post";
     editingId = null;
+    editingReminderId = null;
     selectedDay = dayKey(new Date());
     void renderEditor();
+  });
+  reminderBtn.addEventListener("click", () => {
+    creating = true;
+    creatingKind = "reminder";
+    editingId = null;
+    editingReminderId = null;
+    selectedDay = dayKey(new Date());
+    void renderReminderEditor();
   });
   prevBtn.addEventListener("click", () => {
     month = addMonths(month, -1);
@@ -748,18 +1276,32 @@ export function initCalendarTab() {
   });
 
   async function onRoute(route: AppRoute) {
-    if (route.name !== "calendar" && route.name !== "calendar-post") return;
+    if (!isCalendarRoute(route)) return;
+    profileLock = profileLockOf(route);
+    applyChrome();
     try {
       await loadCaps();
-      if (route.name === "calendar-post") {
-        editingId = route.id;
+      const postId =
+        route.name === "calendar-post"
+          ? route.id
+          : route.name === "lead-calendar-post" ||
+              route.name === "customer-calendar-post"
+            ? route.postId
+            : null;
+      if (postId) {
+        editingId = postId;
+        editingReminderId = null;
         creating = false;
-        const post = await fetchPost(route.id);
+        creatingKind = "post";
+        const post = await fetchPost(postId);
         month = startOfMonth(new Date(post.scheduledAt));
         selectedDay = postDayKey(post);
         document.title = titleForRoute(route, post.title);
       } else if (!creating) {
         editingId = null;
+        if (route.name === "calendar" || route.name === "lead-calendar" || route.name === "customer-calendar") {
+          editingReminderId = creatingKind === "reminder" ? editingReminderId : null;
+        }
       }
       await loadMonth();
       renderGrid();

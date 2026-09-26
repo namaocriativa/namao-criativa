@@ -143,7 +143,7 @@ describe('isolamento multi-tenant', () => {
     const prisma = {
       contentCalendarPost: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    const service = new CalendarService(prisma as never, {} as never);
+    const service = new CalendarService(prisma as never, {} as never, {} as never);
     await runWithTenant('t1', () => service.findRange());
     expect(prisma.contentCalendarPost.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -163,7 +163,7 @@ describe('isolamento multi-tenant', () => {
         }),
       },
     };
-    const service = new CalendarService(prisma as never, {} as never);
+    const service = new CalendarService(prisma as never, {} as never, {} as never);
     await expect(
       runWithTenant('t1', () => service.findById('post-b')),
     ).rejects.toBeInstanceOf(NotFoundException);

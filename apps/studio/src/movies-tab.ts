@@ -16,7 +16,13 @@ import type {
   CreativeMovie,
   CreativeMovieShot,
 } from "./types";
-import { videoRunSettingsPayload } from "./video-run-settings";
+import { takeRepurposeDraft } from "./repurpose-draft";
+import {
+  notifyVideoRunSettings,
+  persistVideoRunSettings,
+  readVideoRunSettings,
+  videoRunSettingsPayload,
+} from "./video-run-settings";
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -132,6 +138,8 @@ export function initMoviesTab(): {
   let characters: CreativeCharacter[] = [];
   let busy = false;
   let mode: "list" | "create" | "board" = "list";
+  let reelMode = false;
+  let reelOverlay = "";
   let boardMovie: CreativeMovie | null = null;
   let newTakeAssets = new Map<string, string>();
   let newTakeFraming = DEFAULT_MOVIE_FRAMING;
@@ -219,7 +227,18 @@ export function initMoviesTab(): {
           Título
           <input id="movies-title" required maxlength="120" placeholder="Ex.: Noite na cobertura" />
         </label>
-        <p class="movies-hint">Formato, duração, resolução e modelo saem das Run settings.</p>
+        <div class="movies-direction-chips" role="group" aria-label="Modo do filme">
+          <button type="button" class="movies-direction-chip${!reelMode ? " is-active" : ""}" data-reel-mode="off">Cinema</button>
+          <button type="button" class="movies-direction-chip${reelMode ? " is-active" : ""}" data-reel-mode="on">Modo Reel</button>
+        </div>
+        ${
+          reelMode
+            ? `<label>Texto na tela no CTA (opcional)
+                <input id="movies-reel-overlay" maxlength="80" placeholder="Uma linha de prova social" value="${escapeHtml(reelOverlay)}" />
+              </label>
+              <p class="movies-hint">Cria em 9:16 e semeia 3 takes: hook, história e CTA.</p>`
+            : `<p class="movies-hint">Formato, duração, resolução e modelo saem das Run settings.</p>`
+        }
         <p class="movies-toolbar">
           <button type="submit" id="movies-create-btn">Criar storyboard</button>
           <button type="button" class="outline" id="movies-cancel">Voltar</button>
@@ -227,7 +246,17 @@ export function initMoviesTab(): {
       </form>
     `;
     composerEl.querySelector("#movies-cancel")?.addEventListener("click", () => {
+      reelMode = false;
       renderList();
+    });
+    composerEl.querySelectorAll<HTMLButtonElement>("[data-reel-mode]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        reelOverlay =
+          (composerEl.querySelector("#movies-reel-overlay") as HTMLInputElement | null)?.value ||
+          reelOverlay;
+        reelMode = btn.dataset.reelMode === "on";
+        renderCreate();
+      });
     });
     composerEl.querySelector("#movies-create-form")?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -768,6 +797,61 @@ export function initMoviesTab(): {
     return (await res.json()) as CreativeMovie;
   }
 
+  function forcePortraitAspect() {
+    const select = document.getElementById("videos-aspect") as HTMLSelectElement | null;
+    if (!select || select.value === "9:16") return;
+    if (![...select.options].some((option) => option.value === "9:16")) return;
+    select.value = "9:16";
+    persistVideoRunSettings(readVideoRunSettings());
+    notifyVideoRunSettings();
+  }
+
+  async function seedReelTakes(movieId: string): Promise<CreativeMovie> {
+    const character = characters.find((item) => heroOf(item)) || characters[0];
+    if (!character) return loadMovie(movieId);
+    const draft = takeRepurposeDraft();
+    const overlay = reelOverlay || draft?.overlayText || "";
+    const takes = [
+      {
+        scene: "Close no criador, olhando para a câmera",
+        action: "Nomeia a dor nos primeiros 2 segundos",
+        dialogue: draft?.hook || "Você ainda sofre com isso?",
+        framing: "close",
+        camera: "handheld",
+      },
+      {
+        scene: "Criador demonstra o produto na mão",
+        action: "Conta a história curta e mostra o resultado",
+        dialogue: draft?.story || "Veja o que muda na prática.",
+        framing: "plano_medio",
+        camera: "handheld",
+      },
+      {
+        scene: "Rosto e produto no quadro",
+        action: overlay
+          ? `Convida a agir.\nOverlay: ${overlay}`
+          : "Convida a agir e olha para a câmera",
+        dialogue: draft?.cta || "Comenta EU QUERO",
+        framing: "primeiro_plano",
+        camera: "dolly_in",
+      },
+    ];
+    let movie: CreativeMovie | null = null;
+    for (const take of takes) {
+      const res = await api(`/creative/movies/${encodeURIComponent(movieId)}/shots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterIds: [character.id],
+          ...take,
+        }),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Falha ao semear o Reel"));
+      movie = (await res.json()) as CreativeMovie;
+    }
+    return movie || loadMovie(movieId);
+  }
+
   async function createMovie() {
     if (busy) return;
     const title = (composerEl.querySelector("#movies-title") as HTMLInputElement | null)
@@ -776,16 +860,31 @@ export function initMoviesTab(): {
       setStatus("Informe o título", true);
       return;
     }
+    reelOverlay =
+      (composerEl.querySelector("#movies-reel-overlay") as HTMLInputElement | null)?.value.trim() ||
+      reelOverlay;
+    if (reelMode) forcePortraitAspect();
     busy = true;
     setStatus("Criando o filme…");
     try {
+      const settings = videoRunSettingsPayload();
       const res = await api("/creative/movies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, ...videoRunSettingsPayload() }),
+        body: JSON.stringify({
+          title,
+          ...settings,
+          ...(reelMode ? { aspectRatio: "9:16" } : {}),
+        }),
       });
       if (!res.ok) throw new Error(await readError(res, "Falha ao criar filme"));
-      const created = (await res.json()) as CreativeMovie;
+      let created = (await res.json()) as CreativeMovie;
+      if (reelMode) {
+        if (!characters.length) await loadCharacters();
+        created = await seedReelTakes(created.id);
+      }
+      reelMode = false;
+      reelOverlay = "";
       navigate({ name: "criativo-skill", id: MOVIES_ID, movieId: created.id });
     } catch (error) {
       setStatus(errorMessage(error, "Falha ao criar filme"), true);
@@ -994,6 +1093,16 @@ export function initMoviesTab(): {
           setStatus(errorMessage(error, "Filme não encontrado"), true);
           if (!cached) renderList();
         });
+      return;
+    }
+    if (sessionStorage.getItem("namao-movies-reel")) {
+      sessionStorage.removeItem("namao-movies-reel");
+      reelMode = true;
+      void loadCharacters().then(() => {
+        if (seq !== routeSeq) return;
+        renderCreate();
+      });
+      renderCreate();
       return;
     }
     if (mode === "create") {

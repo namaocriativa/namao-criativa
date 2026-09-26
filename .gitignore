@@ -83,13 +83,6 @@ services/platform/storage/ugc-skills/**
 services/platform/storage/calendar/**
 !services/platform/storage/calendar/.gitkeep
 
-# Landing projects — versionar fontes de exemplo; nunca deps/build
-leads/*/node_modules/
-leads/*/dist/
-leads/*/.landing-pipeline/
-leads/*/.vercel/
-leads/*/.scaffold-ok
-
 # Crawl4AI Python venv
 .venv
 services/platform/crawler/.venv

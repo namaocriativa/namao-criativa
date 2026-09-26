@@ -19,6 +19,7 @@ export default defineConfig({
     proxy: {
       '/auth': api,
       '/dashboard/analytics': api,
+      '/dashboard/calendar': api,
       '/invites': api,
       '/leads': api,
       '/invite-requests': api,

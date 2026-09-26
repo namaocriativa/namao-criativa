@@ -5,6 +5,9 @@ export interface LeadImage {
   localPath: string;
   filename?: string;
   mimeType?: string | null;
+  width?: number | null;
+  height?: number | null;
+  createdAt?: string;
 }
 
 export interface LeadSource {
@@ -52,8 +55,6 @@ export interface Lead {
   _count?: { images?: number; sources?: number };
   landingSlug?: string | null;
   landingStatus?: string | null;
-  landingBuiltAt?: string | null;
-  activeLandingJobId?: string | null;
   publishedOrigin?: string | null;
   vercelProjectId?: string | null;
   websiteProjectId?: string | null;
@@ -67,31 +68,6 @@ export interface Lead {
   canManageShares?: boolean;
   source?: string;
   discoverySources?: string[];
-  generateConfig?: {
-    sections?: Array<{
-      id?: string;
-      type?: string;
-      title?: string;
-      description?: string;
-      component?: string;
-      stockVideo?: boolean;
-      media?: {
-        images?: string[];
-        logo?: string;
-        video?: string;
-        portraitVideo?: string;
-      };
-    }>;
-    components?: Array<{ component?: string }>;
-    features?: Array<{ id?: string }>;
-    copywriter?: {
-      category?: string;
-      description?: string;
-      services?: string[];
-      address?: string;
-      notes?: string;
-    };
-  } | null;
 }
 
 export interface PackageImage {
@@ -162,6 +138,20 @@ export interface ImageSkillRun {
   completedSlides?: number;
   error?: string;
   spec?: Record<string, unknown> | null;
+  pack?: {
+    staticProjectId?: string;
+    reel?: {
+      hook?: string;
+      story?: string;
+      cta?: string;
+      overlayText?: string;
+    };
+    static?: {
+      headline?: string;
+      body?: string;
+      caption?: string;
+    };
+  };
 }
 
 export interface ImageProjectSettings {
@@ -502,6 +492,41 @@ export interface CalendarPost {
   customer?: { id: string; name: string } | null;
   targets?: CalendarTarget[];
   assets?: CalendarAsset[];
+}
+
+export type CalendarReminderStatus = "open" | "done" | string;
+
+export interface CalendarReminder {
+  id: string;
+  title: string;
+  notes?: string;
+  scheduledAt: string;
+  status: CalendarReminderStatus;
+  leadId?: string | null;
+  customerId?: string | null;
+  lead?: { id: string; name: string } | null;
+  customer?: { id: string; name: string } | null;
+}
+
+export interface CalendarItems {
+  posts: CalendarPost[];
+  reminders: CalendarReminder[];
+}
+
+export type CalendarIdeaFormat = "carousel" | "reel" | "static" | string;
+
+export interface CalendarIdea {
+  title: string;
+  hook: string;
+  caption: string;
+  format: CalendarIdeaFormat;
+  commentKeyword?: string;
+}
+
+export interface CalendarIdeasSpec {
+  pains: string[];
+  hooks: string[];
+  ideas: CalendarIdea[];
 }
 
 export interface CalendarAutomation {

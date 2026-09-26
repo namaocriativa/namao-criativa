@@ -77,12 +77,56 @@ const statsSplit = document.getElementById('dash-stats-split') as HTMLElement;
 const topPagesEl = document.getElementById('dash-top-pages') as HTMLElement;
 const channelsEl = document.getElementById('dash-channels') as HTMLElement;
 const rangeGroup = document.getElementById('dash-range') as HTMLElement;
+const dashCalendar = document.getElementById('dash-calendar') as HTMLElement;
+const dashCalMonth = document.getElementById('dash-cal-month') as HTMLElement;
+const dashCalStatus = document.getElementById('dash-cal-status') as HTMLElement;
+const dashCalList = document.getElementById('dash-cal-list') as HTMLElement;
+const dashCalPrev = document.getElementById('dash-cal-prev') as HTMLButtonElement;
+const dashCalNext = document.getElementById('dash-cal-next') as HTMLButtonElement;
 const kpiUsers = document.getElementById('kpi-users') as HTMLElement;
 const kpiSessions = document.getElementById('kpi-sessions') as HTMLElement;
 const kpiPageviews = document.getElementById('kpi-pageviews') as HTMLElement;
 const kpiEngagement = document.getElementById('kpi-engagement') as HTMLElement;
 
+type DashboardCalendarPost = {
+  id: string;
+  title: string;
+  caption?: string;
+  scheduledAt: string;
+  status: string;
+  targets?: Array<{ platform: string; status: string }>;
+};
+
+type DashboardCalendarReminder = {
+  id: string;
+  title: string;
+  notes?: string;
+  scheduledAt: string;
+  status: string;
+};
+
+type DashboardCalendarResponse = {
+  posts: DashboardCalendarPost[];
+  reminders: DashboardCalendarReminder[];
+};
+
+const MONTHS = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+];
+
 let selectedRange: AnalyticsRange = '7d';
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 void (async () => {
   if (!(await probeLoggedIn())) {
@@ -99,6 +143,24 @@ logoutBtn.addEventListener('click', () => {
     clearChatSession();
     location.href = '/login.html';
   })();
+});
+
+dashCalPrev.addEventListener('click', () => {
+  calendarMonth = new Date(
+    calendarMonth.getFullYear(),
+    calendarMonth.getMonth() - 1,
+    1,
+  );
+  void loadCalendar();
+});
+
+dashCalNext.addEventListener('click', () => {
+  calendarMonth = new Date(
+    calendarMonth.getFullYear(),
+    calendarMonth.getMonth() + 1,
+    1,
+  );
+  void loadCalendar();
 });
 
 rangeGroup.addEventListener('click', (event) => {
@@ -196,6 +258,104 @@ function resetStatsView(message: string) {
   statsSplit.hidden = true;
 }
 
+function calendarKindLabel(kind: 'post' | 'reminder'): string {
+  return kind === 'reminder' ? 'Lembrete' : 'Post Instagram';
+}
+
+function calendarStatusLabel(kind: 'post' | 'reminder', status: string): string {
+  if (kind === 'reminder') return status === 'done' ? 'feito' : 'aberto';
+  const labels: Record<string, string> = {
+    draft: 'rascunho',
+    scheduled: 'agendado',
+    publishing: 'publicando',
+    published: 'publicado',
+    partial: 'parcial',
+    failed: 'falhou',
+  };
+  return labels[status] || status;
+}
+
+async function loadCalendar() {
+  dashCalendar.hidden = false;
+  dashCalMonth.textContent = `${MONTHS[calendarMonth.getMonth()]} ${calendarMonth.getFullYear()}`;
+  dashCalStatus.textContent = 'Carregando agenda…';
+  dashCalList.innerHTML = '';
+  const from = new Date(
+    calendarMonth.getFullYear(),
+    calendarMonth.getMonth(),
+    1,
+  );
+  const to = new Date(
+    calendarMonth.getFullYear(),
+    calendarMonth.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+  );
+  try {
+    const data = (await api(
+      `/dashboard/calendar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
+    )) as DashboardCalendarResponse;
+    const items = [
+      ...(data.posts || []).map((post) => ({
+        id: post.id,
+        kind: 'post' as const,
+        title: post.title,
+        detail: post.caption || '',
+        scheduledAt: post.scheduledAt,
+        status: post.status,
+      })),
+      ...(data.reminders || []).map((reminder) => ({
+        id: reminder.id,
+        kind: 'reminder' as const,
+        title: reminder.title,
+        detail: reminder.notes || '',
+        scheduledAt: reminder.scheduledAt,
+        status: reminder.status,
+      })),
+    ].sort(
+      (a, b) =>
+        new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
+    );
+    if (!items.length) {
+      dashCalStatus.textContent = 'Nada agendado neste mês.';
+      return;
+    }
+    dashCalList.innerHTML = items
+      .map((item) => {
+        const when = new Date(item.scheduledAt);
+        const date = Number.isNaN(when.getTime())
+          ? ''
+          : when.toLocaleString('pt-BR', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+        return `<li class="dash-cal-item dash-cal-item--${escapeHtml(item.kind)}">
+          <p class="kicker">${escapeHtml(calendarKindLabel(item.kind))} · ${escapeHtml(calendarStatusLabel(item.kind, item.status))}</p>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(date)}</span>
+          ${item.detail ? `<p>${escapeHtml(item.detail)}</p>` : ''}
+        </li>`;
+      })
+      .join('');
+    dashCalStatus.textContent = '';
+  } catch (error) {
+    if (error instanceof Error && /401|403/.test(error.message)) {
+      await clearSession();
+      location.href = '/login.html';
+      return;
+    }
+    dashCalStatus.textContent =
+      error instanceof Error
+        ? error.message
+        : 'Não foi possível ler a agenda agora.';
+  }
+}
+
 async function loadAnalytics() {
   resetStatsView('Carregando visitas…');
   try {
@@ -287,6 +447,7 @@ async function boot() {
       return;
     }
     dashGrid.hidden = false;
+    void loadCalendar();
     businessName.textContent = lead.name || 'Seu negócio';
     categoryEl.textContent = lead.category || '';
     descriptionEl.textContent = lead.description || '';

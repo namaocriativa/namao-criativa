@@ -2,11 +2,9 @@
 import {
   buildManifest,
   defaultProps,
-  getComponent,
   listComponents,
   resolveProps,
 } from "./index";
-import { buildLandingKitPanel } from "./landing-kit-panel";
 import type {
   ComponentProps,
   PropSchema,
@@ -363,40 +361,17 @@ function buildManifestPanel(): HTMLElement {
 
 /**
  * Monta a galeria da UI Lib e ativa os componentes marcados como ativos.
- * Overlays entram como categoria no mesmo palco do landing-kit.
  * Os overlays ativos vivem na página inteira, não só na aba.
  */
 export function initUiLib(root: HTMLElement): void {
   const state = loadState();
   const mounted = new Map<string, UiComponentInstance>();
-  const overlayCards = new Map<string, HTMLElement>();
-
+  const wrap = document.createElement("div");
+  wrap.className = "uilib-overlays";
   for (const definition of listComponents()) {
-    overlayCards.set(definition.id, buildCard(definition, state, mounted));
+    wrap.appendChild(buildCard(definition, state, mounted));
   }
-
-  root.replaceChildren();
-  root.appendChild(
-    buildLandingKitPanel({
-      overlays: listComponents().map((item) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-      })),
-      renderOverlay(id, host) {
-        const card = overlayCards.get(id);
-        if (card) {
-          host.replaceChildren(card);
-          return;
-        }
-        const definition = getComponent(id);
-        if (!definition) return;
-        const next = buildCard(definition, state, mounted);
-        overlayCards.set(id, next);
-        host.replaceChildren(next);
-      },
-    }),
-  );
+  root.replaceChildren(wrap);
   root.appendChild(buildManifestPanel());
   saveState(state);
 }
