@@ -13,6 +13,24 @@ import { requireJwtSecret } from '../lib/jwt-secret.js';
 
 type AppCreated = { uuid?: string };
 
+function isLocalUrl(value: string): boolean {
+  return /localhost|127\.0\.0\.1/i.test(value);
+}
+
+function copyEnv(
+  envs: Record<string, string>,
+  key: string,
+  value: string | undefined,
+  opts?: { fallback?: string; rejectLocal?: boolean },
+) {
+  let next = value?.trim() || '';
+  if (!next || (opts?.rejectLocal && isLocalUrl(next))) {
+    next = opts?.fallback?.trim() || '';
+  }
+  if (!next || (opts?.rejectLocal && isLocalUrl(next))) return;
+  envs[key] = next;
+}
+
 function runtimeHealthCheck(stack: StackConfig): Record<string, unknown> {
   return {
     health_check_enabled: true,
@@ -73,10 +91,33 @@ export function buildRuntimeEnvs(opts: {
 
   const githubWebsites = process.env.GITHUB_WEBSITES_TOKEN?.trim();
   if (githubWebsites) envs.GITHUB_WEBSITES_TOKEN = githubWebsites;
+  envs.GITHUB_WEBSITES_ORG =
+    process.env.GITHUB_WEBSITES_ORG?.trim() || 'namaocriativa';
   const cfToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
   if (cfToken) envs.CLOUDFLARE_API_TOKEN = cfToken;
   const cfAccount = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
   if (cfAccount) envs.CLOUDFLARE_ACCOUNT_ID = cfAccount;
+
+  const apiOrigin = opts.stack.runtime.domain.replace(/\/$/, '');
+  copyEnv(envs, 'PUBLIC_CHAT_API_ORIGIN', process.env.PUBLIC_CHAT_API_ORIGIN, {
+    fallback: apiOrigin,
+    rejectLocal: true,
+  });
+  copyEnv(envs, 'META_APP_ID', process.env.META_APP_ID);
+  copyEnv(envs, 'META_APP_SECRET', process.env.META_APP_SECRET);
+  copyEnv(envs, 'META_INSTAGRAM_APP_ID', process.env.META_INSTAGRAM_APP_ID);
+  copyEnv(
+    envs,
+    'META_INSTAGRAM_APP_SECRET',
+    process.env.META_INSTAGRAM_APP_SECRET,
+  );
+  copyEnv(envs, 'META_GRAPH_VERSION', process.env.META_GRAPH_VERSION, {
+    fallback: 'v21.0',
+  });
+  copyEnv(envs, 'META_REDIRECT_URI', process.env.META_REDIRECT_URI, {
+    fallback: apiOrigin ? `${apiOrigin}/auth/instagram/callback` : '',
+    rejectLocal: true,
+  });
 
   const pixKey = process.env.NAMAO_PIX_KEY?.trim();
   if (pixKey) envs.NAMAO_PIX_KEY = pixKey;

@@ -86,8 +86,39 @@ test('buildRuntimeEnvs injeta Cloudflare e GitHub websites quando existem', () =
         databaseUrl: 'postgres://namao:namao@db:5432/namao',
       });
       assert.equal(envs.GITHUB_WEBSITES_TOKEN, 'ghp_test');
+      assert.equal(envs.GITHUB_WEBSITES_ORG, 'namaocriativa');
       assert.equal(envs.CLOUDFLARE_API_TOKEN, 'cf_test');
       assert.equal(envs.CLOUDFLARE_ACCOUNT_ID, 'acct_1');
+      assert.equal(
+        envs.PUBLIC_CHAT_API_ORIGIN,
+        'https://api.namaocriativa.com.br',
+      );
+    },
+  );
+});
+
+test('buildRuntimeEnvs usa redirect Meta de produção e ignora localhost', () => {
+  withEnv(
+    {
+      JWT_SECRET: 'a-long-random-production-secret',
+      META_APP_ID: '111',
+      META_APP_SECRET: 'secret',
+      META_INSTAGRAM_APP_ID: '222',
+      META_INSTAGRAM_APP_SECRET: 'ig-secret',
+      META_REDIRECT_URI: 'https://localhost:4000/auth/instagram/callback',
+    },
+    () => {
+      const envs = buildRuntimeEnvs({
+        state,
+        stack,
+        databaseUrl: 'postgres://namao:namao@db:5432/namao',
+      });
+      assert.equal(envs.META_APP_ID, '111');
+      assert.equal(envs.META_INSTAGRAM_APP_ID, '222');
+      assert.equal(
+        envs.META_REDIRECT_URI,
+        'https://api.namaocriativa.com.br/auth/instagram/callback',
+      );
     },
   );
 });
