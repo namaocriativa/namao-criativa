@@ -452,7 +452,7 @@ export function initLeadWhatsAppModal(
       void openPreview(kind);
       return;
     }
-    if (needsPackage(kind)) {
+    if (kind && needsPackage(kind)) {
       packageKind = kind;
       const offer = offerItem();
       if (!offer?.available) {

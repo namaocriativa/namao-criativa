@@ -11,13 +11,13 @@ export type RepurposeDraft = {
 };
 
 export function saveRepurposeDraft(draft: RepurposeDraft): void {
-  sessionStorage.setItem(RESPURPOSE_DRAFT_KEY, JSON.stringify(draft));
+  sessionStorage.setItem(REPURPOSE_DRAFT_KEY, JSON.stringify(draft));
 }
 
 export function takeRepurposeDraft(): RepurposeDraft | null {
-  const raw = sessionStorage.getItem(RESPURPOSE_DRAFT_KEY);
+  const raw = sessionStorage.getItem(REPURPOSE_DRAFT_KEY);
   if (!raw) return null;
-  sessionStorage.removeItem(RESPURPOSE_DRAFT_KEY);
+  sessionStorage.removeItem(REPURPOSE_DRAFT_KEY);
   try {
     const parsed = JSON.parse(raw) as RepurposeDraft;
     if (!parsed?.prompt?.trim()) return null;

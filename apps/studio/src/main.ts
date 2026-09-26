@@ -254,11 +254,6 @@ const videosStudio = initVideosStudio();
 const usersTab = initUsersTab();
 let currentUser: StudioUser | null = null;
 
-function currentProfileApi(suffix = "", id = currentLeadId) {
-  if (!id) return "";
-  return profileApi(currentEntityKind, id, suffix);
-}
-
 function applyRoute(route: AppRoute) {
   document.body.classList.toggle("is-imagens-studio", isImagensStudioRoute(route));
   document.body.classList.toggle("is-videos-studio", isVideosStudioRoute(route));
