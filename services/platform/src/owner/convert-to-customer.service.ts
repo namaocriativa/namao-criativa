@@ -167,6 +167,10 @@ export class ConvertToCustomerService {
         where: { leadId },
         data: reassign,
       });
+      await tx.contentPlan.updateMany({
+        where: { leadId },
+        data: reassign,
+      });
 
       await tx.lead.delete({ where: { id: leadId } });
 

@@ -710,6 +710,15 @@ const RULES: Rule[] = [
   },
   {
     method: 'POST',
+    pattern: /^\/content-plan\/generate$/,
+    describe: () => ({
+      kind: 'content-plan.generate',
+      title: 'Gerou plano de conteúdo',
+      summary: 'Skill planejamento',
+    }),
+  },
+  {
+    method: 'POST',
     pattern: /^\/invites\/instagram-permission$/,
     describe: () => ({
       kind: 'invite.instagram',

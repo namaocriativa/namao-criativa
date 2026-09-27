@@ -14,17 +14,57 @@ describe('gemini usage e turn', () => {
     ).toEqual({
       promptTokens: 10,
       candidatesTokens: 4,
+      thoughtsTokens: 0,
+      cachedTokens: 0,
       totalTokens: 14,
+    });
+  });
+
+  it('lê thinking e cache', () => {
+    expect(
+      extractGeminiUsage({
+        usageMetadata: {
+          promptTokenCount: 20,
+          candidatesTokenCount: 5,
+          thoughtsTokenCount: 8,
+          cachedContentTokenCount: 4,
+          totalTokenCount: 33,
+        },
+      }),
+    ).toEqual({
+      promptTokens: 20,
+      candidatesTokens: 5,
+      thoughtsTokens: 8,
+      cachedTokens: 4,
+      totalTokens: 33,
     });
   });
 
   it('soma usages', () => {
     expect(
       mergeGeminiUsage(
-        { promptTokens: 2, candidatesTokens: 1, totalTokens: 3 },
-        { promptTokens: 5, candidatesTokens: 5, totalTokens: 10 },
+        {
+          promptTokens: 2,
+          candidatesTokens: 1,
+          thoughtsTokens: 1,
+          cachedTokens: 0,
+          totalTokens: 4,
+        },
+        {
+          promptTokens: 5,
+          candidatesTokens: 5,
+          thoughtsTokens: 0,
+          cachedTokens: 2,
+          totalTokens: 10,
+        },
       ),
-    ).toEqual({ promptTokens: 7, candidatesTokens: 6, totalTokens: 13 });
+    ).toEqual({
+      promptTokens: 7,
+      candidatesTokens: 6,
+      thoughtsTokens: 1,
+      cachedTokens: 2,
+      totalTokens: 14,
+    });
   });
 
   it('extrai functionCall e texto', () => {

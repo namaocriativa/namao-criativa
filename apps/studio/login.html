@@ -71,13 +71,51 @@
         </label>
         <label>
           Senha
-          <input
-            name="password"
-            type="password"
-            required
-            minlength="8"
-            autocomplete="current-password"
-          />
+          <span class="auth-password">
+            <input
+              name="password"
+              type="password"
+              required
+              minlength="8"
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              class="auth-password-toggle"
+              data-password-toggle
+              aria-label="Mostrar senha"
+              aria-pressed="false"
+            >
+              <svg class="auth-password-toggle__show" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="3"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                />
+              </svg>
+              <svg class="auth-password-toggle__hide" viewBox="0 0 24 24" aria-hidden="true" hidden>
+                <path
+                  d="M3 3l18 18M10.6 10.6A3 3 0 0 0 13.4 13.4M7 7.3C4.3 8.8 2.5 12 2.5 12s3.6 7 9.5 7c1.7 0 3.2-.4 4.5-1.1M16.8 16.2C19.4 14.6 21.5 12 21.5 12S17.9 5 12 5c-.9 0-1.8.1-2.6.4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </span>
         </label>
         <label class="auth-remember">
           <input

@@ -19,6 +19,8 @@ import {
 import { cookieJwtToken } from '../auth/jwt-cookie';
 import type { JwtUser } from '../auth/jwt.strategy';
 import { namaoWhatsAppUrl } from '../mail/site-introduction-email';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { GeminiService } from '../llm/gemini.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -297,14 +299,26 @@ export class NamaoChatService {
 
     let assembled = '';
     try {
-      for await (const delta of this.gemini.generateStream(prompt, {
-        temperature: 0.4,
-        signal: abort.signal,
-      })) {
-        if (abort.signal.aborted) break;
-        assembled += delta;
-        writeSse(res, 'token', { delta });
-      }
+      await runWithAiUsage(
+        {
+          feature: AI_FEATURES.namaoChat,
+          tenantId: resolved.user?.tenantId,
+          userId: resolved.user?.id,
+          leadId: session.leadId,
+          customerId: session.customerId,
+          jobId: session.id,
+        },
+        async () => {
+          for await (const delta of this.gemini.generateStream(prompt, {
+            temperature: 0.4,
+            signal: abort.signal,
+          })) {
+            if (abort.signal.aborted) return;
+            assembled += delta;
+            writeSse(res, 'token', { delta });
+          }
+        },
+      );
       const saved = await this.prisma.chatMessage.create({
         data: {
           sessionId: session.id,

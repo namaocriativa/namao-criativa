@@ -12,6 +12,8 @@ import {
 } from '../image-studio/image-models';
 import type { ImageInlineInput } from '../image-studio/image-provider';
 import { GeminiImageProvider } from '../image-studio/gemini-image.provider';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   StorageService,
@@ -201,13 +203,22 @@ export class CreativeCharacterService {
 
     let result;
     try {
-      result = await this.geminiImages.generate({
-        model: settings.model,
-        prompt,
-        history: [],
-        referenceImages,
-        settings,
-      });
+      result = await runWithAiUsage(
+        {
+          feature: AI_FEATURES.characterPhoto,
+          userId: character.createdByUserId,
+          tenantId: character.tenantId,
+          jobId: character.id,
+        },
+        () =>
+          this.geminiImages.generate({
+            model: settings.model,
+            prompt,
+            history: [],
+            referenceImages,
+            settings,
+          }),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Falha ao gerar foto';
@@ -264,12 +275,21 @@ export class CreativeCharacterService {
 
     let result;
     try {
-      result = await this.geminiVideos.generate({
-        model: settings.model,
-        prompt,
-        frames,
-        settings,
-      });
+      result = await runWithAiUsage(
+        {
+          feature: AI_FEATURES.characterVideo,
+          userId: character.createdByUserId,
+          tenantId: character.tenantId,
+          jobId: character.id,
+        },
+        () =>
+          this.geminiVideos.generate({
+            model: settings.model,
+            prompt,
+            frames,
+            settings,
+          }),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Falha ao gerar vídeo';

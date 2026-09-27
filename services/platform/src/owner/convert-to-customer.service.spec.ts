@@ -19,6 +19,7 @@ describe('ConvertToCustomerService', () => {
     contentCalendarReminder: { updateMany: jest.fn() },
     siteSkillJob: { updateMany: jest.fn() },
     instagramSkillJob: { updateMany: jest.fn() },
+    contentPlan: { updateMany: jest.fn() },
   };
 
   const prisma = {
@@ -135,6 +136,10 @@ describe('ConvertToCustomerService', () => {
       data: { customerId: 'lead-1', leadId: null },
     });
     expect(tx.instagramSkillJob.updateMany).toHaveBeenCalledWith({
+      where: { leadId: 'lead-1' },
+      data: { customerId: 'lead-1', leadId: null },
+    });
+    expect(tx.contentPlan.updateMany).toHaveBeenCalledWith({
       where: { leadId: 'lead-1' },
       data: { customerId: 'lead-1', leadId: null },
     });

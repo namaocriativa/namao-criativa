@@ -18,6 +18,11 @@ type ActivityItem = {
   summary: string | null;
   kind: string;
   at: string;
+  costLabel?: string;
+};
+
+type ActivityMonth = {
+  costLabel?: string;
 };
 
 function escapeHtml(value: unknown): string {
@@ -132,11 +137,15 @@ export function initUsersTab() {
       .join("")}</ul>`;
   }
 
-  function renderActivity(items: ActivityItem[]) {
+  function renderActivity(items: ActivityItem[], month?: ActivityMonth | null) {
     const recorded = items.filter((item) => item.kind !== "account.created");
     activityHint.hidden = recorded.length > 0;
-    activityList.innerHTML = items.length
-      ? items
+    const monthRow =
+      month?.costLabel
+        ? `<li><strong>Uso de IA no mês</strong><p class="meta">${escapeHtml(month.costLabel)}</p></li>`
+        : "";
+    activityList.innerHTML = items.length || monthRow
+      ? `${monthRow}${items
           .map(
             (item) =>
               `<li><strong>${escapeHtml(item.title)}</strong>${
@@ -144,12 +153,16 @@ export function initUsersTab() {
                   ? `<p class="meta">${escapeHtml(item.summary)}</p>`
                   : ""
               }${
+                item.costLabel
+                  ? `<p class="meta">${escapeHtml(item.costLabel)}</p>`
+                  : ""
+              }${
                 item.at
                   ? `<p class="meta">${escapeHtml(formatDate(item.at))}</p>`
                   : ""
               }</li>`,
           )
-          .join("")
+          .join("")}`
       : `<li><strong>Sem histórico</strong></li>`;
   }
 
@@ -210,9 +223,12 @@ export function initUsersTab() {
         setDetailStatus(await readError(activityRes), true);
         return;
       }
-      const data = (await activityRes.json()) as { items?: ActivityItem[] };
+      const data = (await activityRes.json()) as {
+        items?: ActivityItem[];
+        month?: ActivityMonth;
+      };
       if (seq !== loadSeq) return;
-      renderActivity(Array.isArray(data.items) ? data.items : []);
+      renderActivity(Array.isArray(data.items) ? data.items : [], data.month);
     } catch (error) {
       if (seq !== loadSeq) return;
       setDetailStatus(errorMessage(error, "Falha ao abrir usuário"), true);

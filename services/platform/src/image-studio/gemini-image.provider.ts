@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import axios from 'axios';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
+import { AI_USAGE_KIND, AI_USAGE_STATUS } from '../ai-usage/ai-usage.features';
 import { GeminiService } from '../llm/gemini.service';
 import { geminiHttpError } from '../llm/gemini-sse';
 import { findImageModel } from './image-models';
@@ -159,7 +161,10 @@ export class GeminiImageProvider implements ImageProvider {
   readonly id = 'gemini';
   private readonly logger = new Logger(GeminiImageProvider.name);
 
-  constructor(private readonly gemini: GeminiService) {}
+  constructor(
+    private readonly gemini: GeminiService,
+    @Optional() private readonly aiUsage?: AiUsageService,
+  ) {}
 
   async generate(input: ImageGenerateRequest): Promise<ImageGenerateResult> {
     if (!this.gemini.configured) {
@@ -171,6 +176,7 @@ export class GeminiImageProvider implements ImageProvider {
     const model = this.gemini.normalizeModel(input.model);
     const url = `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`;
     const body = buildGeminiImageRequest({ ...input, model });
+    await this.aiUsage?.assertWithinBudget();
 
     try {
       const res = await axios.post(url, body, {
@@ -191,10 +197,26 @@ export class GeminiImageProvider implements ImageProvider {
             : 'Gemini retornou resposta vazia',
         );
       }
-      return { ...summary, images, usage: extractGeminiUsage(res.data) };
+      const usage = extractGeminiUsage(res.data);
+      await this.aiUsage?.recordCall({
+        model,
+        kind: AI_USAGE_KIND.image,
+        status: AI_USAGE_STATUS.billed,
+        usage,
+        imageCount: images.length || 1,
+      });
+      return { ...summary, images, usage };
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status || 0;
+        if (status >= 400) {
+          await this.aiUsage?.recordCall({
+            model,
+            kind: AI_USAGE_KIND.image,
+            status: AI_USAGE_STATUS.failedUnbilled,
+            httpStatus: status,
+          });
+        }
         const raw =
           typeof error.response?.data === 'string'
             ? error.response.data

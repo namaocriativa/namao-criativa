@@ -1216,6 +1216,21 @@ button.outline:hover {
   font-size: 0.8rem;
 }
 
+.lead-history__item.is-openable .lead-history__body strong {
+  color: var(--fg);
+}
+
+.lead-history__open {
+  margin-top: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.lead-history__cost {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
 .lead-history__kind {
   margin: 0.28rem 0 0;
 }
@@ -4902,6 +4917,41 @@ body.auth-screen .topbar {
   outline-offset: 1px;
 }
 
+.auth-password {
+  position: relative;
+  display: block;
+}
+
+.auth-password input {
+  padding-right: 2.7rem;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  width: 2.1rem;
+  height: 2.1rem;
+  display: grid;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.auth-password-toggle:hover {
+  color: var(--nav-fg);
+}
+
+.auth-password-toggle svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+}
+
 .auth-card button[type="submit"] {
   min-height: var(--touch-min);
   border: 0;
@@ -7535,6 +7585,49 @@ h2.imagens-studio-title:focus {
   gap: 0.55rem;
 }
 
+.cal-create-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.cal-create-list button {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+}
+
+.cal-create-list button:hover {
+  border-color: color-mix(in srgb, currentColor 28%, var(--line));
+}
+
+.cal-create-kicker {
+  font-size: 0.68rem;
+  color: var(--muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cal-editor .cal-side-head button {
+  font: inherit;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
 .cal-day-list a,
 .cal-day-list button {
   display: grid;
@@ -7737,6 +7830,11 @@ h2.imagens-studio-title:focus {
   border-color: #2e7d32;
 }
 
+.site-skill-toast [data-ig-open] {
+  margin-top: 0.55rem;
+  width: 100%;
+}
+
 .site-skill-gallery {
   display: grid;
   gap: 0.35rem;
@@ -7758,6 +7856,49 @@ h2.imagens-studio-title:focus {
 
 .ig-skill-report__body h4 {
   margin: 0.6rem 0 0.15rem;
+}
+
+.content-plan-form,
+.content-plan-list,
+.content-plan-steps {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.content-plan-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.content-plan-steps .is-done {
+  color: var(--muted, #888);
+}
+
+.content-plan-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.content-plan-formats {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.content-plan-item {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.55rem;
+}
+
+.content-plan-modal .cal-create-list {
+  margin-bottom: 0.35rem;
 }
 
 @media (max-width: 960px) {

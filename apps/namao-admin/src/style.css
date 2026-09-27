@@ -326,6 +326,23 @@ button.secondary:hover,
   font-size: 0.88rem;
 }
 
+.usage-panel {
+  margin: 1rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.usage-panel h4 {
+  margin: 0 0 0.4rem;
+}
+
+.usage-panel label {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+}
+
 .activity-list {
   list-style: none;
   margin: 0.75rem 0 0;

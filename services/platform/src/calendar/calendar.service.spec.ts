@@ -1,6 +1,15 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException } from '@nestjs/common';
 import { CalendarService } from './calendar.service';
 import { runWithTenant } from '../tenant/tenant-context';
+import { fetchWebsiteSnippet } from './calendar-carousel.prompt';
+
+jest.mock('./calendar-carousel.prompt', () => {
+  const actual = jest.requireActual('./calendar-carousel.prompt') as object;
+  return {
+    ...actual,
+    fetchWebsiteSnippet: jest.fn().mockResolvedValue('Studio no centro'),
+  };
+});
 
 describe('CalendarService', () => {
   const prisma = {
@@ -38,14 +47,18 @@ describe('CalendarService', () => {
     readStorageFile: jest.fn(),
   };
   const llm = { generateJson: jest.fn() };
+  const creativeStudio = { generateCarousel: jest.fn() };
+  const user = { id: 'user-1' };
   const service = new CalendarService(
     prisma as never,
     storage as never,
     llm as never,
+    creativeStudio as never,
   );
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(fetchWebsiteSnippet).mockResolvedValue('Studio no centro');
   });
 
   it('cria post em rascunho com alvos por plataforma', async () => {
@@ -224,6 +237,160 @@ describe('CalendarService', () => {
       where: { id: 'rem-1' },
       data: { status: 'done' },
     });
+  });
+
+  it('recusa carrossel sem link', async () => {
+    await expect(
+      service.createFromCarousel(
+        {
+          sourceUrl: '   ',
+          scheduledAt: '2026-09-26T13:00:00.000Z',
+          leadId: 'lead-1',
+        },
+        user as never,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('recusa carrossel sem perfil', async () => {
+    await expect(
+      service.createFromCarousel(
+        {
+          sourceUrl: 'https://www.instagram.com/loja_ana/',
+          scheduledAt: '2026-09-26T13:00:00.000Z',
+        },
+        user as never,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('gera carrossel do Instagram, cria rascunho e anexa slides sem scrape', async () => {
+    prisma.lead.findUnique.mockResolvedValue({
+      id: 'lead-1',
+      tenantId: 'tenant-1',
+      name: 'Loja Ana',
+      category: 'Estética',
+    });
+    prisma.contentCalendarPost.create.mockResolvedValue({ id: 'post-1' });
+    prisma.contentCalendarPost.findUnique.mockResolvedValue({
+      id: 'post-1',
+      tenantId: 'tenant-1',
+      targets: [],
+      assets: [],
+    });
+    creativeStudio.generateCarousel.mockResolvedValue({
+      spec: {
+        caption: 'Salve este carrossel',
+        slides: [{ headline: 'Dor da rotina' }],
+      },
+      assets: [{ id: 'img-1' }, { id: 'img-2' }],
+    });
+    const attach = jest
+      .spyOn(service, 'attachStudioAsset')
+      .mockResolvedValue({ id: 'post-1' } as never);
+
+    await runWithTenant('tenant-1', () =>
+      service.createFromCarousel(
+        {
+          sourceUrl: 'https://www.instagram.com/loja_ana/',
+          scheduledAt: '2026-09-26T13:00:00.000Z',
+          leadId: 'lead-1',
+          notes: 'Tom direto',
+        },
+        user as never,
+      ),
+    );
+
+    expect(fetchWebsiteSnippet).not.toHaveBeenCalled();
+    expect(creativeStudio.generateCarousel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('https://www.instagram.com/loja_ana/'),
+        notes: 'Tom direto',
+      }),
+      user,
+    );
+    expect(prisma.contentCalendarPost.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Dor da rotina',
+          caption: 'Salve este carrossel',
+          status: 'draft',
+          leadId: 'lead-1',
+        }),
+      }),
+    );
+    expect(attach).toHaveBeenCalledTimes(2);
+    expect(attach).toHaveBeenCalledWith('post-1', {
+      source: 'image-studio',
+      assetId: 'img-1',
+    });
+  });
+
+  it('enriquece site (não Instagram) antes de gerar o carrossel', async () => {
+    prisma.lead.findUnique.mockResolvedValue({
+      id: 'lead-1',
+      tenantId: 'tenant-1',
+      name: 'Loja Ana',
+    });
+    prisma.contentCalendarPost.create.mockResolvedValue({ id: 'post-1' });
+    prisma.contentCalendarPost.findUnique.mockResolvedValue({
+      id: 'post-1',
+      tenantId: 'tenant-1',
+      targets: [],
+      assets: [],
+    });
+    creativeStudio.generateCarousel.mockResolvedValue({
+      spec: { caption: 'Salve', slides: [{ headline: 'Capa' }] },
+      assets: [{ id: 'img-1' }],
+    });
+    jest
+      .spyOn(service, 'attachStudioAsset')
+      .mockResolvedValue({ id: 'post-1' } as never);
+
+    await runWithTenant('tenant-1', () =>
+      service.createFromCarousel(
+        {
+          sourceUrl: 'https://loja-ana.com.br',
+          scheduledAt: '2026-09-26T13:00:00.000Z',
+          leadId: 'lead-1',
+        },
+        user as never,
+      ),
+    );
+
+    expect(fetchWebsiteSnippet).toHaveBeenCalledWith('https://loja-ana.com.br/');
+    expect(creativeStudio.generateCarousel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('Studio no centro'),
+      }),
+      user,
+    );
+  });
+
+  it('recusa carrossel sem slides gerados', async () => {
+    prisma.lead.findUnique.mockResolvedValue({
+      id: 'lead-1',
+      tenantId: 'tenant-1',
+      name: 'Loja Ana',
+    });
+    creativeStudio.generateCarousel.mockResolvedValue({
+      spec: { caption: '', slides: [] },
+      assets: [],
+      error: 'Falha ao gerar um slide',
+    });
+    await expect(
+      runWithTenant('tenant-1', () =>
+        service.createFromCarousel(
+          {
+            sourceUrl: 'https://www.instagram.com/loja_ana/',
+            scheduledAt: '2026-09-26T13:00:00.000Z',
+            leadId: 'lead-1',
+          },
+          user as never,
+        ),
+      ),
+    ).rejects.toBeInstanceOf(BadGatewayException);
+    expect(prisma.contentCalendarPost.create).not.toHaveBeenCalled();
   });
 
   it('agenda só com mídia', async () => {

@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { ImageAsset, Prisma } from '@prisma/client';
 import * as fs from 'fs/promises';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   StorageService,
@@ -297,13 +299,24 @@ export class ImageStudioService {
 
     let result;
     try {
-      result = await this.geminiImages.generate({
-        model: settings.model,
-        prompt,
-        history,
-        referenceImages,
-        settings,
-      });
+      const skillRun = this.settingsOf(project.settings).skillRun;
+      result = await runWithAiUsage(
+        {
+          feature: AI_FEATURES.imageGenerate,
+          userId: project.createdByUserId,
+          tenantId: project.tenantId,
+          leadId: skillRun?.leadId || null,
+          jobId: projectId,
+        },
+        () =>
+          this.geminiImages.generate({
+            model: settings.model,
+            prompt,
+            history,
+            referenceImages,
+            settings,
+          }),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Falha ao gerar imagem';

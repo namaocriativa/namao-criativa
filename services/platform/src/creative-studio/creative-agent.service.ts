@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import type { JwtUser } from '../auth/identity';
 import {
   canAccessImages,
@@ -176,12 +178,21 @@ export class CreativeAgentService {
       const history = await this.listMessages(conversationId, kind);
       let turnResult;
       try {
-        turnResult = await this.llm.generateTurn({
-          systemInstruction: creativeAgentSystemPrompt(kind),
-          contents: agentContentsFromMessages(history),
-          tools,
-          temperature: 0.4,
-        });
+        turnResult = await runWithAiUsage(
+          {
+            feature: AI_FEATURES.creativeAgent,
+            userId: user.id,
+            tenantId: user.tenantId,
+            jobId: conversationId,
+          },
+          () =>
+            this.llm.generateTurn({
+              systemInstruction: creativeAgentSystemPrompt(kind),
+              contents: agentContentsFromMessages(history),
+              tools,
+              temperature: 0.4,
+            }),
+        );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Falha no modelo de chat';

@@ -105,6 +105,7 @@ export default defineConfig({
       '/storage': apiProxy(),
       '/site-skill': apiProxy(),
       '/ig-skill': apiProxy(),
+      '/content-plan': apiProxy(),
       '/website-projects': apiProxy(),
       '/config': apiProxy(),
       '/auth': apiProxy(),

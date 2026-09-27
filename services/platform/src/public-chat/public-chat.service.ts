@@ -8,6 +8,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { GeminiService } from '../llm/gemini.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatContextBuilder } from './context-builder';
@@ -154,14 +156,26 @@ export class PublicChatService {
 
     let assembled = '';
     try {
-      for await (const delta of this.gemini.generateStream(prompt, {
-        temperature: 0.4,
-        signal: abort.signal,
-      })) {
-        if (abort.signal.aborted) break;
-        assembled += delta;
-        writeSse(res, 'token', { delta });
-      }
+      const lead = session.lead as { tenantId?: string };
+      await runWithAiUsage(
+        {
+          feature: AI_FEATURES.publicChat,
+          tenantId: lead.tenantId,
+          leadId: session.customerId ? null : session.leadId,
+          customerId: session.customerId,
+          jobId: session.id,
+        },
+        async () => {
+          for await (const delta of this.gemini.generateStream(prompt, {
+            temperature: 0.4,
+            signal: abort.signal,
+          })) {
+            if (abort.signal.aborted) break;
+            assembled += delta;
+            writeSse(res, 'token', { delta });
+          }
+        },
+      );
       const saved = await this.prisma.chatMessage.create({
         data: {
           sessionId: session.id,

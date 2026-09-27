@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { readFile } from 'fs/promises';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import type { JwtUser } from '../auth/identity';
 import { ImageStudioService } from '../image-studio/image-studio.service';
 import { buildLeadBrief } from '../owner/lead-brief';
@@ -85,6 +87,22 @@ export class CreativeStudioService {
     }
 
     await this.access.assertCanAccess(user, dto.leadId);
+    return runWithAiUsage(
+      {
+        feature: AI_FEATURES.flyer,
+        userId: user.id,
+        leadId: dto.leadId,
+      },
+      () => this.generateFlyerBody(dto, user, feature, packageIds),
+    );
+  }
+
+  private async generateFlyerBody(
+    dto: GenerateFlyerDto,
+    user: JwtUser,
+    feature: NonNullable<ReturnType<typeof findCreativeFeature>>,
+    packageIds: string[],
+  ) {
     const lead = (await this.leads.findById(dto.leadId, user)) as LeadLike;
     const packages = await this.loadPackages(packageIds);
     const photos = leadPhotos(lead).slice(0, MAX_LEAD_PHOTOS);
@@ -181,7 +199,21 @@ export class CreativeStudioService {
     const notes = dto.notes?.trim() || '';
     const slideCount = clampSlideCount(dto.slideCount);
     const plannerContext = { prompt, notes, slideCount };
+    return runWithAiUsage(
+      {
+        feature: AI_FEATURES.carousel,
+        userId: user.id,
+      },
+      () => this.generateCarouselBody(dto, user, feature, plannerContext),
+    );
+  }
 
+  private async generateCarouselBody(
+    dto: GenerateCarouselDto,
+    user: JwtUser,
+    feature: NonNullable<ReturnType<typeof findCreativeFeature>>,
+    plannerContext: { prompt: string; notes: string; slideCount: number },
+  ) {
     let spec: CarouselSpec;
     try {
       spec = await this.llm.generateJson(
@@ -199,6 +231,7 @@ export class CreativeStudioService {
       throw new BadGatewayException(message);
     }
 
+    const { prompt, notes } = plannerContext;
     const defaults = feature.defaults || {};
     const aspectRatio = defaults.aspectRatio || '4:5';
     const imageSize = defaults.imageSize || '2K';
@@ -289,7 +322,26 @@ export class CreativeStudioService {
       brief = buildLeadBrief(lead);
     }
     const plannerContext = { prompt, notes, brief };
+    return runWithAiUsage(
+      {
+        feature: AI_FEATURES.repurpose,
+        userId: user.id,
+        leadId: dto.leadId?.trim() || null,
+      },
+      () => this.generateRepurposeBody(dto, user, plannerContext),
+    );
+  }
 
+  private async generateRepurposeBody(
+    dto: GenerateRepurposeDto,
+    user: JwtUser,
+    plannerContext: {
+      prompt: string;
+      notes: string;
+      brief?: ReturnType<typeof buildLeadBrief>;
+    },
+  ) {
+    const { prompt, notes, brief } = plannerContext;
     let spec: RepurposeSpec;
     try {
       spec = await this.llm.generateJson(

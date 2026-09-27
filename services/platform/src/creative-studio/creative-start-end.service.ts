@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as fs from 'fs/promises';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   StorageService,
@@ -191,12 +193,21 @@ export class CreativeStartEndService {
     });
 
     try {
-      const result = await this.geminiVideos.generate({
-        model: settings.model,
-        prompt,
-        frames,
-        settings,
-      });
+      const result = await runWithAiUsage(
+        {
+          feature: AI_FEATURES.startEnd,
+          userId: clip.createdByUserId,
+          tenantId: clip.tenantId,
+          jobId: clip.id,
+        },
+        () =>
+          this.geminiVideos.generate({
+            model: settings.model,
+            prompt,
+            frames,
+            settings,
+          }),
+      );
       const video = result.videos[0];
       if (!video) {
         throw new BadGatewayException(

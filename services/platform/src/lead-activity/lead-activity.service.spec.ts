@@ -138,5 +138,76 @@ describe('LeadActivityService', () => {
       summary: '@firma',
       payload: { igUserId: '1784' },
     });
+    expect(result.items[0]).toMatchObject({
+      title: 'Skill Instagram concluída',
+      summary: 'Relatório pronto · 30 dias',
+    });
+  });
+
+  it('não duplica skill Instagram quando já existe o job', async () => {
+    owners.findProfile.mockResolvedValue({
+      id: 'lead-1',
+      kind: 'lead',
+      name: 'Firma',
+      createdAt: new Date('2026-01-01T10:00:00.000Z'),
+      updatedAt: new Date('2026-01-03T10:00:00.000Z'),
+    });
+    prisma.leadActivity.findMany.mockResolvedValue([
+      {
+        id: 'act-ig',
+        title: 'Skill Instagram concluída',
+        summary: '12 posts analisados',
+        channel: 'skill',
+        kind: 'skill.instagram',
+        payload: { jobId: 'job-1', status: 'done' },
+        createdAt: new Date('2026-01-06T10:00:00.000Z'),
+      },
+    ]);
+    prisma.instagramSkillJob.findMany.mockResolvedValue([
+      {
+        id: 'job-1',
+        status: 'done',
+        stage: 'done',
+        days: 30,
+        model: 'gpt',
+        error: null,
+        createdByUserId: 'op-1',
+        createdAt: new Date('2026-01-06T09:00:00.000Z'),
+        updatedAt: new Date('2026-01-06T10:00:00.000Z'),
+      },
+    ]);
+
+    const result = await service.listHistory('lead-1');
+    expect(result.items.filter((item) => item.kind === 'skill.instagram')).toHaveLength(1);
+    expect(result.items[0].source).toBe('instagram_skill_job');
+  });
+
+  it('mantém a atividade da skill se o job não vier na query', async () => {
+    owners.findProfile.mockResolvedValue({
+      id: 'lead-1',
+      kind: 'lead',
+      name: 'Firma',
+      createdAt: new Date('2026-01-01T10:00:00.000Z'),
+      updatedAt: new Date('2026-01-03T10:00:00.000Z'),
+    });
+    prisma.leadActivity.findMany.mockResolvedValue([
+      {
+        id: 'act-ig',
+        title: 'Skill Instagram concluída',
+        summary: '12 posts analisados',
+        channel: 'skill',
+        kind: 'skill.instagram',
+        payload: { jobId: 'job-1', status: 'done' },
+        createdAt: new Date('2026-01-06T10:00:00.000Z'),
+      },
+    ]);
+    prisma.instagramSkillJob.findMany.mockRejectedValue(new Error('missing table'));
+
+    const result = await service.listHistory('lead-1');
+    expect(result.items[0]).toMatchObject({
+      kind: 'skill.instagram',
+      source: 'lead_activity',
+      payload: { jobId: 'job-1' },
+    });
   });
 });

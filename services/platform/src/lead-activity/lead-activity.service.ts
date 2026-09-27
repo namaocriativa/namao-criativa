@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
 import { OwnerLookup } from '../owner/owner-lookup.service';
 import { ownerCreateData, ownerWhere } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,6 +10,14 @@ import {
   sortHistory,
   type LeadHistoryItem,
 } from './lead-history';
+
+async function settled<T>(task: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await task;
+  } catch {
+    return fallback;
+  }
+}
 
 export type LeadActivityChannel = 'email' | 'whatsapp' | 'system' | string;
 
@@ -28,6 +37,7 @@ export class LeadActivityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly owners: OwnerLookup,
+    @Optional() private readonly usage?: AiUsageService,
   ) {}
 
   async record(input: RecordLeadActivityInput) {
@@ -49,6 +59,7 @@ export class LeadActivityService {
     if (!lead) throw new NotFoundException(`Lead ${leadId} not found`);
 
     const where = ownerWhere(leadId);
+    const empty = [] as never[];
     const [
       activities,
       connections,
@@ -63,142 +74,188 @@ export class LeadActivityService {
       sources,
       chats,
     ] = await Promise.all([
-      this.prisma.leadActivity.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.instagramConnection.findMany({
-        where,
-        select: {
-          id: true,
-          username: true,
-          igUserId: true,
-          scopes: true,
-          tokenExpiresAt: true,
-          createdAt: true,
-        },
-      }),
-      this.prisma.siteSkillJob.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          status: true,
-          stage: true,
-          slug: true,
-          repo: true,
-          model: true,
-          error: true,
-          createdByUserId: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-      this.prisma.instagramSkillJob.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          status: true,
-          stage: true,
-          days: true,
-          model: true,
-          error: true,
-          createdByUserId: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-      this.prisma.invite.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          status: true,
-          phone: true,
-          expiresAt: true,
-          createdAt: true,
-        },
-      }),
-      this.prisma.clientAccount.findMany({
-        where,
-        select: { id: true, email: true, name: true, createdAt: true },
-      }),
-      this.prisma.studioLeadShare.findMany({
-        where,
-        select: {
-          id: true,
-          createdAt: true,
-          user: { select: { id: true, name: true, email: true } },
-        },
-      }),
-      this.prisma.contentCalendarPost.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          scheduledAt: true,
-          createdAt: true,
-          createdByUserId: true,
-        },
-      }),
-      this.prisma.contentCalendarReminder.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          scheduledAt: true,
-          createdAt: true,
-          createdByUserId: true,
-        },
-      }),
-      this.prisma.leadImage.findMany({
-        where,
-        select: {
-          id: true,
-          source: true,
-          filename: true,
-          createdAt: true,
-        },
-      }),
-      this.prisma.leadSource.findMany({
-        where,
-        select: { id: true, provider: true, url: true, createdAt: true },
-      }),
-      this.prisma.chatSession.findMany({
-        where,
-        select: {
-          id: true,
-          channel: true,
-          status: true,
-          messageCount: true,
-          createdAt: true,
-        },
-      }),
+      settled(
+        this.prisma.leadActivity.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.instagramConnection.findMany({
+          where,
+          select: {
+            id: true,
+            username: true,
+            igUserId: true,
+            scopes: true,
+            tokenExpiresAt: true,
+            createdAt: true,
+          },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.siteSkillJob.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            stage: true,
+            slug: true,
+            repo: true,
+            model: true,
+            error: true,
+            createdByUserId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.instagramSkillJob.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            stage: true,
+            days: true,
+            model: true,
+            error: true,
+            createdByUserId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.invite.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            phone: true,
+            expiresAt: true,
+            createdAt: true,
+          },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.clientAccount.findMany({
+          where,
+          select: { id: true, email: true, name: true, createdAt: true },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.studioLeadShare.findMany({
+          where,
+          select: {
+            id: true,
+            createdAt: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.contentCalendarPost.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            scheduledAt: true,
+            createdAt: true,
+            createdByUserId: true,
+          },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.contentCalendarReminder.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            scheduledAt: true,
+            createdAt: true,
+            createdByUserId: true,
+          },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.leadImage.findMany({
+          where,
+          select: {
+            id: true,
+            source: true,
+            filename: true,
+            createdAt: true,
+          },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.leadSource.findMany({
+          where,
+          select: { id: true, provider: true, url: true, createdAt: true },
+        }),
+        empty,
+      ),
+      settled(
+        this.prisma.chatSession.findMany({
+          where,
+          select: {
+            id: true,
+            channel: true,
+            status: true,
+            messageCount: true,
+            createdAt: true,
+          },
+        }),
+        empty,
+      ),
     ]);
 
+    const igJobIds = new Set(igJobs.map((job) => job.id));
     const items: LeadHistoryItem[] = [
-      ...activities.map((activity) => {
+      ...activities.flatMap((activity) => {
         const payload =
           activity.payload &&
           typeof activity.payload === 'object' &&
           !Array.isArray(activity.payload)
             ? (activity.payload as Record<string, unknown>)
             : null;
-        return historyItem({
-          id: activity.id,
-          at: activity.createdAt,
-          kind: activity.kind,
-          channel: activity.channel,
-          title: activity.title,
-          summary: activity.summary || null,
-          payload,
-          source: 'lead_activity',
-        });
+        if (
+          activity.kind === 'skill.instagram' &&
+          typeof payload?.jobId === 'string' &&
+          igJobIds.has(payload.jobId)
+        ) {
+          return [];
+        }
+        return [
+          historyItem({
+            id: activity.id,
+            at: activity.createdAt,
+            kind: activity.kind,
+            channel: activity.channel,
+            title: activity.title,
+            summary: activity.summary || null,
+            payload,
+            source: 'lead_activity',
+          }),
+        ];
       }),
       ...connections.map((connection) =>
         historyItem({
@@ -249,11 +306,19 @@ export class LeadActivityService {
           at: job.status === 'queued' ? job.createdAt : job.updatedAt,
           kind: 'skill.instagram',
           channel: 'skill',
-          title: 'Skill Instagram',
+          title:
+            job.status === 'done'
+              ? 'Skill Instagram concluída'
+              : job.status === 'error'
+                ? 'Skill Instagram falhou'
+                : 'Skill Instagram',
           summary: joinLabels([
-            job.status,
+            job.status === 'done'
+              ? 'Relatório pronto'
+              : job.status === 'error'
+                ? job.error
+                : job.status,
             job.days ? `${job.days} dias` : null,
-            job.error,
           ]),
           actor: job.createdByUserId
             ? { type: 'studio', id: job.createdByUserId }
@@ -398,7 +463,13 @@ export class LeadActivityService {
       }),
     ];
 
-    return { items: sortHistory(items) };
+    const sorted = sortHistory(items);
+    if (!this.usage) return { items: sorted };
+    const withCost = await this.usage.attachCostsToHistory(sorted, {
+      leadId: lead.id,
+      customerId: lead.id,
+    });
+    return { items: withCost };
   }
 
   private groupedImages(

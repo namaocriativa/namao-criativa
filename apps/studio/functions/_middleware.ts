@@ -30,6 +30,7 @@ const API_PREFIXES = [
   '/storage',
   '/site-skill',
   '/ig-skill',
+  '/content-plan',
   '/website-projects',
   '/config',
   '/invites',

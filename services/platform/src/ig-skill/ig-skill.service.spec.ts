@@ -16,17 +16,20 @@ describe('IgSkillService', () => {
   const access = { assertCanAccess: jest.fn() };
   const llm = { modelFor: jest.fn(() => 'gemini-2.5-flash'), generateJson: jest.fn() };
   const graph = { listMedia: jest.fn() };
+  const activity = { record: jest.fn() };
   const service = new IgSkillService(
     prisma as never,
     owners as never,
     access as never,
     llm as never,
     graph as never,
+    activity as never,
   );
 
   beforeEach(() => {
     jest.resetAllMocks();
     llm.modelFor.mockReturnValue('gemini-2.5-flash');
+    activity.record.mockResolvedValue({ id: 'act-1' });
   });
 
   it('recusa sem Instagram conectado', async () => {
@@ -71,6 +74,14 @@ describe('IgSkillService', () => {
       }),
     );
     expect(job.id).toBe('job-1');
+    expect(activity.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: 'lead-1',
+        kind: 'skill.instagram',
+        title: 'Skill Instagram iniciada',
+        payload: expect.objectContaining({ jobId: 'job-1', status: 'queued' }),
+      }),
+    );
     expect(prisma.instagramSkillJob.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -134,6 +145,14 @@ describe('IgSkillService', () => {
     expect(prisma.instagramSkillJob.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'done', stage: 'done' }),
+      }),
+    );
+    expect(activity.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: 'lead-1',
+        kind: 'skill.instagram',
+        title: 'Skill Instagram concluída',
+        payload: expect.objectContaining({ jobId: 'job-1', status: 'done' }),
       }),
     );
   });

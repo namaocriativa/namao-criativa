@@ -29,6 +29,7 @@ type Report = {
 
 export function initIgSkillReport(host: HTMLElement): {
   open: (report: Report, owner: { id: string; kind: EntityKind }) => void;
+  openJob: (jobId: string, owner: { id: string; kind: EntityKind }) => Promise<void>;
   openLatest: (owner: { id: string; kind: EntityKind }) => Promise<void>;
   close: () => void;
 } {
@@ -125,6 +126,12 @@ export function initIgSkillReport(host: HTMLElement): {
       status.textContent = "";
       paint(report);
       modal.hidden = false;
+    },
+    async openJob(jobId, nextOwner) {
+      const res = await api(`/ig-skill/jobs/${encodeURIComponent(jobId)}`);
+      const data = (await res.json()) as { report?: Report };
+      if (!res.ok || !data.report) return;
+      this.open(data.report, nextOwner);
     },
     async openLatest(nextOwner) {
       const qs =

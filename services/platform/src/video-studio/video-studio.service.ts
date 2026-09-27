@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { VideoAsset, Prisma } from '@prisma/client';
 import * as fs from 'fs/promises';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   StorageService,
@@ -311,13 +313,22 @@ export class VideoStudioService {
 
     let result;
     try {
-      result = await this.geminiVideos.generate({
-        model: settings.model,
-        prompt,
-        frames,
-        previousInteractionId,
-        settings,
-      });
+      result = await runWithAiUsage(
+        {
+          feature: AI_FEATURES.videoGenerate,
+          userId: project.createdByUserId,
+          tenantId: project.tenantId,
+          jobId: projectId,
+        },
+        () =>
+          this.geminiVideos.generate({
+            model: settings.model,
+            prompt,
+            frames,
+            previousInteractionId,
+            settings,
+          }),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Falha ao gerar vídeo';

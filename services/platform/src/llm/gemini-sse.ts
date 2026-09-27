@@ -1,5 +1,6 @@
 export async function* parseGeminiSseStream(
   stream: ReadableStream<Uint8Array>,
+  onEvent?: (data: unknown) => void,
 ): AsyncGenerator<string> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -12,7 +13,9 @@ export async function* parseGeminiSseStream(
     dataLines = [];
     if (!raw || raw === '[DONE]') return null;
     try {
-      return extractGeminiText(JSON.parse(raw));
+      const data = JSON.parse(raw);
+      onEvent?.(data);
+      return extractGeminiText(data);
     } catch {
       return null;
     }

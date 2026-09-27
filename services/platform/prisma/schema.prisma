@@ -34,7 +34,10 @@ model Tenant {
   calendarReminders      ContentCalendarReminder[]
   siteSkillJobs          SiteSkillJob[]
   instagramSkillJobs     InstagramSkillJob[]
+  contentPlans           ContentPlan[]
   proposals              Proposal[]
+  aiUsageEvents          AiUsageEvent[]
+  aiBudgets              AiBudget[]
 
   @@index([status])
 }
@@ -88,6 +91,7 @@ model Lead {
   instagramConnections InstagramConnection[]
   siteSkillJobs SiteSkillJob[]
   instagramSkillJobs InstagramSkillJob[]
+  contentPlans ContentPlan[]
   chatSessions ChatSession[]
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
@@ -151,6 +155,7 @@ model Customer {
   instagramConnections InstagramConnection[]
   siteSkillJobs SiteSkillJob[]
   instagramSkillJobs InstagramSkillJob[]
+  contentPlans ContentPlan[]
   chatSessions ChatSession[]
   chatEvents   ChatEvent[]
   activities   LeadActivity[]
@@ -295,6 +300,33 @@ model InstagramSkillJob {
   @@index([tenantId])
 }
 
+model ContentPlan {
+  id             String   @id @default(cuid())
+  tenantId       String
+  leadId         String?
+  customerId     String?
+  title          String
+  description    String   @default("")
+  postsPerWeek   Int
+  weeks          Int
+  formats        Json
+  items          Json
+  status         String   @default("draft")
+  sourceIgJobId  String
+  createdByUserId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([customerId])
+  @@index([status])
+  @@index([tenantId])
+}
+
 /// Staff do Studio (`ROOT` | `ADMIN` | `OPERATOR`). Login do portal é `ClientAccount`.
 model User {
   id              String   @id @default(cuid())
@@ -322,6 +354,7 @@ model User {
   createdUgcClips           CreativeUgcClip[]      @relation("CreativeUgcClipCreatedBy")
   createdCalendarPosts      ContentCalendarPost[] @relation("ContentCalendarPostCreatedBy")
   createdCalendarReminders  ContentCalendarReminder[] @relation("ContentCalendarReminderCreatedBy")
+  aiUsageEvents             AiUsageEvent[]
 
   @@index([tenantId])
 }
@@ -911,6 +944,78 @@ model ContentCalendarAsset {
   post ContentCalendarPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
+}
+
+model AiUsageEvent {
+  id               String   @id @default(cuid())
+  tenantId         String?
+  userId           String?
+  leadId           String?
+  customerId       String?
+  feature          String
+  provider         String   @default("gemini")
+  model            String
+  kind             String
+  promptTokens     Int      @default(0)
+  candidatesTokens Int      @default(0)
+  thoughtsTokens   Int      @default(0)
+  cachedTokens     Int      @default(0)
+  totalTokens      Int      @default(0)
+  imageCount       Int      @default(0)
+  videoSeconds     Float    @default(0)
+  usdMicros        BigInt   @default(0)
+  fxUsdToBrl       Float
+  brlMicros        BigInt   @default(0)
+  status           String
+  jobId            String?
+  periodKey        String
+  occurredAt       DateTime @default(now())
+  metadata         Json?
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, periodKey])
+  @@index([userId, periodKey])
+  @@index([leadId, periodKey])
+  @@index([customerId, periodKey])
+  @@index([jobId])
+  @@index([occurredAt])
+  @@index([feature, occurredAt])
+}
+
+model AiPriceRow {
+  id            String   @id @default(cuid())
+  model         String
+  unit          String
+  usdPerMillion Float    @default(0)
+  usdPerUnit    Float    @default(0)
+  effectiveFrom DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([model, unit, effectiveFrom])
+}
+
+model AiBudget {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  scope                 String
+  scopeId               String   @default("")
+  monthlyLimitUsdMicros BigInt
+  warnPercent           Int      @default(80)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, scope, scopeId])
+  @@index([tenantId])
+}
+
+model AiPlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model ContentCalendarReminder {

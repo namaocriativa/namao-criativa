@@ -29,6 +29,32 @@ describe('gemini-sse', () => {
     expect(chunks).toEqual(['Olá', ' mundo']);
   });
 
+  it('entrega o último evento para ler usageMetadata', async () => {
+    const payload = [
+      'data: {"candidates":[{"content":{"parts":[{"text":"Oi"}]}}]}',
+      '',
+      'data: {"candidates":[{"content":{"parts":[{"text":"!"}]}}],"usageMetadata":{"promptTokenCount":3,"candidatesTokenCount":2,"totalTokenCount":5}}',
+      '',
+    ].join('\n');
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(payload));
+        controller.close();
+      },
+    });
+    const events: unknown[] = [];
+    for await (const _delta of parseGeminiSseStream(stream, (data) => {
+      events.push(data);
+    })) {
+      void _delta;
+    }
+    expect(events.at(-1)).toEqual(
+      expect.objectContaining({
+        usageMetadata: expect.objectContaining({ totalTokenCount: 5 }),
+      }),
+    );
+  });
+
   it('lê mensagem de erro da API', () => {
     expect(
       geminiHttpError(403, '{"error":{"message":"API key invalid"}}'),

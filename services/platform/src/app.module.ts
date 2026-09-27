@@ -13,6 +13,7 @@ import { LeadDiscoveryModule } from './lead-discovery/lead-discovery.module';
 import { LocationsModule } from './locations/locations.module';
 import { SiteSkillModule } from './site-skill/site-skill.module';
 import { IgSkillModule } from './ig-skill/ig-skill.module';
+import { ContentPlanModule } from './content-plan/content-plan.module';
 import { AuthModule } from './auth/auth.module';
 import { InvitesModule } from './invites/invites.module';
 import { InstagramModule } from './instagram/instagram.module';
@@ -33,6 +34,7 @@ import { CreativeStudioModule } from './creative-studio/creative-studio.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { WebsiteProjectsModule } from './website-projects/website-projects.module';
 import { ProposalModule } from './proposal/proposal.module';
+import { AiUsageModule } from './ai-usage/ai-usage.module';
 
 @Module({
   imports: [
@@ -45,6 +47,7 @@ import { ProposalModule } from './proposal/proposal.module';
     StudioLeadAccessModule,
     RedisModule,
     StorageModule,
+    AiUsageModule,
     LlmModule,
     AuthModule,
     InvitesModule,
@@ -57,6 +60,7 @@ import { ProposalModule } from './proposal/proposal.module';
     CustomerModule,
     SiteSkillModule,
     IgSkillModule,
+    ContentPlanModule,
     PackagesModule,
     PublicChatModule,
     NamaoChatModule,

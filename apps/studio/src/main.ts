@@ -45,6 +45,7 @@ import { initSiteSkillProgress } from "./site-skill-progress";
 import { initIgSkillModal } from "./ig-skill-modal";
 import { initIgSkillProgress } from "./ig-skill-progress";
 import { initIgSkillReport } from "./ig-skill-report";
+import { initContentPlanModal } from "./content-plan-modal";
 import { initLeadGallery } from "./lead-gallery";
 import { initLeadAccountModal } from "./lead-account-modal";
 import { initLeadShareModal } from "./lead-share-modal";
@@ -175,6 +176,8 @@ const siteAddBtn = el<HTMLButtonElement>("site-add-btn");
 const siteAgendaBtn = el<HTMLButtonElement>("site-agenda-btn");
 const siteSkillBtn = el<HTMLButtonElement>("site-skill-btn");
 const igSkillBtn = el<HTMLButtonElement>("ig-skill-btn");
+const contentPlanBtn = el<HTMLButtonElement>("content-plan-btn");
+const igSkillReportBtn = el<HTMLButtonElement>("ig-skill-report-btn");
 const siteStatus = el<HTMLElement>("site-status");
 const siteActions = el<HTMLElement>("site-actions");
 const heroHealth = el<HTMLElement>("lead-hero-health");
@@ -187,6 +190,7 @@ let currentEntityKind: EntityKind = "lead";
 let currentLead: Lead | null = null;
 let historyLoadSeq = 0;
 let heroHealthSeq = 0;
+let igReportAvailable = false;
 const contextWide = window.matchMedia("(min-width: 1100px)");
 
 function syncLeadContextFold(on = document.body.classList.contains("is-lead-view")) {
@@ -376,22 +380,39 @@ const siteSkill = initSiteSkillModal(el<HTMLElement>("site-skill-root"), {
   onStarted: (jobId) => siteSkillProgress.watch(jobId),
 });
 const igSkillReport = initIgSkillReport(el<HTMLElement>("ig-skill-report-root"));
+
+function openIgSkillReport(job?: { id?: string; report?: unknown } | null) {
+  if (!currentLeadId) return;
+  const owner = { id: currentLeadId, kind: currentEntityKind };
+  if (job?.report) {
+    igSkillReport.open(job.report as never, owner);
+    return;
+  }
+  if (job?.id) {
+    void igSkillReport.openJob(job.id, owner);
+    return;
+  }
+  void igSkillReport.openLatest(owner);
+}
+
 const igSkillProgress = initIgSkillProgress({
   onDone: (job) => {
-    if (!currentLeadId || !job.report) return;
-    igSkillReport.open(job.report as never, {
-      id: currentLeadId,
-      kind: currentEntityKind,
-    });
+    if (currentLead) {
+      void loadLeadHistory(currentLead);
+      void syncIgReportButton(currentLead);
+    }
+    openIgSkillReport(job);
   },
+  onOpen: (job) => openIgSkillReport(job),
 });
 const igSkill = initIgSkillModal(el<HTMLElement>("ig-skill-root"), {
-  onStarted: (jobId) => igSkillProgress.watch(jobId),
-  onOpenReport: () => {
-    if (!currentLeadId) return;
-    void igSkillReport.openLatest({ id: currentLeadId, kind: currentEntityKind });
+  onStarted: (jobId) => {
+    igSkillProgress.watch(jobId);
+    if (currentLead) void loadLeadHistory(currentLead);
   },
+  onOpenReport: () => openIgSkillReport(),
 });
+const contentPlan = initContentPlanModal(el<HTMLElement>("content-plan-root"));
 const leadGallery = initLeadGallery(el<HTMLElement>("lead-gallery-root"), {
   onLeadUpdated: (lead) => {
     renderLead(lead);
@@ -859,6 +880,11 @@ function renderLeadContext(lead: Lead) {
         ? `<button type="button" data-context-action="mark-paid" hidden>Marcar como pago</button>`
         : ""
     }
+    ${
+      lead.id
+        ? `<button type="button" data-context-action="ig-report" hidden>Relatório Instagram</button>`
+        : ""
+    }
   `;
   leadContextActions
     .querySelector("[data-context-action='gallery']")
@@ -891,9 +917,13 @@ function renderLeadContext(lead: Lead) {
     ?.addEventListener("click", () => {
       if (lead.id) void markProposalPaid(lead);
     });
+  leadContextActions
+    .querySelector("[data-context-action='ig-report']")
+    ?.addEventListener("click", () => openIgSkillReport());
 
   void loadLeadHistory(lead);
   void loadLeadProposal(lead);
+  void syncIgReportButton(lead);
 }
 
 type HistoryItem = {
@@ -936,7 +966,16 @@ function renderHistoryItems(items: HistoryItem[]) {
           const payload = item.payload
             ? JSON.stringify(item.payload, null, 2)
             : "";
-          return `<li class="lead-history__item" data-channel="${escapeHtml(item.channel || "system")}">
+          const jobId =
+            item.kind === "skill.instagram" &&
+            item.payload &&
+            typeof item.payload.jobId === "string"
+              ? item.payload.jobId
+              : "";
+          const canOpenReport =
+            Boolean(jobId) &&
+            (item.payload?.status === "done" || item.title.includes("conclu"));
+          return `<li class="lead-history__item${canOpenReport ? " is-openable" : ""}" data-channel="${escapeHtml(item.channel || "system")}">
             <span class="lead-history__channel">${escapeHtml(historyChannelLabel(item.channel))}</span>
             <div class="lead-history__body">
               <strong>${escapeHtml(item.title)}</strong>
@@ -946,8 +985,18 @@ function renderHistoryItems(items: HistoryItem[]) {
                   : ""
               }
               ${
+                item.payload && typeof item.payload.costLabel === "string"
+                  ? `<p class="meta lead-history__cost">${escapeHtml(item.payload.costLabel)}</p>`
+                  : ""
+              }
+              ${
                 item.atLabel || item.at
                   ? `<p class="meta">${escapeHtml(item.atLabel || item.at || "")}</p>`
+                  : ""
+              }
+              ${
+                canOpenReport
+                  ? `<button type="button" class="lead-history__open" data-ig-history-job="${escapeHtml(jobId)}">Abrir relatório</button>`
                   : ""
               }
               ${
@@ -1044,6 +1093,33 @@ async function markProposalPaid(lead: Lead) {
   } catch (error) {
     alert(error instanceof Error ? error.message : "Falha ao marcar pagamento");
   }
+}
+
+async function syncIgReportButton(lead: Lead | null) {
+  const quickBtn = leadContextActions.querySelector(
+    "[data-context-action='ig-report']",
+  ) as HTMLButtonElement | null;
+  if (!lead?.id) {
+    igReportAvailable = false;
+    igSkillReportBtn.hidden = true;
+    if (quickBtn) quickBtn.hidden = true;
+    return;
+  }
+  const qs =
+    entityKindOf(lead) === "customer"
+      ? `customerId=${encodeURIComponent(lead.id)}`
+      : `leadId=${encodeURIComponent(lead.id)}`;
+  try {
+    const res = await api(`/ig-skill/latest?${qs}`);
+    const data = (await res.json().catch(() => ({}))) as {
+      job?: { id?: string; report?: unknown } | null;
+    };
+    igReportAvailable = Boolean(res.ok && data.job?.report);
+  } catch {
+    igReportAvailable = false;
+  }
+  igSkillReportBtn.hidden = !igReportAvailable;
+  if (quickBtn) quickBtn.hidden = !igReportAvailable;
 }
 
 async function loadLeadHistory(lead: Lead) {
@@ -1175,6 +1251,8 @@ function renderLead(lead: Lead) {
   leadQuickActions.hidden = !currentLeadId;
   leadHistoryCard.hidden = !currentLeadId;
   siteActions.hidden = !currentLeadId;
+  igReportAvailable = false;
+  igSkillReportBtn.hidden = true;
   setSiteActionsEnabled(Boolean(currentLeadId));
   updateLandingMeta();
   void loadHeroHealth(lead);
@@ -2117,6 +2195,8 @@ function setSiteActionsEnabled(enabled: boolean) {
   igSkillBtn.title = connected
     ? "Analisar o feed conectado"
     : "Conecte o Instagram do lead";
+  igSkillReportBtn.hidden = !enabled || !igReportAvailable;
+  contentPlanBtn.disabled = !enabled;
 }
 
 function landingBadgeHtml(lead: Pick<Lead, "landingStatus" | "publishedOrigin" | "websiteProjectId" | "websiteDeployType" | "websiteRepo" | "websiteDomain">) {
@@ -2232,5 +2312,23 @@ siteSkillBtn.addEventListener("click", () => {
 igSkillBtn.addEventListener("click", () => {
   if (!currentLeadId || !currentLead?.instagramConnections?.length) return;
   igSkill.open(currentLeadId, currentEntityKind, currentLead);
+});
+
+contentPlanBtn.addEventListener("click", () => {
+  if (!currentLeadId) return;
+  contentPlan.open(currentLeadId, currentEntityKind, currentLead);
+});
+
+igSkillReportBtn.addEventListener("click", () => openIgSkillReport());
+
+leadContextHistory.addEventListener("click", (event) => {
+  const btn = (event.target as HTMLElement).closest("[data-ig-history-job]");
+  if (!(btn instanceof HTMLElement) || !currentLeadId) return;
+  const jobId = btn.dataset.igHistoryJob;
+  if (!jobId) return;
+  void igSkillReport.openJob(jobId, {
+    id: currentLeadId,
+    kind: currentEntityKind,
+  });
 });
 

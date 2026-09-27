@@ -25,6 +25,7 @@ import {
   CalendarIdeasQueryDto,
   CalendarPostsFromIdeasDto,
 } from './dto/calendar-ideas.dto';
+import { CalendarPostFromCarouselDto } from './dto/calendar-from-carousel.dto';
 import type { CalendarOwnerQuery } from './calendar.service';
 
 @StudioAuth()
@@ -97,8 +98,11 @@ export class CalendarController {
   }
 
   @Post('ideas')
-  generateIdeas(@Body() dto: CalendarIdeasQueryDto) {
-    return this.calendar.generateIdeas(dto);
+  generateIdeas(
+    @Body() dto: CalendarIdeasQueryDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.calendar.generateIdeas(dto, user);
   }
 
   @Post('posts/from-ideas')
@@ -107,6 +111,14 @@ export class CalendarController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.calendar.createFromIdeas(dto, user.id);
+  }
+
+  @Post('posts/from-carousel')
+  createFromCarousel(
+    @Body() dto: CalendarPostFromCarouselDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.calendar.createFromCarousel(dto, user);
   }
 
   @Post('posts')

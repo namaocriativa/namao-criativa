@@ -7,12 +7,15 @@ import {
 import type { JwtUser } from '../auth/identity';
 import { LlmService } from '../llm/llm.service';
 import { InstagramGraphClient } from '../instagram/instagram-graph.client';
+import { LeadActivityService } from '../lead-activity/lead-activity.service';
 import { buildLeadBrief } from '../owner/lead-brief';
 import type { LeadLike } from '../owner/lead-like';
 import { OwnerLookup } from '../owner/owner-lookup.service';
 import { ownerWhere } from '../owner/owner.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { requireTenantId, tenantWhere } from '../tenant/tenant.util';
 import { compactIgCorpus } from './ig-corpus';
 import { estimateIgSkillUsd } from './ig-cost';
@@ -29,6 +32,7 @@ export class IgSkillService {
     private readonly access: StudioLeadAccessService,
     private readonly llm: LlmService,
     private readonly graph: InstagramGraphClient,
+    private readonly activity: LeadActivityService,
   ) {}
 
   estimate(model?: string) {
@@ -97,6 +101,11 @@ export class IgSkillService {
         ],
       },
     });
+    await this.trace(ownerId, {
+      title: 'Skill Instagram iniciada',
+      summary: `${days} dias`,
+      payload: { jobId: row.id, status: 'queued', days },
+    });
     void this.run(row.id, ownerId).catch((error) => {
       this.logger.error(
         error instanceof Error ? error.stack || error.message : String(error),
@@ -106,6 +115,23 @@ export class IgSkillService {
   }
 
   private async run(jobId: string, ownerId: string) {
+    const meta = await this.prisma.instagramSkillJob.findUnique({
+      where: { id: jobId },
+      select: { createdByUserId: true, leadId: true, customerId: true },
+    });
+    return runWithAiUsage(
+      {
+        feature: AI_FEATURES.igSkill,
+        userId: meta?.createdByUserId,
+        leadId: meta?.leadId,
+        customerId: meta?.customerId,
+        jobId,
+      },
+      () => this.execute(jobId, ownerId),
+    );
+  }
+
+  private async execute(jobId: string, ownerId: string) {
     try {
       const job = await this.requireJob(jobId);
       const conn = await this.prisma.instagramConnection.findFirst({
@@ -148,6 +174,11 @@ export class IgSkillService {
           error: null,
         },
       });
+      await this.trace(ownerId, {
+        title: 'Skill Instagram concluída',
+        summary: `${corpus.postCount} posts analisados`,
+        payload: { jobId, status: 'done' },
+      });
       await this.appendLog(jobId, 'done', `Pronto · ${corpus.postCount} posts`);
     } catch (error) {
       const message =
@@ -156,7 +187,36 @@ export class IgSkillService {
         where: { id: jobId },
         data: { status: 'error', stage: 'error', error: message },
       });
+      await this.trace(ownerId, {
+        title: 'Skill Instagram falhou',
+        summary: message,
+        payload: { jobId, status: 'error', error: message },
+      });
       await this.appendLog(jobId, 'error', message);
+    }
+  }
+
+  private async trace(
+    ownerId: string,
+    input: {
+      title: string;
+      summary: string;
+      payload: Record<string, unknown>;
+    },
+  ) {
+    try {
+      await this.activity.record({
+        leadId: ownerId,
+        channel: 'skill',
+        kind: 'skill.instagram',
+        title: input.title,
+        summary: input.summary,
+        payload: input.payload,
+      });
+    } catch (error) {
+      this.logger.warn(
+        error instanceof Error ? error.message : 'Falha ao gravar histórico da skill Instagram',
+      );
     }
   }
 

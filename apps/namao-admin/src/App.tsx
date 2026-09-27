@@ -38,6 +38,36 @@ type TenantActivity = TenantRow & {
   }[];
 };
 
+type UsageCost = {
+  costLabel: string;
+  usd: number;
+  brl: number;
+  calls: number;
+};
+
+type TenantUsage = {
+  period: string;
+  fxUsdToBrl: number;
+  total: UsageCost;
+  limitUsd: number | null;
+  percent: number | null;
+  byUser: Array<UsageCost & { userId: string | null; name: string }>;
+  byLead: Array<UsageCost & { ownerId: string | null; name: string }>;
+  events: Array<{
+    id: string;
+    feature: string;
+    model: string;
+    costLabel: string;
+    occurredAt: string;
+  }>;
+  budgets: Array<{
+    scope: string;
+    scopeId: string;
+    monthlyLimitUsd: number;
+    warnPercent: number;
+  }>;
+};
+
 function statusLabel(status: string): string {
   return status === "disabled" ? "Desativada" : "Ativa";
 }
@@ -55,6 +85,10 @@ export function App() {
   const [createStatus, setCreateStatus] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TenantActivity | null>(null);
+  const [usage, setUsage] = useState<TenantUsage | null>(null);
+  const [pricingFx, setPricingFx] = useState("5.5");
+  const [tenantLimit, setTenantLimit] = useState("");
+  const [usageStatus, setUsageStatus] = useState("");
   const [detailStatus, setDetailStatus] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -112,6 +146,7 @@ export function App() {
   useEffect(() => {
     if (!selectedId) {
       setDetail(null);
+      setUsage(null);
       return;
     }
     void (async () => {
@@ -126,6 +161,24 @@ export function App() {
         }
         setDetail(data as TenantActivity);
         setDetailStatus("");
+        const [usageRes, pricingRes] = await Promise.all([
+          api(`/studio/tenants/${encodeURIComponent(selectedId)}/usage`),
+          api("/studio/ai/pricing"),
+        ]);
+        if (usageRes.ok) {
+          const usageData = (await usageRes.json()) as TenantUsage;
+          setUsage(usageData);
+          const tenantBudget = usageData.budgets.find((row) => row.scope === "tenant");
+          setTenantLimit(
+            tenantBudget ? String(tenantBudget.monthlyLimitUsd) : "",
+          );
+        } else {
+          setUsage(null);
+        }
+        if (pricingRes.ok) {
+          const pricing = (await pricingRes.json()) as { usdToBrl?: number };
+          if (pricing.usdToBrl) setPricingFx(String(pricing.usdToBrl));
+        }
       } catch (error) {
         setDetail(null);
         setDetailStatus(
@@ -184,6 +237,51 @@ export function App() {
       );
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function saveUsageSettings() {
+    if (!selectedId) return;
+    setUsageStatus("Salvando…");
+    try {
+      const fx = Number(pricingFx);
+      if (Number.isFinite(fx) && fx > 0) {
+        const pricingRes = await api("/studio/ai/pricing", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usdToBrl: fx }),
+        });
+        if (!pricingRes.ok) {
+          const data: unknown = await pricingRes.json().catch(() => ({}));
+          throw new Error(apiErrorMessage(data, "Falha ao salvar câmbio"));
+        }
+      }
+      const limit = Number(tenantLimit);
+      const items =
+        Number.isFinite(limit) && limit > 0
+          ? [{ scope: "tenant" as const, monthlyLimitUsd: limit }]
+          : [];
+      const budgetRes = await api(
+        `/studio/tenants/${encodeURIComponent(selectedId)}/usage/budgets`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items }),
+        },
+      );
+      if (!budgetRes.ok) {
+        const data: unknown = await budgetRes.json().catch(() => ({}));
+        throw new Error(apiErrorMessage(data, "Falha ao salvar limite"));
+      }
+      const usageRes = await api(
+        `/studio/tenants/${encodeURIComponent(selectedId)}/usage`,
+      );
+      if (usageRes.ok) setUsage((await usageRes.json()) as TenantUsage);
+      setUsageStatus("Limites e câmbio salvos.");
+    } catch (error) {
+      setUsageStatus(
+        error instanceof Error ? error.message : "Falha ao salvar uso de IA",
+      );
     }
   }
 
@@ -373,6 +471,76 @@ export function App() {
                   </ul>
                 ) : null}
                 <p className="status">{detailStatus}</p>
+                {usage ? (
+                  <section className="usage-panel">
+                    <h4>Uso de IA · {usage.period}</h4>
+                    <p className="tenant-meta">
+                      {usage.total.costLabel}
+                      {usage.percent != null
+                        ? ` · ${usage.percent.toFixed(0)}% do teto`
+                        : ""}
+                      {` · ${usage.total.calls} chamada(s)`}
+                    </p>
+                    <label>
+                      Câmbio US$ → R$
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={pricingFx}
+                        onChange={(event) => setPricingFx(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Teto mensal da agência (US$)
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Ilimitado"
+                        value={tenantLimit}
+                        onChange={(event) => setTenantLimit(event.target.value)}
+                      />
+                    </label>
+                    <div className="actions">
+                      <button type="button" onClick={() => void saveUsageSettings()}>
+                        Salvar limites
+                      </button>
+                    </div>
+                    <p className="status">{usageStatus}</p>
+                    {usage.byUser.length ? (
+                      <ul className="staff-list">
+                        {usage.byUser.map((row) => (
+                          <li key={row.userId || "none"}>
+                            {row.name} · {row.costLabel}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {usage.byLead.length ? (
+                      <ul className="staff-list">
+                        {usage.byLead.map((row) => (
+                          <li key={row.ownerId || "internal"}>
+                            {row.name} · {row.costLabel}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <ul className="activity-list">
+                      {usage.events.slice(0, 20).map((event) => (
+                        <li key={event.id}>
+                          <strong>
+                            {event.feature} · {event.model}
+                          </strong>
+                          <p>{event.costLabel}</p>
+                          <time dateTime={event.occurredAt}>
+                            {formatWhen(event.occurredAt)}
+                          </time>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
                 <ul className="activity-list">
                   {(detail?.items || []).map((item) => (
                     <li key={item.id}>

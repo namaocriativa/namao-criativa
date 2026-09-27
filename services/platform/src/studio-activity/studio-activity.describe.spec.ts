@@ -210,6 +210,11 @@ describe('describeStudioAction', () => {
       title: 'Analisou Instagram do lead',
       summary: 'Skill Instagram',
     });
+    expect(describeStudioAction('POST', '/content-plan/generate')).toEqual({
+      kind: 'content-plan.generate',
+      title: 'Gerou plano de conteúdo',
+      summary: 'Skill planejamento',
+    });
   });
 
   it('traduz o calendário de conteúdo', () => {

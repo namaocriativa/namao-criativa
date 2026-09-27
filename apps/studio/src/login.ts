@@ -16,6 +16,29 @@ if (rememberEl) {
   rememberEl.checked = localStorage.getItem(REMEMBER_KEY) !== "0";
 }
 
+const passwordEl = form.querySelector<HTMLInputElement>('input[name="password"]');
+const passwordToggle = form.querySelector<HTMLButtonElement>(
+  "[data-password-toggle]",
+);
+passwordToggle?.addEventListener("click", () => {
+  if (!passwordEl) return;
+  const show = passwordEl.type === "password";
+  passwordEl.type = show ? "text" : "password";
+  passwordToggle.setAttribute("aria-pressed", show ? "true" : "false");
+  passwordToggle.setAttribute(
+    "aria-label",
+    show ? "Ocultar senha" : "Mostrar senha",
+  );
+  const eye = passwordToggle.querySelector<SVGElement>(
+    ".auth-password-toggle__show",
+  );
+  const eyeOff = passwordToggle.querySelector<SVGElement>(
+    ".auth-password-toggle__hide",
+  );
+  if (eye) eye.toggleAttribute("hidden", show);
+  if (eyeOff) eyeOff.toggleAttribute("hidden", !show);
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const fd = new FormData(form);

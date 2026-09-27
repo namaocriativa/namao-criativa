@@ -1,14 +1,19 @@
 export type GeminiUsage = {
   promptTokens: number;
   candidatesTokens: number;
+  thoughtsTokens: number;
+  cachedTokens: number;
   totalTokens: number;
 };
 
 export function extractGeminiUsage(data: unknown): GeminiUsage | null {
+  if (!data || typeof data !== 'object') return null;
   const root = data as {
     usageMetadata?: {
       promptTokenCount?: number;
       candidatesTokenCount?: number;
+      thoughtsTokenCount?: number;
+      cachedContentTokenCount?: number;
       totalTokenCount?: number;
     };
     usage?: {
@@ -22,15 +27,24 @@ export function extractGeminiUsage(data: unknown): GeminiUsage | null {
   const meta = root.usageMetadata;
   if (
     meta &&
-    (meta.promptTokenCount || meta.candidatesTokenCount || meta.totalTokenCount)
+    (meta.promptTokenCount ||
+      meta.candidatesTokenCount ||
+      meta.totalTokenCount ||
+      meta.thoughtsTokenCount ||
+      meta.cachedContentTokenCount)
   ) {
     const promptTokens = Number(meta.promptTokenCount) || 0;
     const candidatesTokens = Number(meta.candidatesTokenCount) || 0;
+    const thoughtsTokens = Number(meta.thoughtsTokenCount) || 0;
+    const cachedTokens = Number(meta.cachedContentTokenCount) || 0;
     return {
       promptTokens,
       candidatesTokens,
+      thoughtsTokens,
+      cachedTokens,
       totalTokens:
-        Number(meta.totalTokenCount) || promptTokens + candidatesTokens,
+        Number(meta.totalTokenCount) ||
+        promptTokens + candidatesTokens + thoughtsTokens,
     };
   }
   const usage = root.usage;
@@ -42,7 +56,13 @@ export function extractGeminiUsage(data: unknown): GeminiUsage | null {
     const totalTokens =
       Number(usage.total_tokens) || promptTokens + candidatesTokens;
     if (promptTokens || candidatesTokens || totalTokens) {
-      return { promptTokens, candidatesTokens, totalTokens };
+      return {
+        promptTokens,
+        candidatesTokens,
+        thoughtsTokens: 0,
+        cachedTokens: 0,
+        totalTokens,
+      };
     }
   }
   return null;
@@ -57,6 +77,8 @@ export function mergeGeminiUsage(
   return {
     promptTokens: left.promptTokens + right.promptTokens,
     candidatesTokens: left.candidatesTokens + right.candidatesTokens,
+    thoughtsTokens: (left.thoughtsTokens || 0) + (right.thoughtsTokens || 0),
+    cachedTokens: (left.cachedTokens || 0) + (right.cachedTokens || 0),
     totalTokens: left.totalTokens + right.totalTokens,
   };
 }

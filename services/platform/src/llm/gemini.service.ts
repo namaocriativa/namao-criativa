@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
+import { AI_USAGE_KIND, AI_USAGE_STATUS } from '../ai-usage/ai-usage.features';
 import { buildJsonRepairPrompt } from './json-repair-prompt';
 import type { GenerateOptions } from './generate-options';
 import {
@@ -8,6 +10,7 @@ import {
   geminiHttpError,
   parseGeminiSseStream,
 } from './gemini-sse';
+import { extractGeminiUsage } from './gemini-usage';
 import {
   parseGeminiTurnResponse,
   type GeminiToolDeclaration,
@@ -28,7 +31,10 @@ type GeminiPart = {
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly aiUsage?: AiUsageService,
+  ) {}
 
   get apiKey(): string {
     return this.config.get<string>('GEMINI_API_KEY')?.trim() || '';
@@ -130,6 +136,8 @@ export class GeminiService {
     });
 
     const url = `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`;
+    await this.aiUsage?.assertWithinBudget();
+    let recorded = false;
     try {
       const res = await axios.post(
         url,
@@ -149,6 +157,8 @@ export class GeminiService {
         },
       );
       const text = extractGeminiText(res.data);
+      await this.recordText(model, extractGeminiUsage(res.data), AI_USAGE_STATUS.billed);
+      recorded = true;
       if (!text) {
         const block = res.data?.promptFeedback?.blockReason;
         throw new Error(
@@ -160,6 +170,7 @@ export class GeminiService {
       options.onChunk?.(text, text);
       return text;
     } catch (error) {
+      if (!recorded) await this.recordHttpFailure(model, error);
       throw new Error(geminiErrorMessage(error));
     }
   }
@@ -217,6 +228,8 @@ export class GeminiService {
       ];
     }
 
+    await this.aiUsage?.assertWithinBudget();
+    let recorded = false;
     try {
       const res = await axios.post(url, body, {
         params: { key: this.apiKey },
@@ -224,6 +237,8 @@ export class GeminiService {
         signal: input.signal,
       });
       const parsed = parseGeminiTurnResponse(res.data);
+      await this.recordText(model, parsed.usage, AI_USAGE_STATUS.billed);
+      recorded = true;
       if (!parsed.text && !parsed.functionCalls.length) {
         const block = (res.data as { promptFeedback?: { blockReason?: string } })
           ?.promptFeedback?.blockReason;
@@ -235,6 +250,7 @@ export class GeminiService {
       }
       return parsed;
     } catch (error) {
+      if (!recorded) await this.recordHttpFailure(model, error);
       throw new Error(geminiErrorMessage(error));
     }
   }
@@ -252,6 +268,7 @@ export class GeminiService {
       options.model || GEMINI_DEFAULTS.chat,
     );
     const url = `${GEMINI_BASE}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(this.apiKey)}`;
+    await this.aiUsage?.assertWithinBudget();
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -267,20 +284,47 @@ export class GeminiService {
       const body = await res.text().catch(() => '');
       const message = geminiHttpError(res.status, body);
       this.logger.warn(`Gemini stream failed: ${message}`);
+      await this.recordHttpFailure(model, { response: { status: res.status } });
       throw new Error(message);
     }
     if (!res.body) {
       throw new Error('Gemini retornou resposta vazia');
     }
     let yielded = false;
-    for await (const delta of parseGeminiSseStream(res.body)) {
+    let lastUsage = extractGeminiUsage(undefined);
+    for await (const delta of parseGeminiSseStream(res.body, (data) => {
+      lastUsage = extractGeminiUsage(data) || lastUsage;
+    })) {
       if (!delta) continue;
       yielded = true;
       yield delta;
     }
+    await this.recordText(model, lastUsage, AI_USAGE_STATUS.billed);
     if (!yielded) {
       throw new Error('Gemini retornou resposta vazia');
     }
+  }
+
+  private async recordText(
+    model: string,
+    usage: ReturnType<typeof extractGeminiUsage>,
+    status: (typeof AI_USAGE_STATUS)[keyof typeof AI_USAGE_STATUS],
+  ) {
+    await this.aiUsage?.recordCall({
+      model,
+      kind: AI_USAGE_KIND.text,
+      status,
+      usage,
+    });
+  }
+
+  private async recordHttpFailure(model: string, error: unknown) {
+    const status = axios.isAxiosError(error)
+      ? error.response?.status || 0
+      : Number((error as { response?: { status?: number } })?.response?.status) ||
+        0;
+    if (status < 400) return;
+    await this.recordText(model, null, AI_USAGE_STATUS.failedUnbilled);
   }
 }
 

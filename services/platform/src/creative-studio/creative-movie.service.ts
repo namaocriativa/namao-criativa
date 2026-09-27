@@ -5,6 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { GeminiVideoProvider } from '../video-studio/gemini-video.provider';
@@ -315,12 +317,21 @@ export class CreativeMovieService {
     );
 
     try {
-      const result = await this.geminiVideos.generate({
-        model: settings.model,
-        prompt,
-        frames,
-        settings,
-      });
+      const result = await runWithAiUsage(
+        {
+          feature: AI_FEATURES.movieShot,
+          userId: movie.createdByUserId,
+          tenantId: movie.tenantId,
+          jobId: shot.id,
+        },
+        () =>
+          this.geminiVideos.generate({
+            model: settings.model,
+            prompt,
+            frames,
+            settings,
+          }),
+      );
       const video = result.videos[0];
       if (!video) {
         throw new BadGatewayException(

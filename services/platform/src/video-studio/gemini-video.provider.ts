@@ -1,5 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import axios from 'axios';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
+import { AI_USAGE_KIND, AI_USAGE_STATUS } from '../ai-usage/ai-usage.features';
+import { parseDurationSeconds } from '../ai-usage/ai-usage.period';
 import { GeminiService } from '../llm/gemini.service';
 import { geminiHttpError } from '../llm/gemini-sse';
 import { findVideoModel, isVeoVideoModel } from './video-models';
@@ -93,7 +96,10 @@ export class GeminiVideoProvider implements VideoProvider {
   readonly id = 'gemini';
   private readonly logger = new Logger(GeminiVideoProvider.name);
 
-  constructor(private readonly gemini: GeminiService) {}
+  constructor(
+    private readonly gemini: GeminiService,
+    @Optional() private readonly aiUsage?: AiUsageService,
+  ) {}
 
   async generate(input: VideoGenerateRequest): Promise<VideoGenerateResult> {
     if (!this.gemini.configured) {
@@ -103,9 +109,18 @@ export class GeminiVideoProvider implements VideoProvider {
     }
 
     const model = this.gemini.normalizeModel(input.model);
+    const videoSeconds = parseDurationSeconds(input.settings?.duration);
+    await this.aiUsage?.assertWithinBudget();
     if (isVeoVideoModel(model)) {
       try {
-        return await generateVeoVideo({ ...input, model }, this.gemini.apiKey);
+        const result = await generateVeoVideo({ ...input, model }, this.gemini.apiKey);
+        await this.aiUsage?.recordCall({
+          model,
+          kind: AI_USAGE_KIND.video,
+          status: AI_USAGE_STATUS.estimated,
+          videoSeconds: videoSeconds || 8,
+        });
+        return result;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : String(error);
@@ -135,14 +150,30 @@ export class GeminiVideoProvider implements VideoProvider {
             : 'Gemini retornou resposta vazia',
         );
       }
+      const usage = extractGeminiUsage(res.data);
+      await this.aiUsage?.recordCall({
+        model,
+        kind: AI_USAGE_KIND.video,
+        status: AI_USAGE_STATUS.billed,
+        usage,
+        videoSeconds,
+      });
       return {
         ...summary,
         interactionId: geminiInteractionId(res.data),
-        usage: extractGeminiUsage(res.data),
+        usage,
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status || 0;
+        if (status >= 400) {
+          await this.aiUsage?.recordCall({
+            model,
+            kind: AI_USAGE_KIND.video,
+            status: AI_USAGE_STATUS.failedUnbilled,
+            httpStatus: status,
+          });
+        }
         const raw =
           typeof error.response?.data === 'string'
             ? error.response.data

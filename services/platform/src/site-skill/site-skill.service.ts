@@ -19,6 +19,8 @@ import { stableLandingSlug } from '../owner/lead-like';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { StudioLeadAccessService } from '../studio-lead-access/studio-lead-access.service';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { requireTenantId, tenantWhere } from '../tenant/tenant.util';
 import { GithubWebsitesClient } from '../website-projects/github-websites.client';
 import { WebsiteProjectsService } from '../website-projects/website-projects.service';
@@ -129,6 +131,33 @@ export class SiteSkillService {
     },
   ) {
     const work = path.join(os.tmpdir(), `namao-site-${jobId}`);
+    const meta = await this.prisma.siteSkillJob.findUnique({
+      where: { id: jobId },
+      select: { createdByUserId: true, leadId: true, customerId: true },
+    });
+    return runWithAiUsage(
+      {
+        feature: AI_FEATURES.siteSkill,
+        userId: meta?.createdByUserId,
+        leadId: meta?.leadId || (ctx.kind === 'lead' ? ctx.ownerId : null),
+        customerId:
+          meta?.customerId || (ctx.kind === 'customer' ? ctx.ownerId : null),
+        jobId,
+      },
+      () => this.execute(jobId, ctx, work),
+    );
+  }
+
+  private async execute(
+    jobId: string,
+    ctx: {
+      ownerId: string;
+      kind: 'lead' | 'customer';
+      imageIds: string[];
+      uploads: SiteSkillUpload[];
+    },
+    work: string,
+  ) {
     try {
       await fs.rm(work, { recursive: true, force: true });
       await fs.mkdir(work, { recursive: true });

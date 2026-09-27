@@ -3,7 +3,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
 import * as bcrypt from 'bcryptjs';
 import { generatePassword } from '../lead-account/lead-account.util';
 import { ConfigService } from '@nestjs/config';
@@ -35,6 +37,7 @@ export type StudioUserActivityItem = {
   summary: string | null;
   kind: string;
   at: string;
+  costLabel?: string;
 };
 
 @Injectable()
@@ -43,6 +46,7 @@ export class StudioUsersService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    @Optional() private readonly usage?: AiUsageService,
   ) {}
 
   list() {
@@ -151,7 +155,10 @@ export class StudioUsersService {
     return { ok: true as const };
   }
 
-  async listActivity(id: string): Promise<{ items: StudioUserActivityItem[] }> {
+  async listActivity(id: string): Promise<{
+    items: StudioUserActivityItem[];
+    month?: { costLabel: string; usd: number; brl: number };
+  }> {
     const user = await this.requireStudioUser(id);
     const rows = await this.prisma.studioUserActivity.findMany({
       where: { userId: id },
@@ -175,7 +182,8 @@ export class StudioUsersService {
       },
     ];
     items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-    return { items };
+    if (!this.usage) return { items };
+    return this.usage.attachCostsToUserActivity(id, items);
   }
 
   private studioLoginUrl() {

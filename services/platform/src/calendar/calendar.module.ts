@@ -3,13 +3,20 @@ import { AuthModule } from '../auth/auth.module';
 import { StorageModule } from '../storage/storage.module';
 import { InstagramModule } from '../instagram/instagram.module';
 import { LlmModule } from '../llm/llm.module';
+import { CreativeStudioModule } from '../creative-studio/creative-studio.module';
 import { CalendarController } from './calendar.controller';
 import { CalendarPublicController } from './calendar-public.controller';
 import { CalendarService } from './calendar.service';
 import { CalendarPublisher } from './calendar.publisher';
 
 @Module({
-  imports: [AuthModule, StorageModule, InstagramModule, LlmModule],
+  imports: [
+    AuthModule,
+    StorageModule,
+    InstagramModule,
+    LlmModule,
+    CreativeStudioModule,
+  ],
   controllers: [CalendarController, CalendarPublicController],
   providers: [CalendarService, CalendarPublisher],
   exports: [CalendarService, CalendarPublisher],

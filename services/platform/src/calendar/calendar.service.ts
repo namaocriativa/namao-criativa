@@ -9,16 +9,25 @@ import { StorageService } from '../storage/storage.service';
 import { LlmService } from '../llm/llm.service';
 import { buildLeadBrief } from '../owner/lead-brief';
 import type { LeadLike } from '../owner/lead-like';
+import type { JwtUser } from '../auth/identity';
+import { CreativeStudioService } from '../creative-studio/creative-studio.service';
 import { CreateCalendarPostDto } from './dto/create-calendar-post.dto';
 import { UpdateCalendarPostDto } from './dto/update-calendar-post.dto';
 import { CreateCalendarReminderDto } from './dto/create-calendar-reminder.dto';
 import { UpdateCalendarReminderDto } from './dto/update-calendar-reminder.dto';
 import { AttachStudioAssetDto } from './dto/attach-studio-asset.dto';
+import { CalendarPostFromCarouselDto } from './dto/calendar-from-carousel.dto';
 import { isCalendarReminderStatus } from './calendar.reminders';
 import {
   CalendarIdeasQueryDto,
   CalendarPostsFromIdeasDto,
 } from './dto/calendar-ideas.dto';
+import {
+  buildCarouselSkillPrompt,
+  fetchWebsiteSnippet,
+  isInstagramSourceUrl,
+  normalizeSourceUrl,
+} from './calendar-carousel.prompt';
 import {
   buildCalendarIdeasPrompt,
   parseCalendarIdeasSpec,
@@ -31,6 +40,8 @@ import {
   recomputePostStatus,
   type CalendarPlatform,
 } from './calendar.platforms';
+import { runWithAiUsage } from '../ai-usage/ai-usage.context';
+import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { assertSameTenant, requireTenantId, tenantWhere } from '../tenant/tenant.util';
 
 export type CalendarUploadFile = {
@@ -74,6 +85,7 @@ export class CalendarService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly llm: LlmService,
+    private readonly creativeStudio: CreativeStudioService,
   ) {}
 
   async findRange(from?: string, to?: string, owner?: CalendarOwnerQuery) {
@@ -177,20 +189,32 @@ export class CalendarService {
     return assertSameTenant(post, 'Post do calendário não encontrado');
   }
 
-  async generateIdeas(dto: CalendarIdeasQueryDto): Promise<CalendarIdeasSpec> {
+  async generateIdeas(
+    dto: CalendarIdeasQueryDto,
+    user?: JwtUser,
+  ): Promise<CalendarIdeasSpec> {
     const owner = await this.requireOwner(dto.leadId, dto.customerId);
     const profile = await this.loadOwnerProfile(owner);
     const notes = dto.notes?.trim() || '';
     const plannerContext = { brief: buildLeadBrief(profile), notes };
     try {
-      return await this.llm.generateJson(
-        buildCalendarIdeasPrompt(plannerContext),
-        (value) => parseCalendarIdeasSpec(value, plannerContext),
+      return await runWithAiUsage(
         {
-          role: 'plan',
-          temperature: 0.2,
-          expectedShape: 'CalendarIdeasSpec',
+          feature: AI_FEATURES.calendarIdeas,
+          userId: user?.id,
+          leadId: owner.leadId,
+          customerId: owner.customerId,
         },
+        () =>
+          this.llm.generateJson(
+            buildCalendarIdeasPrompt(plannerContext),
+            (value) => parseCalendarIdeasSpec(value, plannerContext),
+            {
+              role: 'plan',
+              temperature: 0.2,
+              expectedShape: 'CalendarIdeasSpec',
+            },
+          ),
       );
     } catch (error) {
       const message =
@@ -227,6 +251,64 @@ export class CalendarService {
       );
     }
     return { posts };
+  }
+
+  async createFromCarousel(dto: CalendarPostFromCarouselDto, user: JwtUser) {
+    const sourceUrl = normalizeSourceUrl(dto.sourceUrl);
+    if (!sourceUrl) {
+      throw new BadRequestException('Informe o link do Instagram ou do site');
+    }
+    const owner = await this.requireOwner(dto.leadId, dto.customerId);
+    const profile = await this.loadOwnerProfile(owner);
+    const brief = buildLeadBrief(profile);
+    const snippet = isInstagramSourceUrl(sourceUrl)
+      ? ''
+      : await fetchWebsiteSnippet(sourceUrl);
+    const notes = dto.notes?.trim() || '';
+    const generated = await runWithAiUsage(
+      {
+        feature: AI_FEATURES.carousel,
+        userId: user.id,
+        leadId: owner.leadId,
+        customerId: owner.customerId,
+      },
+      () =>
+        this.creativeStudio.generateCarousel(
+          {
+            prompt: buildCarouselSkillPrompt({ brief, sourceUrl, notes, snippet }),
+            notes,
+            slideCount: dto.slideCount,
+          },
+          user,
+        ),
+    );
+    const assets = generated.assets || [];
+    if (!assets.length) {
+      const message = generated.error || 'A skill não gerou os slides';
+      throw new BadGatewayException(message);
+    }
+    const title = (
+      generated.spec?.slides?.[0]?.headline || `${brief.name} · Carrossel`
+    ).slice(0, 200);
+    const post = await this.create(
+      {
+        title,
+        caption: (generated.spec?.caption || '').slice(0, 2200),
+        scheduledAt: dto.scheduledAt,
+        platforms: ['instagram'],
+        leadId: owner.leadId || undefined,
+        customerId: owner.customerId || undefined,
+      },
+      user.id,
+    );
+    for (const asset of assets) {
+      if (!asset.id) continue;
+      await this.attachStudioAsset(post.id, {
+        source: 'image-studio',
+        assetId: asset.id,
+      });
+    }
+    return this.findById(post.id);
   }
 
   async create(dto: CreateCalendarPostDto, userId: string) {

@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { USER_ROLE } from '../auth/roles';
 import type { JwtUser } from '../auth/jwt.strategy';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
 import { CalendarService } from '../calendar/calendar.service';
 import { ImageStudioService } from '../image-studio/image-studio.service';
 import { LeadService } from '../lead/lead.service';
@@ -143,7 +144,12 @@ describe('isolamento multi-tenant', () => {
     const prisma = {
       contentCalendarPost: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    const service = new CalendarService(prisma as never, {} as never, {} as never);
+    const service = new CalendarService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
     await runWithTenant('t1', () => service.findRange());
     expect(prisma.contentCalendarPost.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -163,9 +169,41 @@ describe('isolamento multi-tenant', () => {
         }),
       },
     };
-    const service = new CalendarService(prisma as never, {} as never, {} as never);
+    const service = new CalendarService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
     await expect(
       runWithTenant('t1', () => service.findById('post-b')),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('GET usage filtra pelo tenant pedido', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new AiUsageService({
+      tenant: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 't1',
+          name: 'A',
+          slug: 'a',
+        }),
+      },
+      aiUsageEvent: { findMany },
+      aiBudget: { findMany: jest.fn().mockResolvedValue([]) },
+      aiPlatformSetting: {
+        findUnique: jest.fn().mockResolvedValue({ value: '5.5' }),
+      },
+      user: { findMany: jest.fn().mockResolvedValue([]) },
+      lead: { findMany: jest.fn().mockResolvedValue([]) },
+      customer: { findMany: jest.fn().mockResolvedValue([]) },
+    } as never);
+    await service.tenantUsage('t1', '2026-09');
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: 't1' }),
+      }),
+    );
   });
 });
