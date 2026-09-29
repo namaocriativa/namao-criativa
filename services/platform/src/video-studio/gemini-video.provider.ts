@@ -28,8 +28,11 @@ export function buildGeminiVideoRequest(
   input: VideoGenerateRequest,
 ): Record<string, unknown> {
   const model = findVideoModel(input.model);
+  const maxFrames = model?.capabilities.maxFrames ?? 2;
+  const frames =
+    maxFrames > 0 ? input.frames.slice(0, maxFrames) : [];
   const contents: Array<Record<string, unknown>> = [];
-  for (const frame of input.frames) {
+  for (const frame of frames) {
     if (!frame.data) continue;
     contents.push({
       type: 'image',
@@ -84,7 +87,7 @@ export function buildGeminiVideoRequest(
   } else {
     const generationConfig = body.generation_config as Record<string, unknown>;
     generationConfig.video_config = {
-      task: input.frames.length ? 'image_to_video' : 'text_to_video',
+      task: frames.length ? 'image_to_video' : 'text_to_video',
     };
   }
 

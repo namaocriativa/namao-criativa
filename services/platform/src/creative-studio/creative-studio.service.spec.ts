@@ -175,13 +175,31 @@ describe('CreativeStudioService', () => {
     imageStudio.update.mockResolvedValue({});
     imageStudio.generate
       .mockResolvedValueOnce({
-        assets: [{ id: 'slide-1', kind: 'generated' }],
+        assets: [
+          {
+            id: 'slide-1',
+            kind: 'generated',
+            localPath: 'storage/image-projects/carousel-1/s1.png',
+          },
+        ],
       })
       .mockResolvedValueOnce({
-        assets: [{ id: 'slide-2', kind: 'generated' }],
+        assets: [
+          {
+            id: 'slide-2',
+            kind: 'generated',
+            localPath: 'storage/image-projects/carousel-1/s2.png',
+          },
+        ],
       })
       .mockResolvedValueOnce({
-        assets: [{ id: 'slide-3', kind: 'generated' }],
+        assets: [
+          {
+            id: 'slide-3',
+            kind: 'generated',
+            localPath: 'storage/image-projects/carousel-1/s3.png',
+          },
+        ],
       });
 
     const result = await service.generateCarousel(
@@ -234,6 +252,11 @@ describe('CreativeStudioService', () => {
     expect(result.projectId).toBe('carousel-1');
     expect(result.completedSlides).toBe(3);
     expect(result.error).toBeUndefined();
+    expect(result.assets).toEqual([
+      { id: 'slide-1', localPath: 'storage/image-projects/carousel-1/s1.png' },
+      { id: 'slide-2', localPath: 'storage/image-projects/carousel-1/s2.png' },
+      { id: 'slide-3', localPath: 'storage/image-projects/carousel-1/s3.png' },
+    ]);
   });
 
   it('mantém os slides já gerados se um generate falhar no meio', async () => {

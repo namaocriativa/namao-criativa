@@ -35,6 +35,11 @@ export type ImageModelCapabilities = {
   maxReferences: number;
 };
 
+export type ImageModelPricing = {
+  currency: 'USD';
+  imageUsdBySize: Record<string, number>;
+};
+
 export type ImageModelDefinition = {
   id: string;
   label: string;
@@ -42,6 +47,14 @@ export type ImageModelDefinition = {
   provider: ImageProviderId;
   default?: boolean;
   capabilities: ImageModelCapabilities;
+  pricing: ImageModelPricing;
+};
+
+export type ImageCostEstimate = {
+  usdPerImage: number;
+  usdTotal: number;
+  count: number;
+  imageSize: string;
 };
 
 export type ImageSkillRunPackage = {
@@ -130,6 +143,23 @@ const FLASH_31_ASPECT_RATIOS = [
   '8:1',
 ] as const;
 
+const PRO_IMAGE_PRICING: ImageModelPricing = {
+  currency: 'USD',
+  imageUsdBySize: { '1K': 0.134, '2K': 0.134, '4K': 0.24 },
+};
+const FLASH_31_IMAGE_PRICING: ImageModelPricing = {
+  currency: 'USD',
+  imageUsdBySize: { '0.5K': 0.045, '1K': 0.067, '2K': 0.067, '4K': 0.12 },
+};
+const LITE_IMAGE_PRICING: ImageModelPricing = {
+  currency: 'USD',
+  imageUsdBySize: { '1K': 0.02 },
+};
+const FLASH_25_IMAGE_PRICING: ImageModelPricing = {
+  currency: 'USD',
+  imageUsdBySize: { '1K': 0.039 },
+};
+
 export const IMAGE_MODELS: ImageModelDefinition[] = [
   {
     id: 'gemini-3-pro-image',
@@ -148,6 +178,7 @@ export const IMAGE_MODELS: ImageModelDefinition[] = [
       thinking: true,
       maxReferences: 14,
     },
+    pricing: PRO_IMAGE_PRICING,
   },
   {
     id: 'gemini-3.1-flash-image',
@@ -165,6 +196,7 @@ export const IMAGE_MODELS: ImageModelDefinition[] = [
       thinking: true,
       maxReferences: 14,
     },
+    pricing: FLASH_31_IMAGE_PRICING,
   },
   {
     id: 'gemini-3.1-flash-lite-image',
@@ -182,6 +214,7 @@ export const IMAGE_MODELS: ImageModelDefinition[] = [
       thinking: true,
       maxReferences: 14,
     },
+    pricing: LITE_IMAGE_PRICING,
   },
   {
     id: 'gemini-2.5-flash-image',
@@ -199,6 +232,7 @@ export const IMAGE_MODELS: ImageModelDefinition[] = [
       thinking: false,
       maxReferences: 3,
     },
+    pricing: FLASH_25_IMAGE_PRICING,
   },
 ];
 
@@ -209,6 +243,33 @@ export function defaultImageModel(): ImageModelDefinition {
 export function findImageModel(id: string): ImageModelDefinition | undefined {
   const normalized = id.replace(/^models\//, '').trim();
   return IMAGE_MODELS.find((model) => model.id === normalized);
+}
+
+export function estimateImageCost(input: {
+  model?: string;
+  imageSize?: string;
+  count?: number;
+}): ImageCostEstimate {
+  const model = findImageModel(String(input.model || '')) || defaultImageModel();
+  const allowed = model.capabilities.resolutions;
+  const requested = String(input.imageSize || '').trim();
+  const imageSize = allowed.includes(requested)
+    ? requested
+    : allowed.includes('2K')
+      ? '2K'
+      : allowed[0] || '1K';
+  const usdPerImage =
+    model.pricing.imageUsdBySize[imageSize] ??
+    model.pricing.imageUsdBySize['2K'] ??
+    model.pricing.imageUsdBySize['1K'] ??
+    0.039;
+  const count = Math.max(1, Math.round(Number(input.count) || 1));
+  return {
+    usdPerImage,
+    usdTotal: Number((usdPerImage * count).toFixed(2)),
+    count,
+    imageSize,
+  };
 }
 
 export function defaultImageProjectSettings(): ImageProjectSettings {

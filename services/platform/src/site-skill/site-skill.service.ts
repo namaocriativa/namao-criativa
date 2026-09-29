@@ -13,6 +13,7 @@ import * as path from 'path';
 import type { JwtUser } from '../auth/identity';
 import { LlmService } from '../llm/llm.service';
 import { OwnerLookup } from '../owner/owner-lookup.service';
+import { ownerWhere } from '../owner/owner.util';
 import { buildLeadBrief } from '../owner/lead-brief';
 import type { LeadLike } from '../owner/lead-like';
 import { stableLandingSlug } from '../owner/lead-like';
@@ -24,14 +25,31 @@ import { AI_FEATURES } from '../ai-usage/ai-usage.features';
 import { requireTenantId, tenantWhere } from '../tenant/tenant.util';
 import { GithubWebsitesClient } from '../website-projects/github-websites.client';
 import { WebsiteProjectsService } from '../website-projects/website-projects.service';
+import {
+  buildSiteSkillBrief,
+  isLeadImageSelected,
+  type SiteBriefSource,
+} from './site-brief';
 import { estimateSiteSkillUsd } from './site-cost';
 import { parseSiteFiles, buildSiteCodePrompt } from './site-files';
 import { assertSafeRelPath } from './site-paths';
+import { buildLeadPromptRewriteTask, parseLeadPrompt } from './site-prompt';
 import {
-  buildLeadPromptRewriteTask,
-  parseLeadPrompt,
-} from './site-prompt';
-import { publicJob, type SiteSkillLogItem, type SiteSkillStage } from './site-skill.jobs';
+  parseSiteObjective,
+  type SiteApprovedBrief,
+  type SiteObjective,
+} from './site-skill.contract';
+import {
+  publicJob,
+  type SiteSkillLogItem,
+  type SiteSkillStage,
+} from './site-skill.jobs';
+import {
+  buildSiteStructureTask,
+  parseApprovedBrief,
+  parseSiteStructure,
+  parseStoredBrief,
+} from './site-structure';
 
 const execFileAsync = promisify(execFile);
 
@@ -61,6 +79,55 @@ export class SiteSkillService {
     return estimateSiteSkillUsd(chosen);
   }
 
+  async briefFor(user: JwtUser, leadId?: string, customerId?: string) {
+    const owner = await this.resolveOwner(user, leadId, customerId);
+    return this.loadBrief(owner);
+  }
+
+  async propose(opts: {
+    user: JwtUser;
+    leadId?: string;
+    customerId?: string;
+    objective?: string;
+    objectiveNote?: string;
+  }) {
+    const owner = await this.resolveOwner(
+      opts.user,
+      opts.leadId,
+      opts.customerId,
+    );
+    let objective: SiteObjective;
+    try {
+      objective = parseSiteObjective(opts.objective);
+    } catch {
+      throw new BadRequestException('Escolha o objetivo da página');
+    }
+    const objectiveNote = (opts.objectiveNote || '').trim();
+    if (objective === 'other' && !objectiveNote) {
+      throw new BadRequestException('Descreva o outro objetivo');
+    }
+    const loaded = await this.loadBrief(owner);
+    return runWithAiUsage(
+      {
+        feature: AI_FEATURES.siteSkill,
+        userId: opts.user.id,
+        leadId: owner.kind === 'lead' ? owner.ownerId : null,
+        customerId: owner.kind === 'customer' ? owner.ownerId : null,
+      },
+      () =>
+        this.llm.generateJson(
+          buildSiteStructureTask({ brief: loaded, objective, objectiveNote }),
+          (value) =>
+            parseSiteStructure(value, {
+              objective,
+              objectiveNote,
+              knownGaps: loaded.gaps,
+            }),
+          { role: 'plan', expectedShape: '{sections,gaps}' },
+        ),
+    );
+  }
+
   async findJob(id: string) {
     const row = await this.prisma.siteSkillJob.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('Job não encontrado');
@@ -78,30 +145,31 @@ export class SiteSkillService {
     notes?: string;
     imageIds?: string[];
     uploads?: SiteSkillUpload[];
+    brief?: unknown;
   }) {
-    const leadId = opts.leadId?.trim() || '';
-    const customerId = opts.customerId?.trim() || '';
-    if ((leadId && customerId) || (!leadId && !customerId)) {
-      throw new BadRequestException('Informe leadId ou customerId');
-    }
-    const ownerId = leadId || customerId;
-    await this.access.assertCanAccess(opts.user, ownerId);
-    const detail = await this.owners.requireDetail(ownerId);
+    const owner = await this.resolveOwner(
+      opts.user,
+      opts.leadId,
+      opts.customerId,
+    );
+    const detail = owner.detail as LeadLike;
     const slug = stableLandingSlug(detail);
     if (!detail.landingSlug) {
-      await this.owners.update(ownerId, { landingSlug: slug });
+      await this.owners.update(owner.ownerId, { landingSlug: slug });
     }
     const model = opts.model?.trim() || this.llm.modelFor('code');
+    const stored = this.readApproved(opts.brief);
     const row = await this.prisma.siteSkillJob.create({
       data: {
         tenantId: requireTenantId(),
-        leadId: leadId || null,
-        customerId: customerId || null,
+        leadId: owner.kind === 'lead' ? owner.ownerId : null,
+        customerId: owner.kind === 'customer' ? owner.ownerId : null,
         slug,
         status: 'queued',
         stage: 'queued',
         model,
         notes: (opts.notes || '').trim(),
+        ...(stored ? { brief: stored } : {}),
         createdByUserId: opts.user.id,
         log: [
           { stage: 'queued', message: 'Na fila', at: new Date().toISOString() },
@@ -109,8 +177,8 @@ export class SiteSkillService {
       },
     });
     void this.run(row.id, {
-      ownerId,
-      kind: leadId ? 'lead' : 'customer',
+      ownerId: owner.ownerId,
+      kind: owner.kind,
       imageIds: opts.imageIds || [],
       uploads: opts.uploads || [],
     }).catch((error) => {
@@ -164,6 +232,12 @@ export class SiteSkillService {
       const job = await this.requireJob(jobId);
       const detail = (await this.owners.requireDetail(ctx.ownerId)) as LeadLike;
       const brief = buildLeadBrief(detail);
+      const approved = parseStoredBrief(job.brief);
+      const wanted = new Set(ctx.imageIds);
+      const promptBrief = {
+        ...brief,
+        images: brief.images.filter((image) => wanted.has(image.filename)),
+      };
 
       await this.mark(jobId, 'scaffold', 'Criando o Vite…');
       const projectDir = await this.scaffold(work, job.slug);
@@ -171,21 +245,40 @@ export class SiteSkillService {
       await this.mark(jobId, 'prompt', 'Adaptando o prompt…');
       const extraNames = ctx.uploads.map((file) => file.originalname);
       const rewritten = await this.llm.generateJson(
-        buildLeadPromptRewriteTask(brief, job.notes, extraNames),
+        buildLeadPromptRewriteTask(
+          promptBrief,
+          job.notes,
+          extraNames,
+          approved,
+        ),
         parseLeadPrompt,
         { role: 'plan', expectedShape: '{prompt}' },
       );
-      await fs.writeFile(path.join(projectDir, 'prompt.md'), rewritten.prompt, 'utf8');
+      await fs.writeFile(
+        path.join(projectDir, 'prompt.md'),
+        rewritten.prompt,
+        'utf8',
+      );
 
       await this.mark(jobId, 'code', 'Gerando o site…');
       const generated = await this.llm.generateJson(
         buildSiteCodePrompt({
           prompt: rewritten.prompt,
           slug: job.slug,
-          imageNames: extraNames,
+          imageNames: [
+            ...promptBrief.images.map((image) =>
+              image.publicPath.replace(/^\//, ''),
+            ),
+            ...extraNames,
+          ],
+          approved,
         }),
         parseSiteFiles,
-        { role: 'code', model: job.model || undefined, expectedShape: '{files}' },
+        {
+          role: 'code',
+          model: job.model || undefined,
+          expectedShape: '{files}',
+        },
       );
       await this.writeFiles(projectDir, generated.files);
       await this.mergeDeps(projectDir, generated.extraDeps || []);
@@ -214,9 +307,13 @@ export class SiteSkillService {
           error: null,
         },
       });
-      await this.appendLog(jobId, 'done', cloned
-        ? `Pronto · ${remote.id} · clone em websites/${job.slug}`
-        : `Pronto · ${remote.id}`);
+      await this.appendLog(
+        jobId,
+        'done',
+        cloned
+          ? `Pronto · ${remote.id} · clone em websites/${job.slug}`
+          : `Pronto · ${remote.id}`,
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Falha ao gerar o site';
@@ -226,7 +323,9 @@ export class SiteSkillService {
       });
       await this.appendLog(jobId, 'error', message);
     } finally {
-      await fs.rm(work, { recursive: true, force: true }).catch(() => undefined);
+      await fs
+        .rm(work, { recursive: true, force: true })
+        .catch(() => undefined);
     }
   }
 
@@ -278,9 +377,7 @@ export class SiteSkillService {
     }
     const wanted = new Set(ctx.imageIds);
     for (const image of detail.images || []) {
-      if (wanted.size && image.filename && !wanted.has(String(image.filename))) {
-        continue;
-      }
+      if (!isLeadImageSelected(image.filename, wanted)) continue;
       if (!image.localPath) continue;
       const buf = await this.storage.readStorageFile(image.localPath);
       if (!buf) continue;
@@ -290,11 +387,7 @@ export class SiteSkillService {
   }
 
   private async writeCdYml(root: string, slug: string) {
-    const src = path.resolve(
-      this.websitesDir(),
-      '_templates',
-      'cd.yml',
-    );
+    const src = path.resolve(this.websitesDir(), '_templates', 'cd.yml');
     let body = '';
     try {
       body = await fs.readFile(src, 'utf8');
@@ -319,7 +412,11 @@ jobs:
     await fs.writeFile(path.join(dest, 'cd.yml'), body, 'utf8');
   }
 
-  async cloneLocal(owner: string, name: string, slug: string): Promise<boolean> {
+  async cloneLocal(
+    owner: string,
+    name: string,
+    slug: string,
+  ): Promise<boolean> {
     const destRoot = this.websitesDir();
     try {
       await fs.access(destRoot);
@@ -372,6 +469,53 @@ jobs:
     const configured = this.config.get<string>('WEBSITES_DIR')?.trim();
     if (configured) return path.resolve(configured);
     return path.resolve(__dirname, '..', '..', '..', '..', 'websites');
+  }
+
+  private async resolveOwner(
+    user: JwtUser,
+    leadId?: string,
+    customerId?: string,
+  ) {
+    const lead = leadId?.trim() || '';
+    const customer = customerId?.trim() || '';
+    if ((lead && customer) || (!lead && !customer)) {
+      throw new BadRequestException('Informe leadId ou customerId');
+    }
+    const ownerId = lead || customer;
+    await this.access.assertCanAccess(user, ownerId);
+    const detail = await this.owners.requireDetail(ownerId);
+    return {
+      ownerId,
+      kind: lead ? ('lead' as const) : ('customer' as const),
+      detail,
+    };
+  }
+
+  private async loadBrief(owner: { ownerId: string; detail: unknown }) {
+    const igJob = await this.prisma.instagramSkillJob.findFirst({
+      where: tenantWhere({
+        status: 'done',
+        ...ownerWhere(owner.ownerId),
+      }),
+      orderBy: { createdAt: 'desc' },
+    });
+    return buildSiteSkillBrief(owner.detail as SiteBriefSource, igJob);
+  }
+
+  private readApproved(value: unknown): SiteApprovedBrief | null {
+    if (value == null || value === '') return null;
+    try {
+      const raw: unknown =
+        typeof value === 'string' ? (JSON.parse(value) as unknown) : value;
+      return parseApprovedBrief(raw);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      throw new BadRequestException(
+        message === 'descreva o objetivo'
+          ? 'Descreva o outro objetivo'
+          : 'Briefing aprovado inválido',
+      );
+    }
   }
 
   private async requireJob(id: string) {

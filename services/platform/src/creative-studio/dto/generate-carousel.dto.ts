@@ -30,4 +30,19 @@ export class GenerateCarouselDto {
   @IsString()
   @MaxLength(4000)
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  planModel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  model?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  imageSize?: string;
 }

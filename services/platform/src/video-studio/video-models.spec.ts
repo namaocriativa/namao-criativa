@@ -48,10 +48,14 @@ describe('video-models', () => {
     expect(lite?.capabilities.durations).toEqual(['4s', '6s', '8s']);
     expect(lite?.capabilities.resolutions).toEqual(['720p', '1080p']);
     expect(lite?.capabilities.thinkingLevels).toEqual([]);
+    expect(lite?.capabilities.maxFrames).toBe(2);
     expect(lite?.pricing.videoUsdPerSecond).toEqual({
       '720p': 0.05,
       '1080p': 0.08,
     });
+    expect(findVideoModel('veo-3.1-fast-generate-preview')?.capabilities.maxFrames).toBe(
+      2,
+    );
     expect(isVeoVideoModel('veo-3.1-generate-preview')).toBe(true);
     expect(isVeoVideoModel('gemini-omni-1.1-flash')).toBe(false);
     expect(listVideoModelsPayload().usdBrl).toBe(5.4);

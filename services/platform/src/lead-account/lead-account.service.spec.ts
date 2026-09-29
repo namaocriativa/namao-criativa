@@ -99,6 +99,86 @@ describe('LeadAccountService', () => {
     );
   });
 
+  it('troca o login interno pelo e-mail do lead quando ele passa a ser válido', async () => {
+    prisma.clientAccount.findFirst.mockResolvedValue({
+      id: 'u1',
+      email: 'lead+abc@clientes.namao.local',
+      name: 'Firma',
+      leadId: 'lead-1',
+      customerId: null,
+    });
+    prisma.clientAccount.findUnique.mockResolvedValue(null);
+    prisma.clientAccount.update.mockResolvedValue({
+      id: 'u1',
+      email: 'ana@loja.com',
+      name: 'Firma',
+      leadId: 'lead-1',
+      customerId: null,
+    });
+
+    const user = await service.ensureForLead({
+      id: 'lead-1',
+      name: 'Firma',
+      email: 'ana@loja.com',
+    });
+
+    expect(prisma.clientAccount.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'u1' },
+        data: { email: 'ana@loja.com' },
+      }),
+    );
+    expect(user.email).toBe('ana@loja.com');
+    expect(prisma.clientAccount.create).not.toHaveBeenCalled();
+  });
+
+  it('mantém o login real mesmo se o e-mail do lead mudar', async () => {
+    prisma.clientAccount.findFirst.mockResolvedValue({
+      id: 'u1',
+      email: 'ana@loja.com',
+      name: 'Firma',
+      leadId: 'lead-1',
+      customerId: null,
+    });
+
+    const user = await service.ensureForLead({
+      id: 'lead-1',
+      name: 'Firma',
+      email: 'novo@loja.com',
+    });
+
+    expect(user.email).toBe('ana@loja.com');
+    expect(prisma.clientAccount.update).not.toHaveBeenCalled();
+  });
+
+  it('sendPassword envia para o e-mail do lead quando o login ainda é interno', async () => {
+    prisma.clientAccount.findFirst.mockResolvedValue({
+      id: 'u1',
+      email: 'lead+abc@clientes.namao.local',
+      name: 'Firma',
+      leadId: 'lead-1',
+      customerId: null,
+    });
+    prisma.clientAccount.findUnique.mockResolvedValue(null);
+    prisma.clientAccount.update
+      .mockResolvedValueOnce({
+        id: 'u1',
+        email: 'ana@loja.com',
+        name: 'Firma',
+        leadId: 'lead-1',
+        customerId: null,
+      })
+      .mockResolvedValueOnce({});
+
+    const result = await service.sendPassword('lead-1');
+
+    expect(result.email).toBe('ana@loja.com');
+    expect(result.sent).toBe(true);
+    expect(mail.sendCredentials).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'ana@loja.com', email: 'ana@loja.com' }),
+    );
+  });
+
   it('GET account 404 se lead não existe', async () => {
     owners.findProfile.mockResolvedValue(null);
     await expect(service.getAccount('missing')).rejects.toBeInstanceOf(

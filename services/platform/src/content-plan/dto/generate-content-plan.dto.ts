@@ -1,9 +1,12 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -11,6 +14,11 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import {
+  CONTENT_PLAN_MIX_MODES,
+  CONTENT_PLAN_OBJECTIVES,
+  CONTENT_PLAN_TONES,
+} from '../content-plan.contract';
 import {
   CONTENT_PLAN_FORMATS,
   MAX_PLAN_WEEKS,
@@ -28,15 +36,45 @@ export class GenerateContentPlanDto {
   @IsString()
   customerId?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(200)
-  title!: string;
+  title?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
+  @IsIn(CONTENT_PLAN_OBJECTIVES, { each: true })
+  objectives!: string[];
 
   @IsOptional()
   @IsString()
-  @MaxLength(4000)
-  description?: string;
+  @MaxLength(400)
+  goalNote?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(CONTENT_PLAN_TONES, { each: true })
+  tones?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  promote?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  avoid?: string;
+
+  @IsOptional()
+  @IsObject()
+  contextOverrides?: {
+    segment?: string;
+    audience?: string;
+    voice?: string;
+  };
 
   @Type(() => Number)
   @IsInt()
@@ -54,4 +92,22 @@ export class GenerateContentPlanDto {
   @ArrayMinSize(1)
   @IsIn(CONTENT_PLAN_FORMATS, { each: true })
   formats!: string[];
+
+  @IsOptional()
+  @IsIn(CONTENT_PLAN_MIX_MODES)
+  formatMix?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  startsOn?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  usePreviousPlan?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  referencePlanId?: string;
 }

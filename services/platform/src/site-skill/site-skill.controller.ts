@@ -24,6 +24,35 @@ export class SiteSkillController {
     return this.skill.estimate(model);
   }
 
+  @Get('brief')
+  brief(
+    @CurrentUser() user: JwtUser,
+    @Query('leadId') leadId?: string,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.skill.briefFor(user, leadId, customerId);
+  }
+
+  @Post('propose')
+  propose(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      leadId?: string;
+      customerId?: string;
+      objective?: string;
+      objectiveNote?: string;
+    },
+  ) {
+    return this.skill.propose({
+      user,
+      leadId: body.leadId,
+      customerId: body.customerId,
+      objective: body.objective,
+      objectiveNote: body.objectiveNote,
+    });
+  }
+
   @Get('jobs/:id')
   job(@Param('id') id: string) {
     return this.skill.findJob(id);
@@ -42,6 +71,7 @@ export class SiteSkillController {
       model?: string;
       notes?: string;
       imageIds?: string | string[];
+      brief?: string;
     },
     @UploadedFiles() files: SiteSkillUpload[],
   ) {
@@ -59,6 +89,7 @@ export class SiteSkillController {
       customerId: body.customerId,
       model: body.model,
       notes: body.notes,
+      brief: body.brief,
       imageIds,
       uploads: files || [],
     });

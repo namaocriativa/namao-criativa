@@ -1,4 +1,5 @@
 import { assertSafeRelPath } from './site-paths';
+import type { SiteApprovedBrief } from './site-skill.contract';
 
 export type SiteFilesSpec = {
   files: Record<string, string>;
@@ -23,7 +24,7 @@ export function parseSiteFiles(value: unknown): SiteFilesSpec {
   }
   if (!Object.keys(files).length) throw new Error('nenhum arquivo gerado');
   const extraDeps = Array.isArray((value as { extraDeps?: unknown }).extraDeps)
-    ? ((value as { extraDeps: unknown[] }).extraDeps)
+    ? (value as { extraDeps: unknown[] }).extraDeps
         .map(String)
         .map((item) => item.trim())
         .filter(Boolean)
@@ -35,7 +36,18 @@ export function buildSiteCodePrompt(opts: {
   prompt: string;
   slug: string;
   imageNames: string[];
+  approved?: SiteApprovedBrief | null;
 }): string {
+  const structure = opts.approved
+    ? opts.approved.sections
+        .map(
+          (section, index) =>
+            `${index + 1}. ${section.title}: ${section.purpose}`,
+        )
+        .join('\n')
+    : '';
+  const gaps =
+    opts.approved?.gaps.map((gap) => `- ${gap.note}`).join('\n') || '';
   return `Você é um engenheiro front-end. Gere um site Vite + React + TypeScript a partir do prompt.
 
 O scaffold já existe (index.html, src/main.tsx, src/App.tsx, src/index.css, package.json).
@@ -49,7 +61,14 @@ Regras:
 - Vídeos mencionados no prompt devem usar /video1.mp4 e /video2.mp4 se existirem.
 - SEO: title, description, Open Graph.
 - Conversão: CTA com WhatsApp/contato do prompt, sem inventar dados.
+- Siga a estrutura aprovada. Não preencha lacunas com dados inventados.
 - Slug do projeto: ${opts.slug}
+
+## Estrutura aprovada
+${structure || '(nenhuma)'}
+
+## Não inventar
+${gaps || '(nenhuma)'}
 
 ## Prompt do site
 ${opts.prompt}`;

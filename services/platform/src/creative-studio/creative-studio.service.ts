@@ -223,6 +223,7 @@ export class CreativeStudioService {
           role: 'plan',
           temperature: 0.2,
           expectedShape: 'CarouselSpec',
+          ...(dto.planModel?.trim() ? { model: dto.planModel.trim() } : {}),
         },
       );
     } catch (error) {
@@ -234,7 +235,8 @@ export class CreativeStudioService {
     const { prompt, notes } = plannerContext;
     const defaults = feature.defaults || {};
     const aspectRatio = defaults.aspectRatio || '4:5';
-    const imageSize = defaults.imageSize || '2K';
+    const imageSize = dto.imageSize?.trim() || defaults.imageSize || '2K';
+    const imageModel = dto.model?.trim() || defaults.model;
     const baseSkillRun = {
       prompt,
       notes,
@@ -246,7 +248,7 @@ export class CreativeStudioService {
       {
         name: `Carrossel · ${prompt.slice(0, 60)}`,
         featureId: CAROUSEL_INSTAGRAM_ID,
-        model: defaults.model,
+        model: imageModel,
         aspectRatio,
         imageSize,
         temperature: 0.4,
@@ -257,14 +259,14 @@ export class CreativeStudioService {
       user.id,
     );
 
-    const assets: Array<{ id: string }> = [];
+    const assets: Array<{ id: string; localPath?: string }> = [];
     let lastGeneratedId: string | undefined;
     let error: string | undefined;
     for (const slide of spec.slides) {
       try {
         const generated = await this.imageStudio.generate(project.id, {
           prompt: buildCarouselSlidePrompt(spec, slide, spec.slides.length),
-          model: defaults.model,
+          model: imageModel,
           aspectRatio,
           imageSize,
           temperature: 0.4,
@@ -273,12 +275,15 @@ export class CreativeStudioService {
           referenceAssetIds: lastGeneratedId ? [lastGeneratedId] : [],
         });
         const next = (generated.assets || []).find(
-          (asset: { kind?: string; id?: string }) =>
+          (asset: { kind?: string; id?: string; localPath?: string }) =>
             asset.kind === 'generated' && asset.id,
         );
         if (next?.id) {
           lastGeneratedId = next.id;
-          assets.push({ id: next.id });
+          assets.push({
+            id: next.id,
+            ...(next.localPath ? { localPath: next.localPath } : {}),
+          });
         }
         await this.imageStudio.update(project.id, {
           skillRun: {

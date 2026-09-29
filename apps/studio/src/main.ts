@@ -58,7 +58,6 @@ import { initLeadEditModal } from "./lead-edit-modal";
 import { initLeadFichaModal } from "./lead-ficha-modal";
 import { initLeadEmailsModal } from "./lead-emails-modal";
 import { initLeadWhatsAppModal } from "./lead-whatsapp-modal";
-import { initUiLib } from "./ui-lib/playground";
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -349,7 +348,7 @@ function applyRoute(route: AppRoute) {
       return;
     }
   }
-  if (route.name === "users" || route.name === "user" || route.name === "ui-lib") {
+  if (route.name === "users" || route.name === "user") {
     if (!isStudioAdmin()) {
       showTab("not-found");
       document.title = titleForRoute({ name: "not-found" });
@@ -373,7 +372,6 @@ function applyRoute(route: AppRoute) {
   }
 }
 
-initUiLib(el<HTMLElement>("ui-lib-root"));
 initConfigTab({ onSaved: () => undefined });
 const siteSkillProgress = initSiteSkillProgress();
 const siteSkill = initSiteSkillModal(el<HTMLElement>("site-skill-root"), {
@@ -412,7 +410,9 @@ const igSkill = initIgSkillModal(el<HTMLElement>("ig-skill-root"), {
   },
   onOpenReport: () => openIgSkillReport(),
 });
-const contentPlan = initContentPlanModal(el<HTMLElement>("content-plan-root"));
+const contentPlan = initContentPlanModal(el<HTMLElement>("content-plan-root"), {
+  onOpenReport: () => openIgSkillReport(),
+});
 const leadGallery = initLeadGallery(el<HTMLElement>("lead-gallery-root"), {
   onLeadUpdated: (lead) => {
     renderLead(lead);

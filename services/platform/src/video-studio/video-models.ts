@@ -123,7 +123,7 @@ export const VIDEO_MODELS: VideoModelDefinition[] = [
     id: 'veo-3.1-lite-generate-preview',
     label: 'Veo 3.1 Lite',
     description:
-      'Veo mais barato, 720p/1080p, 4–8s, áudio nativo. ~US$ 0,05/s em 720p.',
+      'Veo mais barato: texto ou quadro inicial, 720p/1080p, 4–8s. ~US$ 0,05/s em 720p.',
     provider: 'gemini',
     generationApi: 'predictLongRunning',
     capabilities: {
@@ -136,7 +136,7 @@ export const VIDEO_MODELS: VideoModelDefinition[] = [
     id: 'veo-3.1-fast-generate-preview',
     label: 'Veo 3.1 Fast',
     description:
-      'Veo rápido com 720p a 4k. ~US$ 0,10/s em 720p; 4k só em 8s.',
+      'Veo rápido com quadro inicial/final, 720p a 4k. ~US$ 0,10/s em 720p; 4k só em 8s.',
     provider: 'gemini',
     generationApi: 'predictLongRunning',
     capabilities: {
@@ -149,7 +149,7 @@ export const VIDEO_MODELS: VideoModelDefinition[] = [
     id: 'veo-3.1-generate-preview',
     label: 'Veo 3.1',
     description:
-      'Veo de qualidade máxima. ~US$ 0,40/s em 720p/1080p; 4k ~US$ 0,60/s.',
+      'Veo de qualidade máxima com quadro inicial/final. ~US$ 0,40/s em 720p/1080p; 4k ~US$ 0,60/s.',
     provider: 'gemini',
     generationApi: 'predictLongRunning',
     capabilities: {

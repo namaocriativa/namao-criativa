@@ -55,7 +55,10 @@ export class LeadAccountService {
       where: ownerWhere(lead.id),
       select: CLIENT_ACCOUNT_SELECT,
     });
-    if (existing) return this.toLeadAccount(existing);
+    if (existing) {
+      const synced = await this.adoptLeadEmail(existing, lead);
+      return this.toLeadAccount(synced);
+    }
 
     const kind = await this.owners.requireKind(lead.id);
     const email = await this.resolveLoginEmail(lead);
@@ -142,6 +145,27 @@ export class LeadAccountService {
     });
     if (customer) return customer.tenantId;
     throw new NotFoundException(`Lead ${id} not found`);
+  }
+
+  private async adoptLeadEmail(
+    account: {
+      id: string;
+      email: string;
+      name: string;
+      leadId: string | null;
+      customerId: string | null;
+    },
+    lead: LeadAccountSeed,
+  ) {
+    if (isSendableEmail(account.email)) return account;
+    const preferred = normalizeEmail(lead.email);
+    if (!preferred || !isSendableEmail(preferred)) return account;
+    if (!(await this.emailAvailable(preferred))) return account;
+    return this.prisma.clientAccount.update({
+      where: { id: account.id },
+      data: { email: preferred },
+      select: CLIENT_ACCOUNT_SELECT,
+    });
   }
 
   private async resolveLoginEmail(lead: LeadAccountSeed): Promise<string> {

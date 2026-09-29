@@ -77,6 +77,16 @@ describe('LeadMailService', () => {
     expect(result.items[3].unavailableReason).toMatch(/pacote ativo/i);
   });
 
+  it('libera o acesso quando o login é interno e o lead já tem e-mail', async () => {
+    prisma.clientAccount.findFirst.mockResolvedValue({
+      email: 'lead+acct@clientes.namao.local',
+    });
+    const result = await service.list('lead-1');
+    const credentials = result.items.find((item) => item.id === 'credentials');
+    expect(credentials?.available).toBe(true);
+    expect(credentials?.to).toBe('contato@firma.com');
+  });
+
   it('marca pedido de Instagram indisponível se já conectou', async () => {
     prisma.lead.findUnique.mockResolvedValue({
       id: 'lead-1',

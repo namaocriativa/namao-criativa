@@ -1,4 +1,10 @@
 import { api } from "./api";
+import {
+  buildIgReportPdf,
+  formatIgReportText,
+  igReportPdfName,
+  type IgReportExport,
+} from "./ig-skill-report-export";
 import type { EntityKind } from "./profile-api";
 
 function escapeHtml(value: unknown): string {
@@ -17,15 +23,7 @@ type Idea = {
   commentKeyword?: string;
 };
 
-type Report = {
-  overview?: { who?: string; sells?: string; audience?: string; stage?: string };
-  voice?: { adjectives?: string[]; quotes?: string[] };
-  pillars?: string[];
-  gaps?: string[];
-  plan?: Array<{ week?: string; mix?: string; goal?: string }>;
-  ideas?: Idea[];
-  corpus?: { postCount?: number; postsPerWeek?: number; username?: string | null };
-};
+type Report = IgReportExport;
 
 export function initIgSkillReport(host: HTMLElement): {
   open: (report: Report, owner: { id: string; kind: EntityKind }) => void;
@@ -35,6 +33,7 @@ export function initIgSkillReport(host: HTMLElement): {
 } {
   let owner: { id: string; kind: EntityKind } | null = null;
   let ideas: Idea[] = [];
+  let report: Report | null = null;
 
   host.innerHTML = `
     <div class="site-wizard-modal ig-skill-report" hidden>
@@ -45,7 +44,15 @@ export function initIgSkillReport(host: HTMLElement): {
             <p class="site-wizard-modal__kicker">Relatório</p>
             <h3>Skill Instagram</h3>
           </div>
-          <button type="button" class="outline" data-ig-report-close>Fechar</button>
+          <div class="ig-skill-report__tools">
+            <button type="button" class="outline ig-skill-report__icon" data-ig-report-copy aria-label="Copiar relatório" title="Copiar">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+            </button>
+            <button type="button" class="outline ig-skill-report__icon" data-ig-report-pdf aria-label="Exportar PDF" title="Exportar PDF">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7.2L19 8.2V20.5H7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 3.5V8.5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 11.2v6M9.2 14.6 12 17.2l2.8-2.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="outline" data-ig-report-close>Fechar</button>
+          </div>
         </header>
         <div data-ig-report-body class="ig-skill-report__body"></div>
         <p class="status" data-ig-report-status></p>
@@ -64,11 +71,12 @@ export function initIgSkillReport(host: HTMLElement): {
     modal.hidden = true;
   }
 
-  function paint(report: Report) {
-    const ov = report.overview || {};
-    const voice = report.voice || {};
-    const corpus = report.corpus || {};
-    ideas = report.ideas || [];
+  function paint(next: Report) {
+    report = next;
+    const ov = next.overview || {};
+    const voice = next.voice || {};
+    const corpus = next.corpus || {};
+    ideas = next.ideas || [];
     body.innerHTML = `
       <p class="meta">${escapeHtml(corpus.username ? `@${corpus.username}` : "feed")} · ${escapeHtml(corpus.postCount ?? 0)} posts · ${escapeHtml(corpus.postsPerWeek ?? 0)}/semana</p>
       <h4>Overview</h4>
@@ -114,8 +122,71 @@ export function initIgSkillReport(host: HTMLElement): {
     }
   }
 
+  function copyWithSelection(text: string): boolean {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    }
+    area.remove();
+    return ok;
+  }
+
+  function copyReport() {
+    if (!report) return;
+    const text = formatIgReportText(report);
+    if (copyWithSelection(text)) {
+      status.textContent = "Relatório copiado.";
+      return;
+    }
+    const clipboard = navigator.clipboard;
+    if (!clipboard?.writeText) {
+      status.textContent = "Não foi possível copiar.";
+      return;
+    }
+    void clipboard.writeText(text).then(
+      () => {
+        status.textContent = "Relatório copiado.";
+      },
+      () => {
+        status.textContent = "Não foi possível copiar.";
+      },
+    );
+  }
+
+  function exportPdf() {
+    if (!report) return;
+    const bytes = buildIgReportPdf(report);
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = igReportPdfName(report);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    status.textContent = "PDF exportado.";
+  }
+
   host.addEventListener("click", (event) => {
     const node = event.target as HTMLElement;
+    if (node.closest("[data-ig-report-copy]")) {
+      copyReport();
+      return;
+    }
+    if (node.closest("[data-ig-report-pdf]")) {
+      exportPdf();
+      return;
+    }
     if (node.closest("[data-ig-report-close]")) close();
     if (node.closest("[data-ig-send]")) void sendToCalendar();
   });

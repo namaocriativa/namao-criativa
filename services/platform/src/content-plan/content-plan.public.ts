@@ -1,4 +1,9 @@
-import type { ContentPlanItem } from './content-plan.planner';
+import {
+  parsePlanItems,
+  type ContentPlanClientContext,
+  type ContentPlanFormBrief,
+  type ContentPlanStrategy,
+} from './content-plan.contract';
 
 export const CONTENT_PLAN_STATUS = {
   DRAFT: 'draft',
@@ -17,8 +22,11 @@ export function publicContentPlan(row: {
   weeks: number;
   formats: unknown;
   items: unknown;
+  strategy?: unknown;
+  brief?: unknown;
   status: string;
   sourceIgJobId: string;
+  referencePlanId?: string | null;
   createdAt: Date;
 }) {
   return {
@@ -28,11 +36,19 @@ export function publicContentPlan(row: {
     postsPerWeek: row.postsPerWeek,
     weeks: row.weeks,
     formats: Array.isArray(row.formats) ? row.formats : [],
-    items: Array.isArray(row.items) ? (row.items as ContentPlanItem[]) : [],
+    items: parsePlanItems(row.items),
+    strategy: (row.strategy && typeof row.strategy === 'object'
+      ? row.strategy
+      : null) as ContentPlanStrategy | null,
+    brief: (row.brief && typeof row.brief === 'object'
+      ? row.brief
+      : null) as ContentPlanFormBrief | null,
     status: row.status,
     sourceIgJobId: row.sourceIgJobId,
+    referencePlanId: row.referencePlanId || null,
     createdAt: row.createdAt,
   };
 }
 
 export type PublicContentPlan = ReturnType<typeof publicContentPlan>;
+export type { ContentPlanClientContext };

@@ -22,7 +22,6 @@ export type AppRoute =
   | { name: "imagens-project"; id: string }
   | { name: "videos" }
   | { name: "videos-project"; id: string }
-  | { name: "ui-lib" }
   | { name: "config" }
   | { name: "users" }
   | { name: "user"; id: string }
@@ -197,7 +196,6 @@ export function parsePath(pathname: string): AppRoute {
       return { name: "not-found" };
     }
   }
-  if (path === "/ui-lib") return { name: "ui-lib" };
   if (path === "/config") return { name: "config" };
   if (path === "/users") return { name: "users" };
   const user = path.match(/^\/users\/([^/]+)$/);
@@ -264,8 +262,6 @@ export function hrefFor(route: AppRoute): string {
       return "/criativo/videos";
     case "videos-project":
       return `/criativo/videos/${encodeURIComponent(route.id)}`;
-    case "ui-lib":
-      return "/ui-lib";
     case "config":
       return "/config";
     case "users":
@@ -318,8 +314,6 @@ export function tabForRoute(route: AppRoute): string {
       return "videos-studio";
     case "videos-project":
       return "videos-studio";
-    case "ui-lib":
-      return "ui-lib";
     case "config":
       return "config";
     case "users":
@@ -404,8 +398,6 @@ export function titleForRoute(route: AppRoute, leadName?: string): string {
       return `Chat de vídeo · Studio Criativo · ${APP_TITLE}`;
     case "videos-project":
       return `${leadName || "Conversa"} · Studio Criativo · ${APP_TITLE}`;
-    case "ui-lib":
-      return `Componentes · ${APP_TITLE}`;
     case "config":
       return `Configurações · ${APP_TITLE}`;
     case "users":

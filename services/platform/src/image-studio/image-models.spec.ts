@@ -1,6 +1,7 @@
 import {
   defaultImageModel,
   defaultImageProjectSettings,
+  estimateImageCost,
   findImageModel,
   IMAGE_MODELS,
   normalizeImageProjectSettings,
@@ -38,6 +39,35 @@ describe('image-models', () => {
     ).toBe(true);
     expect(defaultImageProjectSettings().personGeneration).toBe('ALLOW_ADULT');
     expect(defaultImageProjectSettings().includeThoughts).toBe(true);
+  });
+
+  it('estima o custo por modelo, resolução e quantidade', () => {
+    expect(
+      estimateImageCost({
+        model: 'gemini-3-pro-image',
+        imageSize: '2K',
+        count: 5,
+      }),
+    ).toEqual({
+      usdPerImage: 0.134,
+      usdTotal: 0.67,
+      count: 5,
+      imageSize: '2K',
+    });
+    expect(
+      estimateImageCost({
+        model: 'gemini-3.1-flash-lite-image',
+        imageSize: '1K',
+        count: 5,
+      }).usdTotal,
+    ).toBe(0.1);
+    expect(
+      estimateImageCost({
+        model: 'gemini-3-pro-image',
+        imageSize: '4K',
+        count: 1,
+      }).usdPerImage,
+    ).toBe(0.24);
   });
 
   it('normaliza settings inválidas para o modelo escolhido', () => {

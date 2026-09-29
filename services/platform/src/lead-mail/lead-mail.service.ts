@@ -555,9 +555,15 @@ export class LeadMailService {
       where: ownerWhere(lead.id),
       select: { email: true },
     });
-    const email = normalizeEmail(user?.email) || normalizeEmail(lead.email);
-    const available = Boolean(email && isSendableEmail(email));
-    return { to: available ? email : null, available };
+    const accountEmail = normalizeEmail(user?.email);
+    const leadEmail = normalizeEmail(lead.email);
+    const email =
+      accountEmail && isSendableEmail(accountEmail)
+        ? accountEmail
+        : leadEmail && isSendableEmail(leadEmail)
+          ? leadEmail
+          : null;
+    return { to: email, available: Boolean(email) };
   }
 
   private async requireLead(leadId: string) {

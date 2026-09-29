@@ -301,7 +301,8 @@ export class VideoStudioService {
 
     const frames = [first, last]
       .filter((frame): frame is ResolvedFrame => Boolean(frame))
-      .map((frame) => frame.inline);
+      .map((frame) => frame.inline)
+      .slice(0, Math.max(0, model.capabilities.maxFrames));
 
     const previousInteractionId = frames.length
       ? undefined

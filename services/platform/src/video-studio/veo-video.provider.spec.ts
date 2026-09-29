@@ -30,8 +30,8 @@ describe('veo-video.provider', () => {
       instances: [
         {
           prompt: 'personagem mostra o produto',
-          image: { inlineData: { mimeType: 'image/png', data: 'aaa' } },
-          lastFrame: { inlineData: { mimeType: 'image/jpeg', data: 'bbb' } },
+          image: { bytesBase64Encoded: 'aaa', mimeType: 'image/png' },
+          lastFrame: { bytesBase64Encoded: 'bbb', mimeType: 'image/jpeg' },
         },
       ],
       parameters: {

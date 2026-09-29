@@ -11,8 +11,9 @@ const POLL_MS = 10_000;
 const MAX_WAIT_MS = 600_000;
 const MAX_BODY_BYTES = 80 * 1024 * 1024;
 
-type VeoInlineImage = {
-  inlineData: { mimeType: string; data: string };
+type VeoImagePayload = {
+  bytesBase64Encoded: string;
+  mimeType: string;
 };
 
 type VeoSampleVideo = {
@@ -61,8 +62,12 @@ export function buildVeoVideoRequest(
     '8s',
   );
   const seconds = durationSeconds(duration) || 8;
-  const first = input.frames[0];
-  const last = input.frames[1];
+  const maxFrames =
+    model?.capabilities.maxFrames ?? (input.frames.length ? 2 : 0);
+  const frames =
+    maxFrames > 0 ? input.frames.slice(0, maxFrames) : [];
+  const first = frames[0];
+  const last = frames[1];
   const instance: Record<string, unknown> = {
     prompt: input.prompt.trim(),
   };
@@ -81,7 +86,7 @@ export function buildVeoVideoRequest(
         aspectRatio,
         durationSeconds: seconds,
         resolution,
-        personGeneration: input.frames.length ? 'allow_adult' : 'allow_all',
+        personGeneration: frames.length ? 'allow_adult' : 'allow_all',
       },
     },
   };
@@ -225,12 +230,10 @@ function veoOperationUrl(name: string): string {
   return `${GEMINI_BASE}/${name.replace(/^\//, '')}`;
 }
 
-function veoImage(mimeType: string, data: string): VeoInlineImage {
+function veoImage(mimeType: string, data: string): VeoImagePayload {
   return {
-    inlineData: {
-      mimeType: mimeType || 'image/png',
-      data,
-    },
+    bytesBase64Encoded: data,
+    mimeType: mimeType || 'image/png',
   };
 }
 

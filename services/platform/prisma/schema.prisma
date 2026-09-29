@@ -258,6 +258,7 @@ model SiteSkillJob {
   error      String?
   model      String   @default("")
   notes      String   @default("")
+  brief      Json?
   repo       String   @default("")
   createdByUserId String?
   createdAt  DateTime @default(now())
@@ -311,8 +312,11 @@ model ContentPlan {
   weeks          Int
   formats        Json
   items          Json
+  strategy       Json?
+  brief          Json?
   status         String   @default("draft")
   sourceIgJobId  String
+  referencePlanId String?
   createdByUserId String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
