@@ -165,7 +165,15 @@ export function initIgSkillReport(host: HTMLElement): {
   function exportPdf() {
     if (!report) return;
     const bytes = buildIgReportPdf(report);
-    const blob = new Blob([bytes], { type: "application/pdf" });
+    const blob = new Blob(
+      [
+        bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer,
+      ],
+      { type: "application/pdf" },
+    );
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
