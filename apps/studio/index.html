@@ -102,6 +102,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5 14.2 4.8M9.2 19.5 18.5 4.8M4.5 14.8h15M4.5 9.2h15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
               Criativo
             </a>
+            <a href="/editor" data-route="editor" data-feature="videos" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 15.5v-7l6 3.5-6 3.5Z" fill="currentColor"/><path d="M7 19.5h10M9.5 21h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Editor
+            </a>
             <a href="/packages" data-route="packages">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 8.2 12 4.5l7.5 3.7v7.6L12 19.5l-7.5-3.7V8.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 12.2V19.5M4.5 8.2 12 12.2l7.5-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Pacotes
@@ -961,6 +965,81 @@
         </div>
       </section>
 
+      <section id="tab-video-editor" class="tab-panel video-editor-panel">
+        <div class="video-editor" id="video-editor-root">
+          <header class="video-editor-toolbar">
+            <div class="video-editor-toolbar-left">
+              <a href="/editor" class="video-editor-back" id="video-editor-back" hidden>Projetos</a>
+              <input
+                type="text"
+                id="video-editor-name"
+                class="video-editor-name"
+                placeholder="Nome do projeto"
+                autocomplete="off"
+                disabled
+              />
+              <span id="video-editor-save-status" class="video-editor-save-status" aria-live="polite"></span>
+            </div>
+            <div class="video-editor-toolbar-actions">
+              <button type="button" class="outline" id="video-editor-undo" disabled title="Desfazer (⌘Z)">Desfazer</button>
+              <button type="button" class="outline" id="video-editor-redo" disabled title="Refazer (⌘⇧Z)">Refazer</button>
+              <button type="button" id="video-editor-export" disabled>Exportar</button>
+            </div>
+          </header>
+          <div class="video-editor-home" id="video-editor-home">
+            <div class="video-editor-home-head">
+              <h2>Editor de Vídeos</h2>
+              <button type="button" id="video-editor-new">Novo projeto</button>
+            </div>
+            <p class="prompt-hint">Monte clipes, áudios e imagens da plataforma e exporte em MP4.</p>
+            <div id="video-editor-project-list" class="video-editor-project-list"></div>
+          </div>
+          <div class="video-editor-workspace" id="video-editor-workspace" hidden>
+            <aside class="video-editor-left" id="video-editor-left">
+              <div class="video-editor-side-tabs" role="tablist">
+                <button type="button" class="active" data-ve-side="library" role="tab">Biblioteca</button>
+                <button type="button" data-ve-side="tools" role="tab">Ferramentas</button>
+              </div>
+              <div id="video-editor-library" class="video-editor-side-pane"></div>
+              <div id="video-editor-tools" class="video-editor-side-pane" hidden></div>
+            </aside>
+            <section class="video-editor-center">
+              <div class="video-editor-preview-wrap">
+                <canvas id="video-editor-canvas" width="1080" height="1920" aria-label="Pré-visualização"></canvas>
+                <video id="video-editor-video-probe" playsinline muted hidden></video>
+              </div>
+              <div class="video-editor-transport">
+                <button type="button" id="video-editor-play" class="outline">Play</button>
+                <span id="video-editor-timecode" class="video-editor-timecode">00:00 / 00:00</span>
+              </div>
+            </section>
+            <aside class="video-editor-right" id="video-editor-inspector"></aside>
+            <div class="video-editor-timeline" id="video-editor-timeline"></div>
+          </div>
+        </div>
+        <div id="video-editor-export-modal" class="video-editor-modal" hidden>
+          <div class="video-editor-modal-card">
+            <h3>Exportar MP4</h3>
+            <label class="video-editor-field">
+              Proporção
+              <select id="video-editor-export-preset">
+                <option value="9:16">9:16 — Reels / Shorts / TikTok</option>
+                <option value="16:9">16:9 — Horizontal</option>
+                <option value="1:1">1:1 — Quadrado</option>
+              </select>
+            </label>
+            <div id="video-editor-export-progress" class="video-editor-export-progress" hidden>
+              <div class="video-editor-export-bar"><span id="video-editor-export-bar-fill"></span></div>
+              <p id="video-editor-export-status">Preparando…</p>
+            </div>
+            <div class="video-editor-modal-actions">
+              <button type="button" class="outline" id="video-editor-export-cancel">Cancelar</button>
+              <button type="button" id="video-editor-export-start">Iniciar exportação</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="tab-criativo-gallery" class="tab-panel imagens-studio">
         <header class="imagens-studio-top">
           <nav class="imagens-studio-kinds" id="gallery-studio-kinds" aria-label="Modalidade"></nav>
@@ -1251,6 +1330,12 @@
             <button type="button" class="secondary" id="site-agenda-btn">
               Agenda
             </button>
+            <button type="button" class="secondary" id="brand-identity-btn" disabled>
+              Identidade da marca
+            </button>
+            <button type="button" class="secondary" id="profile-character-btn" disabled>
+              Personagem
+            </button>
             <button type="button" class="secondary" id="site-skill-btn" disabled>
               Skill site lead
             </button>
@@ -1314,6 +1399,8 @@
     </div>
 
     <div id="site-skill-root"></div>
+    <div id="brand-identity-root"></div>
+    <div id="profile-character-root"></div>
     <div id="ig-skill-root"></div>
     <div id="ig-skill-report-root"></div>
     <div id="content-plan-root"></div>

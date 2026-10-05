@@ -30,6 +30,8 @@ model Tenant {
   creativeMovies         CreativeMovie[]
   creativeStartEndClips  CreativeStartEndClip[]
   creativeUgcClips       CreativeUgcClip[]
+  creativeVideoLivreClips CreativeVideoLivreClip[]
+  creativeVideoEditProjects CreativeVideoEditProject[]
   calendarPosts          ContentCalendarPost[]
   calendarReminders      ContentCalendarReminder[]
   siteSkillJobs          SiteSkillJob[]
@@ -64,6 +66,8 @@ model Lead {
   rating      Float?
   reviewCount Int?
   metadata    Json?
+  brandIdentity Json?
+  characterId         String?
   landingSlug         String?   @unique
   landingStatus       String    @default("none")
   publicSiteId        String?   @unique
@@ -84,6 +88,7 @@ model Lead {
 
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdBy User? @relation("LeadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  character CreativeCharacter? @relation(fields: [characterId], references: [id], onDelete: SetNull)
   images  LeadImage[]
   sources LeadSource[]
   clientAccounts ClientAccount[]
@@ -103,6 +108,7 @@ model Lead {
   @@index([fromPublicSignup])
   @@index([createdByUserId])
   @@index([tenantId])
+  @@index([characterId])
 }
 
 model Customer {
@@ -127,6 +133,8 @@ model Customer {
   rating      Float?
   reviewCount Int?
   metadata    Json?
+  brandIdentity Json?
+  characterId         String?
   landingSlug         String?   @unique
   landingStatus       String    @default("none")
   publicSiteId        String?   @unique
@@ -148,6 +156,7 @@ model Customer {
 
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdBy User? @relation("CustomerCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  character CreativeCharacter? @relation(fields: [characterId], references: [id], onDelete: SetNull)
   images  LeadImage[]
   sources LeadSource[]
   clientAccounts ClientAccount[]
@@ -167,6 +176,7 @@ model Customer {
   @@index([fromPublicSignup])
   @@index([createdByUserId])
   @@index([tenantId])
+  @@index([characterId])
 }
 
 model LeadActivity {
@@ -356,6 +366,8 @@ model User {
   createdCreativeMovies     CreativeMovie[]      @relation("CreativeMovieCreatedBy")
   createdStartEndClips      CreativeStartEndClip[] @relation("CreativeStartEndClipCreatedBy")
   createdUgcClips           CreativeUgcClip[]      @relation("CreativeUgcClipCreatedBy")
+  createdVideoLivreClips    CreativeVideoLivreClip[] @relation("CreativeVideoLivreClipCreatedBy")
+  createdVideoEditProjects  CreativeVideoEditProject[] @relation("CreativeVideoEditProjectCreatedBy")
   createdCalendarPosts      ContentCalendarPost[] @relation("ContentCalendarPostCreatedBy")
   createdCalendarReminders  ContentCalendarReminder[] @relation("ContentCalendarReminderCreatedBy")
   aiUsageEvents             AiUsageEvent[]
@@ -619,6 +631,9 @@ model CreativeCharacter {
   movieShots   CreativeMovieShot[]
   movieCast    CreativeMovieShotCast[]
   ugcClips   CreativeUgcClip[]
+  videoLivreClips CreativeVideoLivreClip[]
+  leads        Lead[]
+  customers    Customer[]
 
   @@index([createdByUserId])
   @@index([updatedAt])
@@ -765,6 +780,39 @@ model CreativeUgcClip {
   @@index([tenantId])
 }
 
+model CreativeVideoLivreClip {
+  id                String   @id @default(cuid())
+  tenantId          String
+  title             String   @default("")
+  brief             String   @default("")
+  prompt            String   @default("")
+  characterId       String?
+  characterAssetId  String   @default("")
+  videoHookId       String   @default("")
+  duration          String   @default("8s")
+  aspectRatio       String   @default("9:16")
+  resolution        String   @default("360p")
+  model             String   @default("")
+  status            String   @default("draft")
+  error             String   @default("")
+  videoProjectId    String   @default("")
+  localPath         String   @default("")
+  filename          String   @default("")
+  mimeType          String?
+  createdByUserId   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  character CreativeCharacter? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  createdBy User?              @relation("CreativeVideoLivreClipCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId])
+  @@index([characterId])
+  @@index([updatedAt])
+  @@index([tenantId])
+}
+
 model ImageProject {
   id              String   @id @default(cuid())
   tenantId        String
@@ -886,6 +934,39 @@ model VideoAsset {
   @@index([projectId, createdAt])
   @@index([messageId])
   @@index([kind])
+}
+
+model CreativeVideoEditProject {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  document        Json
+  exportPath      String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy User?                    @relation("CreativeVideoEditProjectCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  media     CreativeVideoEditMedia[]
+
+  @@index([createdByUserId])
+  @@index([updatedAt])
+  @@index([tenantId])
+}
+
+model CreativeVideoEditMedia {
+  id        String   @id @default(cuid())
+  projectId String
+  filename  String
+  localPath String
+  mimeType  String
+  source    String   @default("upload")
+  createdAt DateTime @default(now())
+
+  project CreativeVideoEditProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
 }
 
 model ContentCalendarPost {

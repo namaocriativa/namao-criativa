@@ -1077,7 +1077,10 @@ export function initMoviesTab(): {
   });
 
   function onRoute(route: AppRoute) {
-    if (route.name !== "criativo-skill" || route.id !== MOVIES_ID) return;
+    if (route.name !== "criativo-skill" || route.id !== MOVIES_ID) {
+      routeSeq += 1;
+      return;
+    }
     const seq = ++routeSeq;
     setStatus("");
     if (route.movieId) {

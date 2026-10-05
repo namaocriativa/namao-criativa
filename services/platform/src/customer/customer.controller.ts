@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UploadedFile,
   UploadedFiles,
@@ -13,6 +14,10 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { BrandIdentityService } from '../brand-identity/brand-identity.service';
+import { UpdateBrandIdentityDto } from '../brand-identity/dto/update-brand-identity.dto';
+import { ProfileCharacterService } from '../profile-character/profile-character.service';
+import { UpdateProfileCharacterDto } from '../profile-character/dto/update-profile-character.dto';
 import { LeadAccountService } from '../lead-account/lead-account.service';
 import { LeadActivityService } from '../lead-activity/lead-activity.service';
 import { LeadMailService } from '../lead-mail/lead-mail.service';
@@ -42,6 +47,8 @@ export class CustomerController {
     private readonly activity: LeadActivityService,
     private readonly proposals: ProposalService,
     private readonly shares: StudioLeadShareService,
+    private readonly brandIdentity: BrandIdentityService,
+    private readonly profileCharacter: ProfileCharacterService,
   ) {}
 
   @Get()
@@ -136,6 +143,32 @@ export class CustomerController {
   @Get(':id/history')
   listHistory(@Param('id') id: string) {
     return this.activity.listHistory(id);
+  }
+
+  @Get(':id/brand-identity')
+  getBrandIdentity(@Param('id') id: string) {
+    return this.brandIdentity.get(id);
+  }
+
+  @Put(':id/brand-identity')
+  putBrandIdentity(
+    @Param('id') id: string,
+    @Body() dto: UpdateBrandIdentityDto,
+  ) {
+    return this.brandIdentity.put(id, dto);
+  }
+
+  @Get(':id/character')
+  getCharacter(@Param('id') id: string) {
+    return this.profileCharacter.get(id);
+  }
+
+  @Put(':id/character')
+  putCharacter(
+    @Param('id') id: string,
+    @Body() dto: UpdateProfileCharacterDto,
+  ) {
+    return this.profileCharacter.put(id, dto);
   }
 
   @Get(':id/proposal')

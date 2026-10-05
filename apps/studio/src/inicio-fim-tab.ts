@@ -603,6 +603,7 @@ export function initInicioFimTab(): {
         stopPoll();
         active = false;
       }
+      routeSeq += 1;
       return;
     }
     if (!active) {

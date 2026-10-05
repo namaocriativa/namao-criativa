@@ -100,6 +100,7 @@ export default defineConfig({
       '/image-models': apiProxy(),
       '/video-projects': apiProxy(),
       '/video-models': apiProxy(),
+      '/video-edits': apiProxy(),
       '/creative': apiProxy(),
       '/locations': apiProxy(),
       '/storage': apiProxy(),

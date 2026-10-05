@@ -25,6 +25,7 @@ const API_PREFIXES = [
   '/image-models',
   '/video-projects',
   '/video-models',
+  '/video-edits',
   '/creative',
   '/locations',
   '/storage',

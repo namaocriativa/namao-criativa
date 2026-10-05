@@ -10,11 +10,13 @@ import { initPersonagensTab } from "./personagens-tab";
 import { initMoviesTab } from "./movies-tab";
 import { initInicioFimTab } from "./inicio-fim-tab";
 import { initUgcSkillsTab } from "./ugc-skills-tab";
+import { initVideoLivreTab } from "./video-livre-tab";
 import { initImagensTab } from "./imagens-tab";
 import { initImagensStudio } from "./imagens-studio";
 import { initCriativoGallery } from "./criativo-gallery";
 import { initVideosTab } from "./videos-tab";
 import { initVideosStudio } from "./videos-studio";
+import { initVideoEditorTab } from "./video-editor";
 import { initUsersTab } from "./users-tab";
 import { isVideoCreativeSkill } from "./creative/features";
 import {
@@ -31,6 +33,7 @@ import {
   isCriativoGalleryRoute,
   isImagensStudioRoute,
   isVideosStudioRoute,
+  isVideoEditorRoute,
   hrefFor,
   navigate,
   navRouteFor,
@@ -42,6 +45,8 @@ import {
 import { entityKindOf, profileApi, type EntityKind } from "./profile-api";
 import { initSiteSkillModal } from "./site-skill-modal";
 import { initSiteSkillProgress } from "./site-skill-progress";
+import { initBrandIdentityModal } from "./brand-identity-modal";
+import { initProfileCharacterModal } from "./profile-character-modal";
 import { initIgSkillModal } from "./ig-skill-modal";
 import { initIgSkillProgress } from "./ig-skill-progress";
 import { initIgSkillReport } from "./ig-skill-report";
@@ -174,6 +179,8 @@ const leadQuickActions = el<HTMLElement>("lead-quick-actions");
 const siteAddBtn = el<HTMLButtonElement>("site-add-btn");
 const siteAgendaBtn = el<HTMLButtonElement>("site-agenda-btn");
 const siteSkillBtn = el<HTMLButtonElement>("site-skill-btn");
+const brandIdentityBtn = el<HTMLButtonElement>("brand-identity-btn");
+const profileCharacterBtn = el<HTMLButtonElement>("profile-character-btn");
 const igSkillBtn = el<HTMLButtonElement>("ig-skill-btn");
 const contentPlanBtn = el<HTMLButtonElement>("content-plan-btn");
 const igSkillReportBtn = el<HTMLButtonElement>("ig-skill-report-btn");
@@ -249,11 +256,13 @@ const personagensTab = initPersonagensTab();
 const moviesTab = initMoviesTab();
 const inicioFimTab = initInicioFimTab();
 const ugcSkillsTab = initUgcSkillsTab();
+const videoLivreTab = initVideoLivreTab();
 const imagensTab = initImagensTab();
 const imagensStudio = initImagensStudio();
 const criativoGallery = initCriativoGallery();
 const videosTab = initVideosTab();
 const videosStudio = initVideosStudio();
+const videoEditorTab = initVideoEditorTab();
 const usersTab = initUsersTab();
 let currentUser: StudioUser | null = null;
 
@@ -261,6 +270,7 @@ function applyRoute(route: AppRoute) {
   document.body.classList.toggle("is-imagens-studio", isImagensStudioRoute(route));
   document.body.classList.toggle("is-videos-studio", isVideosStudioRoute(route));
   document.body.classList.toggle("is-criativo-gallery", isCriativoGalleryRoute(route));
+  document.body.classList.toggle("is-video-editor", isVideoEditorRoute(route));
   showTab(tabForRoute(route));
   syncNav(route);
   if (route.name === "lead" || route.name === "customer") {
@@ -342,6 +352,20 @@ function applyRoute(route: AppRoute) {
         "is-imagens-studio",
         "is-videos-studio",
         "is-criativo-gallery",
+        "is-video-editor",
+      );
+      showTab("not-found");
+      document.title = titleForRoute({ name: "not-found" });
+      return;
+    }
+  }
+  if (route.name === "editor" || route.name === "editor-project") {
+    if (!canAccessVideos(currentUser)) {
+      document.body.classList.remove(
+        "is-imagens-studio",
+        "is-videos-studio",
+        "is-criativo-gallery",
+        "is-video-editor",
       );
       showTab("not-found");
       document.title = titleForRoute({ name: "not-found" });
@@ -367,6 +391,8 @@ function applyRoute(route: AppRoute) {
   moviesTab.onRoute(route);
   inicioFimTab.onRoute(route);
   ugcSkillsTab.onRoute(route);
+  videoLivreTab.onRoute(route);
+  videoEditorTab.onRoute(route);
   if (route.name === "users" || route.name === "user") {
     usersTab.onRoute(route);
   }
@@ -377,6 +403,16 @@ const siteSkillProgress = initSiteSkillProgress();
 const siteSkill = initSiteSkillModal(el<HTMLElement>("site-skill-root"), {
   onStarted: (jobId) => siteSkillProgress.watch(jobId),
 });
+const brandIdentity = initBrandIdentityModal(el<HTMLElement>("brand-identity-root"), {
+  onSaved: (lead) => {
+    if (currentLead?.id === lead.id) {
+      currentLead = { ...currentLead, ...lead };
+    }
+  },
+});
+const profileCharacter = initProfileCharacterModal(
+  el<HTMLElement>("profile-character-root"),
+);
 const igSkillReport = initIgSkillReport(el<HTMLElement>("ig-skill-report-root"));
 
 function openIgSkillReport(job?: { id?: string; report?: unknown } | null) {
@@ -2190,6 +2226,8 @@ function setSiteActionsEnabled(enabled: boolean) {
   siteAddBtn.disabled = !enabled;
   siteAgendaBtn.disabled = !enabled;
   siteSkillBtn.disabled = !enabled;
+  brandIdentityBtn.disabled = !enabled;
+  profileCharacterBtn.disabled = !enabled;
   const connected = Boolean(currentLead?.instagramConnections?.length);
   igSkillBtn.disabled = !enabled || !connected;
   igSkillBtn.title = connected
@@ -2307,6 +2345,16 @@ siteAgendaBtn.addEventListener("click", () => {
 siteSkillBtn.addEventListener("click", () => {
   if (!currentLeadId) return;
   siteSkill.open(currentLeadId, currentEntityKind, currentLead);
+});
+
+brandIdentityBtn.addEventListener("click", () => {
+  if (!currentLead) return;
+  brandIdentity.open(currentLead);
+});
+
+profileCharacterBtn.addEventListener("click", () => {
+  if (!currentLead) return;
+  profileCharacter.open(currentLead);
 });
 
 igSkillBtn.addEventListener("click", () => {

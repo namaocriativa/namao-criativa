@@ -6,7 +6,15 @@ import {
   type LlmRole,
 } from "./llm-catalog";
 import { PERSONAGENS_ID } from "./creative/features";
-import type { EntityKind } from "./profile-api";
+import {
+  type BrandIdentity,
+  DEFAULT_LOGO_APPEARANCE,
+} from "./brand-identity-modal";
+import {
+  defaultProduceBrandFlags,
+  produceBrandPayload,
+} from "./produce-brand";
+import { profileApi, type EntityKind } from "./profile-api";
 import type {
   CreativeCharacter,
   CreativeCharacterAsset,
@@ -72,6 +80,7 @@ type PlanItem = {
   selectedStudioAssetId?: string;
   calendarPostId?: string;
   characterId?: string;
+  characterAssetId?: string;
   videoHookId?: string;
   videoTakes?: Array<{
     id?: string;
@@ -92,7 +101,11 @@ type ProduceRun = {
   duration: string;
   resolution: string;
   characterId: string;
+  characterAssetId: string;
   videoHookId: string;
+  useBrandIdentity: boolean;
+  useBrandLogo: boolean;
+  logoAppearance: string;
 };
 
 type ProduceVideoHook = {
@@ -289,8 +302,21 @@ function isCharacterImage(asset: CreativeCharacterAsset): boolean {
   return asset.kind !== "video" && !String(asset.mimeType || "").startsWith("video/");
 }
 
+function characterImageAssets(character: CreativeCharacter | undefined): CreativeCharacterAsset[] {
+  return (character?.assets || []).filter(isCharacterImage);
+}
+
+function characterAssetById(
+  character: CreativeCharacter | undefined,
+  assetId: string | undefined,
+): CreativeCharacterAsset | undefined {
+  const id = String(assetId || "").trim();
+  if (!id) return undefined;
+  return characterImageAssets(character).find((asset) => asset.id === id);
+}
+
 function characterHero(character: CreativeCharacter | undefined): CreativeCharacterAsset | undefined {
-  const assets = (character?.assets || []).filter(isCharacterImage);
+  const assets = characterImageAssets(character);
   return (
     [...assets].reverse().find((item) => item.kind === "sheet") ||
     [...assets].reverse().find((item) => item.kind === "photo") ||
@@ -301,6 +327,7 @@ function characterHero(character: CreativeCharacter | undefined): CreativeCharac
 function produceCharacterPickerHtml(
   characters: CreativeCharacter[],
   selectedId: string,
+  selectedAssetId = "",
 ): string {
   if (!characters.length) {
     return `<p class="movies-hint">Nenhum personagem na biblioteca. <a href="/criativo/habilidade/${PERSONAGENS_ID}">Criar em Personagens</a>.</p>`;
@@ -309,8 +336,8 @@ function produceCharacterPickerHtml(
   const noneActive = !selectedId;
   return `${
     missingHero
-      ? `<p class="movies-hint">Gere uma foto em <a href="/criativo/habilidade/${PERSONAGENS_ID}">Personagens</a> para usar no vídeo.</p>`
-      : `<p class="movies-hint">Opcional. A foto entra como quadro inicial do vídeo.</p>`
+      ? `<p class="movies-hint">Gere ou envie uma foto em <a href="/criativo/habilidade/${PERSONAGENS_ID}">Personagens</a> para usar no vídeo.</p>`
+      : `<p class="movies-hint">Opcional. Clique no personagem para escolher a foto usada como quadro inicial.</p>`
   }<div class="movies-cast" role="listbox" aria-label="Personagem">
       <button type="button" class="movies-cast-option${noneActive ? " is-active" : ""}" data-character-id="" aria-pressed="${noneActive ? "true" : "false"}">
         <span class="movies-cast-empty"></span>
@@ -318,11 +345,13 @@ function produceCharacterPickerHtml(
       </button>
       ${characters
         .map((item) => {
-          const hero = characterHero(item);
-          const src = previewSrcFromLocalPath(hero?.localPath);
+          const chosen =
+            characterAssetById(item, selectedId === item.id ? selectedAssetId : "") ||
+            characterHero(item);
+          const src = previewSrcFromLocalPath(chosen?.localPath);
           const selected = item.id === selectedId;
-          const disabled = !hero;
-          return `<button type="button" class="movies-cast-option${selected ? " is-active" : ""}" data-character-id="${escapeHtml(item.id)}" ${disabled ? "disabled" : ""} aria-pressed="${selected ? "true" : "false"}" title="${disabled ? "Gere uma foto em Personagens" : escapeHtml(item.name)}">
+          const disabled = !characterHero(item);
+          return `<button type="button" class="movies-cast-option${selected ? " is-active" : ""}" data-character-id="${escapeHtml(item.id)}" ${disabled ? "disabled" : ""} aria-pressed="${selected ? "true" : "false"}" title="${disabled ? "Gere uma foto em Personagens" : `Escolher foto de ${escapeHtml(item.name)}`}">
             ${
               src
                 ? `<img src="${escapeHtml(src)}" alt="" />`
@@ -352,7 +381,11 @@ function defaultProduceRun(): ProduceRun {
     duration: "8s",
     resolution: "360p",
     characterId: "",
+    characterAssetId: "",
     videoHookId: "",
+    useBrandIdentity: false,
+    useBrandLogo: false,
+    logoAppearance: "",
   };
 }
 
@@ -438,6 +471,7 @@ export function initContentPlanModal(
   let produceRun: ProduceRun = defaultProduceRun();
   let produceEstimateMode: "create" | "regen" = "create";
   let produceBreakTakeCount = 3;
+  let produceBrand: BrandIdentity | null = null;
   let produceCharacters: CreativeCharacter[] | null = null;
   let produceVideoHooks: ProduceVideoHook[] | null = null;
   let imageCatalog: { defaultModelId?: string; models: ImageModelDefinition[] } | null = null;
@@ -479,6 +513,19 @@ export function initContentPlanModal(
           <div data-cp-hooks-list></div>
         </div>
       </div>
+      <div class="videos-picker content-plan-character-modal" data-cp-character-modal hidden>
+        <div class="videos-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="content-plan-character-title">
+          <header>
+            <h3 id="content-plan-character-title">Escolha a foto do personagem</h3>
+            <button type="button" data-cp-character-close>Fechar</button>
+          </header>
+          <p class="movies-hint" data-cp-character-status></p>
+          <div class="videos-picker-grid" data-cp-character-grid></div>
+          <p class="movies-toolbar">
+            <button type="button" class="outline danger" data-cp-character-remove hidden>Remover personagem</button>
+          </p>
+        </div>
+      </div>
     </div>
   `;
 
@@ -514,6 +561,7 @@ export function initContentPlanModal(
     produceCharacters = null;
     produceVideoHooks = null;
     closeProduceHooks();
+    closeProduceCharacterPicker();
     status.textContent = "";
   }
 
@@ -1001,11 +1049,20 @@ export function initContentPlanModal(
       paintProduceList(draft);
       return;
     }
-    if (produceView === "preview" || item.status === "created" || item.status === "scheduled") {
-      paintProducePreview(draft, item);
-      return;
-    }
-    paintProduceCreate(draft, item);
+    void ensureProduceBrand().then(() => {
+      if (!draft) return;
+      const current = findProduceItem(draft, produceItemId);
+      if (!current || isDroppedItem(current)) return;
+      if (
+        produceView === "preview" ||
+        current.status === "created" ||
+        current.status === "scheduled"
+      ) {
+        paintProducePreview(draft, current);
+        return;
+      }
+      paintProduceCreate(draft, current);
+    });
   }
 
   function paintProduceSelect(plan: ContentPlan) {
@@ -1106,10 +1163,20 @@ export function initContentPlanModal(
       resolution: produceRun.resolution,
       slides: (item.structure || []).length || undefined,
       ...(tool === "video" && produceRun.characterId
-        ? { characterId: produceRun.characterId }
+        ? {
+            characterId: produceRun.characterId,
+            ...(produceRun.characterAssetId
+              ? { characterAssetId: produceRun.characterAssetId }
+              : {}),
+          }
         : {}),
       ...(tool === "video" ? { videoHookId: produceRun.videoHookId || "" } : {}),
       ...(tool === "video" && nextTake ? { takeId: nextTake } : {}),
+      ...produceBrandPayload({
+        useBrandIdentity: produceRun.useBrandIdentity,
+        useBrandLogo: produceRun.useBrandLogo,
+        logoAppearance: produceRun.logoAppearance,
+      }),
     };
   }
 
@@ -1218,6 +1285,28 @@ export function initContentPlanModal(
       }
     } catch {
       llmLive = [];
+    }
+    await ensureProduceBrand();
+  }
+
+  let produceBrandDefaultsApplied = false;
+
+  async function ensureProduceBrand() {
+    if (!leadId) return;
+    if (produceBrand == null) {
+      try {
+        const res = await api(profileApi(kind, leadId, "/brand-identity"));
+        produceBrand = res.ok ? ((await res.json()) as BrandIdentity) : {};
+      } catch {
+        produceBrand = {};
+      }
+    }
+    if (!produceBrandDefaultsApplied) {
+      const flags = defaultProduceBrandFlags(produceBrand);
+      produceRun.useBrandIdentity = flags.useBrandIdentity;
+      produceRun.useBrandLogo = false;
+      produceRun.logoAppearance = DEFAULT_LOGO_APPEARANCE;
+      produceBrandDefaultsApplied = true;
     }
   }
 
@@ -1334,6 +1423,28 @@ export function initContentPlanModal(
       const value = Number((event.target as HTMLSelectElement).value);
       if (Number.isFinite(value)) produceBreakTakeCount = value;
     });
+    body.querySelector<HTMLInputElement>("[data-cp-use-brand-identity]")?.addEventListener("change", (event) => {
+      produceRun.useBrandIdentity = (event.target as HTMLInputElement).checked;
+      void refreshProduceEstimate(item);
+    });
+    const logoToggle = body.querySelector<HTMLInputElement>("[data-cp-use-brand-logo]");
+    const appearanceWrap = body.querySelector<HTMLElement>("[data-cp-logo-appearance-wrap]");
+    const appearanceInput = body.querySelector<HTMLTextAreaElement>("[data-cp-logo-appearance]");
+    logoToggle?.addEventListener("change", (event) => {
+      produceRun.useBrandLogo = (event.target as HTMLInputElement).checked;
+      if (appearanceWrap) appearanceWrap.hidden = !produceRun.useBrandLogo;
+      if (produceRun.useBrandLogo && appearanceInput && !appearanceInput.value.trim()) {
+        appearanceInput.value = DEFAULT_LOGO_APPEARANCE;
+        produceRun.logoAppearance = appearanceInput.value;
+      }
+      void refreshProduceEstimate(item);
+    });
+    appearanceInput?.addEventListener("change", () => {
+      produceRun.logoAppearance = appearanceInput.value;
+    });
+    appearanceInput?.addEventListener("input", () => {
+      produceRun.logoAppearance = appearanceInput.value;
+    });
     body.querySelectorAll<HTMLButtonElement>("[data-cp-settings-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const tab = btn.dataset.cpSettingsTab;
@@ -1411,9 +1522,43 @@ export function initContentPlanModal(
         ${llmPane}
         ${runPane}
         ${planPane}
+        ${paintProduceBrand()}
         ${estimate}
       </aside>
     `;
+  }
+
+  function paintProduceBrand(): string {
+    const hasLogo = Boolean(produceBrand?.logoImageId);
+    const showAppearance = hasLogo && produceRun.useBrandLogo;
+    const appearance = produceRun.logoAppearance || DEFAULT_LOGO_APPEARANCE;
+    return `<div class="content-plan-brand">
+      <label class="content-plan-brand-check">
+        <input type="checkbox" data-cp-use-brand-identity ${
+          produceRun.useBrandIdentity ? "checked" : ""
+        } />
+        Usar identidade
+      </label>
+      <label class="content-plan-brand-check">
+        <input type="checkbox" data-cp-use-brand-logo ${
+          produceRun.useBrandLogo ? "checked" : ""
+        } ${hasLogo ? "" : "disabled"} />
+        Usar logo
+      </label>
+      ${
+        hasLogo
+          ? ""
+          : `<p class="meta">Configure o logo em Identidade da marca.</p>`
+      }
+      ${
+        hasLogo
+          ? `<label data-cp-logo-appearance-wrap ${showAppearance ? "" : "hidden"}>
+        Como o logo aparece
+        <textarea data-cp-logo-appearance rows="2" maxlength="400" placeholder="${escapeHtml(DEFAULT_LOGO_APPEARANCE)}">${escapeHtml(appearance)}</textarea>
+      </label>`
+          : ""
+      }
+    </div>`;
   }
 
   function paintProduceBreak(): string {
@@ -1596,6 +1741,7 @@ export function initContentPlanModal(
     const tool = toolForFormat(item.format || "");
     if (tool === "video" && !produceRun.characterId && item.characterId) {
       produceRun.characterId = item.characterId;
+      produceRun.characterAssetId = item.characterAssetId || "";
     }
     if (tool === "video" && !produceRun.videoHookId && item.videoHookId) {
       produceRun.videoHookId = item.videoHookId;
@@ -1661,14 +1807,80 @@ export function initContentPlanModal(
     if (!box) return;
     box.innerHTML = `
       <p class="content-plan-legend">Personagem</p>
-      ${produceCharacterPickerHtml(produceCharacters || [], produceRun.characterId)}
+      ${produceCharacterPickerHtml(
+        produceCharacters || [],
+        produceRun.characterId,
+        produceRun.characterAssetId,
+      )}
     `;
     box.querySelectorAll<HTMLButtonElement>("[data-character-id]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        produceRun.characterId = btn.dataset.characterId || "";
-        paintProduceCharacterPicker();
+        const id = btn.dataset.characterId || "";
+        if (!id) {
+          produceRun.characterId = "";
+          produceRun.characterAssetId = "";
+          paintProduceCharacterPicker();
+          return;
+        }
+        openProduceCharacterPicker(id);
       });
     });
+  }
+
+  function closeProduceCharacterPicker() {
+    const picker = modal.querySelector<HTMLElement>("[data-cp-character-modal]");
+    if (picker) picker.hidden = true;
+  }
+
+  function openProduceCharacterPicker(characterId: string) {
+    const character = (produceCharacters || []).find((item) => item.id === characterId);
+    if (!character) return;
+    const picker = modal.querySelector<HTMLElement>("[data-cp-character-modal]");
+    const title = modal.querySelector<HTMLElement>("#content-plan-character-title");
+    const statusEl = modal.querySelector<HTMLElement>("[data-cp-character-status]");
+    const grid = modal.querySelector<HTMLElement>("[data-cp-character-grid]");
+    const remove = modal.querySelector<HTMLButtonElement>("[data-cp-character-remove]");
+    if (!picker || !title || !statusEl || !grid || !remove) return;
+
+    const images = characterImageAssets(character);
+    const currentAssetId =
+      (produceRun.characterId === characterId ? produceRun.characterAssetId : "") ||
+      characterHero(character)?.id ||
+      "";
+    title.textContent = `Escolha a foto de ${character.name}`;
+    statusEl.textContent = images.length
+      ? "A imagem escolhida entra como quadro inicial do vídeo."
+      : "Este personagem ainda não tem imagens. Gere ou envie uma foto em Personagens.";
+    grid.innerHTML = images
+      .map((asset) => {
+        const src = previewSrcFromLocalPath(asset.localPath);
+        const selected = asset.id === currentAssetId;
+        return `<button type="button" class="videos-picker-card movies-character-image-option${selected ? " is-active" : ""}" data-cp-character-asset="${escapeHtml(asset.id || "")}" aria-pressed="${selected ? "true" : "false"}" aria-label="Usar ${escapeHtml(asset.filename || asset.kind || "foto")}">
+          ${src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(asset.filename || character.name)}" />` : ""}
+          <span>${escapeHtml(asset.filename || asset.kind || "foto")}</span>
+        </button>`;
+      })
+      .join("");
+    remove.hidden = produceRun.characterId !== characterId;
+    picker.hidden = false;
+    picker.dataset.characterId = characterId;
+  }
+
+  function applyProduceCharacterAsset(assetId: string) {
+    const picker = modal.querySelector<HTMLElement>("[data-cp-character-modal]");
+    const characterId = picker?.dataset.characterId || "";
+    if (!characterId || !assetId) return;
+    produceRun.characterId = characterId;
+    produceRun.characterAssetId = assetId;
+    closeProduceCharacterPicker();
+    paintProduceCharacterPicker();
+  }
+
+  function clearProduceCharacter() {
+    produceRun.characterId = "";
+    produceRun.characterAssetId = "";
+    closeProduceCharacterPicker();
+    paintProduceCharacterPicker();
   }
 
   async function loadProduceCharacters() {
@@ -1678,8 +1890,19 @@ export function initContentPlanModal(
         if (!res.ok) throw new Error("Não carregou os personagens");
         produceCharacters = (await res.json()) as CreativeCharacter[];
       }
-      if (produceRun.characterId && !(produceCharacters || []).some((item) => item.id === produceRun.characterId)) {
+      const selected = (produceCharacters || []).find(
+        (item) => item.id === produceRun.characterId,
+      );
+      if (produceRun.characterId && !selected) {
         produceRun.characterId = "";
+        produceRun.characterAssetId = "";
+      } else if (
+        produceRun.characterAssetId &&
+        !characterAssetById(selected, produceRun.characterAssetId)
+      ) {
+        produceRun.characterAssetId = characterHero(selected)?.id || "";
+      } else if (produceRun.characterId && !produceRun.characterAssetId) {
+        produceRun.characterAssetId = characterHero(selected)?.id || "";
       }
       paintProduceCharacterPicker();
     } catch (error) {
@@ -1697,6 +1920,7 @@ export function initContentPlanModal(
     const tool = toolForFormat(item.format || "");
     if (tool === "video" && !produceRun.characterId && item.characterId) {
       produceRun.characterId = item.characterId;
+      produceRun.characterAssetId = item.characterAssetId || "";
     }
     if (tool === "video" && !produceRun.videoHookId && item.videoHookId) {
       produceRun.videoHookId = item.videoHookId;
@@ -1902,6 +2126,10 @@ export function initContentPlanModal(
       !takeId
     ) {
       openProduce(draft, "preview", produceItemId);
+      return;
+    }
+    if (produceRun.useBrandLogo && !produceRun.logoAppearance.trim()) {
+      setStatus("Descreva como o logo aparece.");
       return;
     }
     busy = true;
@@ -2172,6 +2400,23 @@ export function initContentPlanModal(
       closeProduceHooks();
       return;
     }
+    if (node.closest("[data-cp-character-close]")) {
+      closeProduceCharacterPicker();
+      return;
+    }
+    if (node.matches("[data-cp-character-modal]")) {
+      closeProduceCharacterPicker();
+      return;
+    }
+    if (node.closest("[data-cp-character-remove]")) {
+      clearProduceCharacter();
+      return;
+    }
+    const characterAsset = node.closest("[data-cp-character-asset]") as HTMLElement | null;
+    if (characterAsset && characterAsset.closest("[data-cp-character-modal]")) {
+      applyProduceCharacterAsset(characterAsset.dataset.cpCharacterAsset || "");
+      return;
+    }
     const hookCard = node.closest("[data-cp-hook-id]") as HTMLElement | null;
     if (hookCard && hookCard.closest("[data-cp-hooks-modal]")) {
       applyProduceVideoHook(hookCard.dataset.cpHookId || "");
@@ -2320,6 +2565,9 @@ export function initContentPlanModal(
       formStep = 0;
       produceView = "select";
       produceItemId = null;
+      produceRun = defaultProduceRun();
+      produceBrand = null;
+      produceBrandDefaultsApplied = false;
       busy = false;
       setStatus("");
       modal.hidden = false;

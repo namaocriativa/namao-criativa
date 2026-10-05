@@ -4,6 +4,7 @@ export const PERSONAGENS_ID = "personagens";
 export const MOVIES_ID = "movies";
 export const INICIO_FIM_ID = "inicio-fim";
 export const UGC_SKILLS_ID = "ugc-skills";
+export const VIDEO_LIVRE_ID = "video-livre";
 export const PLAYGROUND_IMAGEM_ID = "playground-imagem";
 export const PLAYGROUND_VIDEO_ID = "playground-video";
 export const STATIC_INSTAGRAM_ID = "static-instagram";
@@ -75,9 +76,19 @@ export const CREATIVE_FEATURES: CreativeFeatureDefinition[] = [
   {
     id: PLAYGROUND_VIDEO_ID,
     kind: "video",
-    title: "Vídeo livre",
+    title: "Chat",
     description:
       "Chat com a LLM. O vídeo só é gerado depois que você revisar o prompt e confirmar.",
+    status: "ready",
+    composer: ["prompt"],
+    projectKind: "video",
+  },
+  {
+    id: VIDEO_LIVRE_ID,
+    kind: "video",
+    title: "Vídeo livre",
+    description:
+      "Briefing, LLM, personagem e hooks — gera um reel como na produção do planejamento.",
     status: "ready",
     composer: ["prompt"],
     projectKind: "video",

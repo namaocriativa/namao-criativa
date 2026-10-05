@@ -282,6 +282,29 @@ export interface CreativeUgcClip {
   character?: CreativeCharacter;
 }
 
+export interface CreativeVideoLivreClip {
+  id: string;
+  title?: string;
+  brief?: string;
+  prompt?: string;
+  characterId?: string | null;
+  characterAssetId?: string;
+  videoHookId?: string;
+  duration: string;
+  aspectRatio: string;
+  resolution?: string;
+  model?: string;
+  status: CreativeStartEndStatus;
+  error?: string;
+  videoProjectId?: string;
+  localPath?: string;
+  filename?: string;
+  mimeType?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  character?: CreativeCharacter;
+}
+
 export interface ImageAsset {
   id: string;
   projectId?: string;

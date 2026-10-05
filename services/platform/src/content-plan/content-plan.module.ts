@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { BrandIdentityModule } from '../brand-identity/brand-identity.module';
 import { CalendarModule } from '../calendar/calendar.module';
 import { CreativeStudioModule } from '../creative-studio/creative-studio.module';
 import { ImageStudioModule } from '../image-studio/image-studio.module';
@@ -18,6 +19,7 @@ import { ContentPlanService } from './content-plan.service';
     CreativeStudioModule,
     ImageStudioModule,
     VideoStudioModule,
+    BrandIdentityModule,
   ],
   controllers: [ContentPlanController],
   providers: [ContentPlanService],

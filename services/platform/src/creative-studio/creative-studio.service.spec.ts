@@ -259,6 +259,61 @@ describe('CreativeStudioService', () => {
     ]);
   });
 
+  it('inclui logo da marca em referenceAssetIds de cada slide', async () => {
+    llm.generateJson.mockImplementation(async (_prompt, validate) =>
+      validate({
+        caption: 'Salve',
+        slides: [
+          { role: 'cover', headline: 'Capa' },
+          { role: 'tip', headline: 'Meio' },
+        ],
+      }),
+    );
+    imageStudio.create.mockResolvedValue({ id: 'carousel-brand' });
+    imageStudio.update.mockResolvedValue({});
+    imageStudio.addReferences.mockResolvedValue([{ id: 'ref-logo' }]);
+    imageStudio.generate
+      .mockResolvedValueOnce({
+        assets: [{ id: 'slide-1', kind: 'generated' }],
+      })
+      .mockResolvedValueOnce({
+        assets: [{ id: 'slide-2', kind: 'generated' }],
+      });
+
+    await service.generateCarousel(
+      {
+        prompt: 'Carrossel com marca',
+        slideCount: 2,
+        brandReferences: [
+          {
+            buffer: Buffer.from('logo'),
+            originalname: 'logo.png',
+            mimetype: 'image/png',
+            size: 4,
+          },
+        ],
+      },
+      {
+        id: 'user-1',
+        email: 'a@b.c',
+        name: 'Ana',
+        role: 'ADMIN',
+        leadId: null,
+        customerId: null,
+        tenantId: 'tenant-1',
+      } as never,
+    );
+
+    expect(imageStudio.addReferences).toHaveBeenCalled();
+    expect(imageStudio.generate.mock.calls[0][1].referenceAssetIds).toEqual([
+      'ref-logo',
+    ]);
+    expect(imageStudio.generate.mock.calls[1][1].referenceAssetIds).toEqual([
+      'ref-logo',
+      'slide-1',
+    ]);
+  });
+
   it('mantém os slides já gerados se um generate falhar no meio', async () => {
     llm.generateJson.mockImplementation(async (_prompt, validate) =>
       validate({

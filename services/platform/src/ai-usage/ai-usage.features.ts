@@ -14,6 +14,7 @@ export const AI_FEATURES = {
   movieShot: 'movie_shot',
   ugc: 'ugc',
   startEnd: 'start_end',
+  videoLivre: 'video_livre',
   publicChat: 'public_chat',
   namaoChat: 'namao_chat',
   unattributed: 'unattributed',

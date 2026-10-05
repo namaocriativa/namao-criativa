@@ -29,13 +29,17 @@ describe('ContentPlanService', () => {
   const activity = { record: jest.fn() };
   const owners = { requireDetail: jest.fn() };
   const creativeStudio = { generateCarousel: jest.fn() };
-  const imageStudio = { create: jest.fn(), generate: jest.fn() };
+  const imageStudio = { create: jest.fn(), generate: jest.fn(), addReferences: jest.fn() };
   const videoStudio = { create: jest.fn(), generate: jest.fn(), addFrames: jest.fn() };
   const characters = { heroImageFile: jest.fn() };
   const calendar = {
     create: jest.fn(),
     attachStudioAsset: jest.fn(),
     schedule: jest.fn(),
+  };
+  const brandIdentity = {
+    get: jest.fn(),
+    resolveLogoFile: jest.fn(),
   };
   const user = { id: 'user-1', role: 'ADMIN', tenantId: 'tenant-1' };
   const service = new ContentPlanService(
@@ -49,6 +53,7 @@ describe('ContentPlanService', () => {
     videoStudio as never,
     characters as never,
     calendar as never,
+    brandIdentity as never,
   );
 
   beforeEach(() => {
@@ -917,5 +922,88 @@ describe('ContentPlanService', () => {
     expect(generatePrompt).toContain('Do NOT reproduce the famous office-chair');
     expect(plan.items[0].characterId).toBe('ch-1');
     expect(plan.items[0].videoHookId).toBe('stunt-cinematic');
+  });
+
+  it('injeta identidade e logo no carrossel quando as flags estão ligadas', async () => {
+    prisma.contentPlan.findFirst.mockResolvedValue(confirmedPlan);
+    brandIdentity.get.mockResolvedValue({
+      logoImageId: 'logo-1',
+      primaryColor: '#112233',
+      voice: 'direto',
+      logoAppearance: 'salvo',
+    });
+    brandIdentity.resolveLogoFile.mockResolvedValue({
+      buffer: Buffer.from('logo'),
+      originalname: 'logo.png',
+      mimetype: 'image/png',
+      size: 4,
+    });
+    creativeStudio.generateCarousel.mockResolvedValue({
+      projectId: 'img-brand',
+      assets: [{ id: 'asset-1', localPath: 'storage/image-projects/img-brand/a.png' }],
+    });
+    prisma.contentPlan.update.mockImplementation(async (args: { data: { items: unknown } }) => ({
+      ...confirmedPlan,
+      items: args.data.items,
+    }));
+    await runWithTenant('tenant-1', () =>
+      service.createItem('plan-1', 'cp-1', user as never, {
+        useBrandIdentity: true,
+        useBrandLogo: true,
+        logoAppearance: 'canto inferior direito, 8%',
+      }),
+    );
+    expect(creativeStudio.generateCarousel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringMatching(/Identidade da marca[\s\S]*#112233[\s\S]*canto inferior direito/),
+        brandReferences: [
+          expect.objectContaining({ originalname: 'logo.png' }),
+        ],
+      }),
+      user,
+    );
+  });
+
+  it('não anexa logo quando só a identidade está ligada', async () => {
+    prisma.contentPlan.findFirst.mockResolvedValue(confirmedPlan);
+    brandIdentity.get.mockResolvedValue({
+      logoImageId: 'logo-1',
+      primaryColor: '#445566',
+    });
+    creativeStudio.generateCarousel.mockResolvedValue({
+      projectId: 'img-2',
+      assets: [{ id: 'asset-1', localPath: 'storage/image-projects/img-2/a.png' }],
+    });
+    prisma.contentPlan.update.mockImplementation(async (args: { data: { items: unknown } }) => ({
+      ...confirmedPlan,
+      items: args.data.items,
+    }));
+    await runWithTenant('tenant-1', () =>
+      service.createItem('plan-1', 'cp-1', user as never, {
+        useBrandIdentity: true,
+        useBrandLogo: false,
+      }),
+    );
+    expect(brandIdentity.resolveLogoFile).not.toHaveBeenCalled();
+    expect(creativeStudio.generateCarousel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('#445566'),
+      }),
+      user,
+    );
+    expect(creativeStudio.generateCarousel.mock.calls[0][0].brandReferences).toBeUndefined();
+  });
+
+  it('exige aparência do logo quando Usar logo está ligado', async () => {
+    prisma.contentPlan.findFirst.mockResolvedValue(confirmedPlan);
+    brandIdentity.get.mockResolvedValue({ logoImageId: 'logo-1' });
+    await expect(
+      runWithTenant('tenant-1', () =>
+        service.createItem('plan-1', 'cp-1', user as never, {
+          useBrandLogo: true,
+          logoAppearance: '',
+        }),
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

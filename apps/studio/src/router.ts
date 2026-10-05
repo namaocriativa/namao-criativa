@@ -22,6 +22,8 @@ export type AppRoute =
   | { name: "imagens-project"; id: string }
   | { name: "videos" }
   | { name: "videos-project"; id: string }
+  | { name: "editor" }
+  | { name: "editor-project"; id: string }
   | { name: "config" }
   | { name: "users" }
   | { name: "user"; id: string }
@@ -108,6 +110,18 @@ export function parsePath(pathname: string): AppRoute {
       return { name: "not-found" };
     }
   }
+  if (path === "/editor") return { name: "editor" };
+  const editorProject = path.match(/^\/editor\/([^/]+)$/);
+  if (editorProject?.[1]) {
+    try {
+      return {
+        name: "editor-project",
+        id: decodeURIComponent(editorProject[1]),
+      };
+    } catch {
+      return { name: "not-found" };
+    }
+  }
   if (path === "/calendario") return { name: "calendar" };
   const calendarPost = path.match(/^\/calendario\/([^/]+)$/);
   if (calendarPost?.[1]) {
@@ -151,7 +165,7 @@ export function parsePath(pathname: string): AppRoute {
     }
   }
   const startEndSkill = path.match(
-    /^\/criativo\/habilidade\/(inicio-fim|ugc-skills)\/([^/]+)$/,
+    /^\/criativo\/habilidade\/(inicio-fim|ugc-skills|video-livre)\/([^/]+)$/,
   );
   if (startEndSkill?.[1] && startEndSkill[2]) {
     try {
@@ -235,6 +249,10 @@ export function hrefFor(route: AppRoute): string {
       return "/packages";
     case "package":
       return `/packages/${encodeURIComponent(route.id)}`;
+    case "editor":
+      return "/editor";
+    case "editor-project":
+      return `/editor/${encodeURIComponent(route.id)}`;
     case "calendar":
       return "/calendario";
     case "calendar-post":
@@ -314,6 +332,9 @@ export function tabForRoute(route: AppRoute): string {
       return "videos-studio";
     case "videos-project":
       return "videos-studio";
+    case "editor":
+    case "editor-project":
+      return "video-editor";
     case "config":
       return "config";
     case "users":
@@ -338,6 +359,9 @@ export function navRouteFor(route: AppRoute): string | null {
     return "customers";
   }
   if (route.name === "package") return "packages";
+  if (route.name === "editor" || route.name === "editor-project") {
+    return "editor";
+  }
   if (route.name === "calendar" || route.name === "calendar-post") {
     return "calendar";
   }
@@ -380,6 +404,10 @@ export function titleForRoute(route: AppRoute, leadName?: string): string {
       return `Pacotes · ${APP_TITLE}`;
     case "package":
       return `${leadName || "Pacote"} · ${APP_TITLE}`;
+    case "editor":
+      return `Editor de Vídeos · ${APP_TITLE}`;
+    case "editor-project":
+      return `${leadName || "Projeto"} · Editor · ${APP_TITLE}`;
     case "calendar":
       return `Calendário · ${APP_TITLE}`;
     case "calendar-post":
@@ -431,6 +459,10 @@ export function isCriativoGalleryRoute(route: AppRoute): boolean {
   return route.name === "criativo-gallery";
 }
 
+export function isVideoEditorRoute(route: AppRoute): boolean {
+  return route.name === "editor" || route.name === "editor-project";
+}
+
 export function currentRoute(): AppRoute {
   return parsePath(window.location.pathname);
 }
@@ -470,6 +502,9 @@ function sameRoute(a: AppRoute, b: AppRoute): boolean {
     return a.id === b.id;
   }
   if (a.name === "videos-project" && b.name === "videos-project") {
+    return a.id === b.id;
+  }
+  if (a.name === "editor-project" && b.name === "editor-project") {
     return a.id === b.id;
   }
   if (a.name === "user" && b.name === "user") return a.id === b.id;

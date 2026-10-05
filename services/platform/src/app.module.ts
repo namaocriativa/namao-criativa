@@ -31,6 +31,7 @@ import { NamaoChatModule } from './namao-chat/namao-chat.module';
 import { ImageStudioModule } from './image-studio/image-studio.module';
 import { VideoStudioModule } from './video-studio/video-studio.module';
 import { CreativeStudioModule } from './creative-studio/creative-studio.module';
+import { VideoEditModule } from './video-edit/video-edit.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { WebsiteProjectsModule } from './website-projects/website-projects.module';
 import { ProposalModule } from './proposal/proposal.module';
@@ -67,6 +68,7 @@ import { AiUsageModule } from './ai-usage/ai-usage.module';
     ImageStudioModule,
     VideoStudioModule,
     CreativeStudioModule,
+    VideoEditModule,
     CalendarModule,
     WebsiteProjectsModule,
     ProposalModule,

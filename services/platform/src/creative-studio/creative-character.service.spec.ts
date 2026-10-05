@@ -169,6 +169,33 @@ describe('CreativeCharacterService', () => {
     );
   });
 
+  it('faz upload de fotos de referência sem gerar retrato', async () => {
+    storage.saveCharacterAsset.mockResolvedValue({
+      localPath: 'storage/characters/char-1/ref2.jpg',
+      filename: 'ref2.jpg',
+      mimeType: 'image/jpeg',
+    });
+    prisma.creativeCharacterAsset.create.mockResolvedValue({});
+    await runWithTenant('tenant-1', () =>
+      service.uploadAssets('char-1', [
+        {
+          buffer: Buffer.from('face'),
+          originalname: 'face.jpg',
+          mimetype: 'image/jpeg',
+          size: 4,
+        },
+      ]),
+    );
+    expect(storage.saveCharacterAsset).toHaveBeenCalled();
+    expect(geminiImages.generate).not.toHaveBeenCalled();
+    expect(prisma.creativeCharacterAsset.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        characterId: 'char-1',
+        kind: CHARACTER_ASSET_KIND.UPLOAD,
+      }),
+    });
+  });
+
   it('recusa excluir personagem usado em UGC Skills', async () => {
     prisma.creativeUgcClip.count.mockResolvedValue(1);
     await expect(service.deleteById('char-1')).rejects.toBeInstanceOf(

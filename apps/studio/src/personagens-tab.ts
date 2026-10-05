@@ -155,10 +155,29 @@ export function initPersonagensTab(): {
     composerEl.querySelector("#personagens-cancel")?.addEventListener("click", () => {
       renderList();
     });
+    const filesInput = composerEl.querySelector(
+      "#personagens-files",
+    ) as HTMLInputElement | null;
+    filesInput?.addEventListener("change", () => syncCreateButton());
+    syncCreateButton();
     composerEl.querySelector("#personagens-create-form")?.addEventListener("submit", (event) => {
       event.preventDefault();
       void createCharacter();
     });
+  }
+
+  function hasCreateReferenceFiles() {
+    const files = (composerEl.querySelector("#personagens-files") as HTMLInputElement | null)
+      ?.files;
+    return Boolean(files && files.length > 0);
+  }
+
+  function syncCreateButton() {
+    const btn = composerEl.querySelector("#personagens-create-btn") as HTMLButtonElement | null;
+    if (!btn) return;
+    btn.textContent = hasCreateReferenceFiles()
+      ? "Criar personagem"
+      : "Criar e gerar retrato";
   }
 
   function renderDetail(character: CreativeCharacter) {
@@ -212,15 +231,22 @@ export function initPersonagensTab(): {
           }
         </div>
         <div class="personagens-gallery">
-          ${gallery || `<p class="criativo-empty">Ainda sem mídias. Gere o retrato abaixo.</p>`}
+          ${gallery || `<p class="criativo-empty">Ainda sem mídias. Envie uma referência ou gere o retrato abaixo.</p>`}
         </div>
         <form id="personagens-photo-form" class="criativo-flyer-form personagens-composer">
           <p class="criativo-field-label">Nova foto</p>
           <label>
+            Enviar fotos
+            <input id="personagens-photo-files" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+          </label>
+          <label>
             Cena ou ângulo
             <textarea id="personagens-photo-prompt" rows="3" placeholder="Vazio gera o retrato-mestre da ficha"></textarea>
           </label>
-          <button type="submit">Gerar foto</button>
+          <p class="personagens-toolbar">
+            <button type="button" class="outline" id="personagens-upload-btn" disabled>Enviar fotos</button>
+            <button type="submit" id="personagens-generate-btn">Gerar foto</button>
+          </p>
         </form>
         ${videoComposer}
       </div>
@@ -231,6 +257,20 @@ export function initPersonagensTab(): {
     });
     composerEl.querySelector("#personagens-delete")?.addEventListener("click", () => {
       void deleteCharacter(character.id);
+    });
+    const photoFiles = composerEl.querySelector(
+      "#personagens-photo-files",
+    ) as HTMLInputElement | null;
+    const uploadBtn = composerEl.querySelector(
+      "#personagens-upload-btn",
+    ) as HTMLButtonElement | null;
+    const syncUploadBtn = () => {
+      if (uploadBtn) uploadBtn.disabled = !photoFiles?.files?.length;
+    };
+    photoFiles?.addEventListener("change", syncUploadBtn);
+    syncUploadBtn();
+    uploadBtn?.addEventListener("click", () => {
+      void uploadPhotos(character.id);
     });
     composerEl.querySelector("#personagens-photo-form")?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -273,13 +313,18 @@ export function initPersonagensTab(): {
     busy = true;
     const btn = composerEl.querySelector("#personagens-create-btn") as HTMLButtonElement | null;
     if (btn) btn.disabled = true;
-    setStatus("Criando o personagem e gerando o retrato…");
+    const withRefs = Boolean(files && files.length > 0);
+    setStatus(
+      withRefs
+        ? "Criando o personagem com as referências…"
+        : "Criando o personagem e gerando o retrato…",
+    );
     try {
       const body = new FormData();
       body.set("name", name);
       body.set("appearance", appearance);
       if (personality) body.set("personality", personality);
-      body.set("generatePortrait", "true");
+      body.set("generatePortrait", withRefs ? "false" : "true");
       if (files) {
         for (const file of Array.from(files).slice(0, 8)) body.append("files", file);
       }
@@ -299,12 +344,59 @@ export function initPersonagensTab(): {
     }
   }
 
+  async function uploadPhotos(id: string) {
+    if (busy) return;
+    const input = composerEl.querySelector(
+      "#personagens-photo-files",
+    ) as HTMLInputElement | null;
+    const files = input?.files;
+    if (!files?.length) {
+      setStatus("Selecione ao menos uma foto", true);
+      return;
+    }
+    busy = true;
+    const uploadBtn = composerEl.querySelector(
+      "#personagens-upload-btn",
+    ) as HTMLButtonElement | null;
+    const generateBtn = composerEl.querySelector(
+      "#personagens-generate-btn",
+    ) as HTMLButtonElement | null;
+    if (uploadBtn) uploadBtn.disabled = true;
+    if (generateBtn) generateBtn.disabled = true;
+    setStatus(`Enviando ${files.length} foto(s)…`);
+    try {
+      const body = new FormData();
+      for (const file of Array.from(files).slice(0, 8)) body.append("files", file);
+      const res = await api(`/creative/characters/${encodeURIComponent(id)}/uploads`, {
+        method: "POST",
+        body,
+      });
+      if (!res.ok) throw new Error(await readError(res, "Falha ao enviar fotos"));
+      const next = (await res.json()) as CreativeCharacter;
+      setStatus("Fotos enviadas");
+      renderDetail(next);
+    } catch (error) {
+      setStatus(errorMessage(error, "Falha ao enviar fotos"), true);
+    } finally {
+      busy = false;
+      if (generateBtn) generateBtn.disabled = false;
+    }
+  }
+
   async function generatePhoto(id: string) {
     if (busy) return;
     const prompt = (
       composerEl.querySelector("#personagens-photo-prompt") as HTMLTextAreaElement | null
     )?.value.trim();
     busy = true;
+    const uploadBtn = composerEl.querySelector(
+      "#personagens-upload-btn",
+    ) as HTMLButtonElement | null;
+    const generateBtn = composerEl.querySelector(
+      "#personagens-generate-btn",
+    ) as HTMLButtonElement | null;
+    if (uploadBtn) uploadBtn.disabled = true;
+    if (generateBtn) generateBtn.disabled = true;
     setStatus("Gerando foto do personagem…");
     try {
       const res = await api(`/creative/characters/${encodeURIComponent(id)}/photos`, {
@@ -320,6 +412,11 @@ export function initPersonagensTab(): {
       setStatus(errorMessage(error, "Falha ao gerar foto"), true);
     } finally {
       busy = false;
+      if (generateBtn) generateBtn.disabled = false;
+      const input = composerEl.querySelector(
+        "#personagens-photo-files",
+      ) as HTMLInputElement | null;
+      if (uploadBtn) uploadBtn.disabled = !input?.files?.length;
     }
   }
 
@@ -365,7 +462,10 @@ export function initPersonagensTab(): {
   }
 
   function onRoute(route: AppRoute) {
-    if (route.name !== "criativo-skill" || route.id !== PERSONAGENS_ID) return;
+    if (route.name !== "criativo-skill" || route.id !== PERSONAGENS_ID) {
+      routeSeq += 1;
+      return;
+    }
     const seq = ++routeSeq;
     setStatus("");
     if (route.characterId) {

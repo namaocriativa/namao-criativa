@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { BrandIdentityModule } from '../brand-identity/brand-identity.module';
+import { ProfileCharacterModule } from '../profile-character/profile-character.module';
 import { LeadAccountModule } from '../lead-account/lead-account.module';
 import { LeadActivityModule } from '../lead-activity/lead-activity.module';
 import { LeadMailModule } from '../lead-mail/lead-mail.module';
@@ -13,6 +15,8 @@ import { LeadService } from './lead.service';
   imports: [
     AuthModule,
     StorageModule,
+    BrandIdentityModule,
+    ProfileCharacterModule,
     LeadAccountModule,
     LeadMailModule,
     LeadWhatsAppModule,

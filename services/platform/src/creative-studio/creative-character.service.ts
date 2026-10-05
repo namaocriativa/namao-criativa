@@ -126,6 +126,18 @@ export class CreativeCharacterService {
     return this.findById(character.id);
   }
 
+  async uploadAssets(id: string, files: CharacterUploadFile[]) {
+    await this.findById(id);
+    if (!files.length) {
+      throw new BadRequestException('Selecione ao menos uma foto');
+    }
+    if (files.length > MAX_UPLOADS) {
+      throw new BadRequestException(`Envie no máximo ${MAX_UPLOADS} fotos`);
+    }
+    await this.saveUploads(id, files);
+    return this.findById(id);
+  }
+
   async update(id: string, dto: UpdateCharacterDto) {
     const current = await this.findById(id);
     const name = dto.name?.trim() || current.name;

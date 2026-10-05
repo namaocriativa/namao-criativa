@@ -75,6 +75,8 @@ describe('ConvertToCustomerService', () => {
       rating: 4,
       reviewCount: 2,
       metadata: { k: 1 },
+      brandIdentity: { primaryColor: '#112233' },
+      characterId: 'ch-9',
       landingSlug: 'firma',
       landingStatus: 'built',
       publicSiteId: 'site-1',
@@ -100,6 +102,8 @@ describe('ConvertToCustomerService', () => {
       data: expect.objectContaining({
         id: 'lead-1',
         name: 'Firma',
+        characterId: 'ch-9',
+        brandIdentity: { primaryColor: '#112233' },
         landingSlug: 'firma',
         publicSiteId: 'site-1',
         fromPublicSignup: true,

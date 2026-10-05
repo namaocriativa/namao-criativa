@@ -76,6 +76,19 @@ export class CreativeCharacterController {
     return this.characters.generatePhoto(id, dto);
   }
 
+  @Post(':id/uploads')
+  @UseInterceptors(
+    FilesInterceptor('files', 8, {
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
+  uploadAssets(
+    @Param('id') id: string,
+    @UploadedFiles() files: CharacterUploadFile[],
+  ) {
+    return this.characters.uploadAssets(id, files ?? []);
+  }
+
   @Post(':id/videos')
   @StudioPermission(STUDIO_PERMISSION.VIDEOS)
   generateVideo(

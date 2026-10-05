@@ -811,6 +811,7 @@ export function initUgcSkillsTab(): {
         stopPoll();
         active = false;
       }
+      routeSeq += 1;
       return;
     }
     if (!active) {

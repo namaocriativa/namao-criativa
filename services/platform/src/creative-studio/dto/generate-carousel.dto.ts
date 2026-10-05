@@ -13,6 +13,13 @@ import {
   MIN_CAROUSEL_SLIDES,
 } from '../carousel-instagram.planner';
 
+export type CarouselBrandReferenceFile = {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+  size: number;
+};
+
 export class GenerateCarouselDto {
   @IsString()
   @MinLength(1)
@@ -45,4 +52,7 @@ export class GenerateCarouselDto {
   @IsString()
   @MaxLength(16)
   imageSize?: string;
+
+  /** Internal: brand logo files attached before slides (not from HTTP body). */
+  brandReferences?: CarouselBrandReferenceFile[];
 }

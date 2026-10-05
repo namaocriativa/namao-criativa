@@ -17,6 +17,8 @@ import { CreativeStartEndController } from './creative-start-end.controller';
 import { CreativeStartEndService } from './creative-start-end.service';
 import { CreativeUgcController } from './creative-ugc.controller';
 import { CreativeUgcService } from './creative-ugc.service';
+import { CreativeVideoLivreController } from './creative-video-livre.controller';
+import { CreativeVideoLivreService } from './creative-video-livre.service';
 import { CreativeStudioController } from './creative-studio.controller';
 import { CreativeStudioService } from './creative-studio.service';
 
@@ -36,6 +38,7 @@ import { CreativeStudioService } from './creative-studio.service';
     CreativeMovieController,
     CreativeStartEndController,
     CreativeUgcController,
+    CreativeVideoLivreController,
     CreativeAgentController,
   ],
   providers: [
@@ -44,6 +47,7 @@ import { CreativeStudioService } from './creative-studio.service';
     CreativeMovieService,
     CreativeStartEndService,
     CreativeUgcService,
+    CreativeVideoLivreService,
     CreativeToolGateway,
     CreativeAgentService,
   ],
@@ -53,6 +57,7 @@ import { CreativeStudioService } from './creative-studio.service';
     CreativeMovieService,
     CreativeStartEndService,
     CreativeUgcService,
+    CreativeVideoLivreService,
     CreativeAgentService,
   ],
 })

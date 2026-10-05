@@ -1,5 +1,21 @@
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
+
+function toOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  const text = String(value).trim().toLowerCase();
+  if (text === 'true' || text === '1' || text === 'on') return true;
+  if (text === 'false' || text === '0' || text === 'off') return false;
+  return undefined;
+}
 
 export class CreateContentPlanItemDto {
   @IsOptional()
@@ -57,4 +73,19 @@ export class CreateContentPlanItemDto {
   @IsInt()
   @Min(1)
   slides?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  useBrandIdentity?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  useBrandLogo?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  logoAppearance?: string;
 }

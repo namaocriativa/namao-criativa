@@ -262,8 +262,22 @@ export class CreativeStudioService {
     const assets: Array<{ id: string; localPath?: string }> = [];
     let lastGeneratedId: string | undefined;
     let error: string | undefined;
+    const brandRefIds: string[] = [];
+    if (dto.brandReferences?.length) {
+      const created = await this.imageStudio.addReferences(
+        project.id,
+        dto.brandReferences,
+      );
+      for (const asset of created) {
+        if (asset?.id) brandRefIds.push(asset.id);
+      }
+    }
     for (const slide of spec.slides) {
       try {
+        const referenceAssetIds = [
+          ...brandRefIds,
+          ...(lastGeneratedId ? [lastGeneratedId] : []),
+        ];
         const generated = await this.imageStudio.generate(project.id, {
           prompt: buildCarouselSlidePrompt(spec, slide, spec.slides.length),
           model: imageModel,
@@ -272,7 +286,7 @@ export class CreativeStudioService {
           temperature: 0.4,
           systemInstruction: CAROUSEL_SYSTEM_INSTRUCTION,
           googleSearch: false,
-          referenceAssetIds: lastGeneratedId ? [lastGeneratedId] : [],
+          referenceAssetIds,
         });
         const next = (generated.assets || []).find(
           (asset: { kind?: string; id?: string; localPath?: string }) =>

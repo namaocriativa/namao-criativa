@@ -8,6 +8,12 @@ import {
 } from '@nestjs/common';
 import type { JwtUser } from '../auth/identity';
 import { hasStudioPermission, STUDIO_PERMISSION } from '../auth/roles';
+import {
+  buildBrandIdentityPromptBlock,
+  hasUsefulBrandIdentity,
+  type BrandIdentity,
+} from '../brand-identity/brand-identity.contract';
+import { BrandIdentityService } from '../brand-identity/brand-identity.service';
 import { CalendarService } from '../calendar/calendar.service';
 import { CreativeCharacterService } from '../creative-studio/creative-character.service';
 import { CreativeStudioService } from '../creative-studio/creative-studio.service';
@@ -98,6 +104,7 @@ export class ContentPlanService {
     private readonly videoStudio: VideoStudioService,
     private readonly characters: CreativeCharacterService,
     private readonly calendar: CalendarService,
+    private readonly brandIdentity: BrandIdentityService,
   ) {}
 
   async open(user: JwtUser, leadId?: string, customerId?: string) {
@@ -422,7 +429,15 @@ export class ContentPlanService {
     if (!prompt.trim()) {
       throw new BadRequestException('A peça está sem briefing');
     }
-    const generated = await this.generateItemMedia(current, tool, prompt, user, dto);
+    const ownerId = row.leadId || row.customerId || '';
+    const generated = await this.generateItemMedia(
+      current,
+      tool,
+      prompt,
+      user,
+      dto,
+      ownerId,
+    );
     const characterId =
       tool === 'video' ? String(dto.characterId || '').trim() : '';
     const characterAssetId = characterId
@@ -657,22 +672,28 @@ export class ContentPlanService {
     prompt: string,
     user: JwtUser,
     dto: CreateContentPlanItemDto = {},
+    ownerId = '',
   ): Promise<{
     studioSource: ContentPlanStudioSource;
     studioProjectId: string;
     studioAssetIds: string[];
     previewUrls: string[];
   }> {
+    const brand = await this.resolveProduceBrand(ownerId, dto);
+    const productionPrompt = brand.promptBlock
+      ? `${prompt}\n\n${brand.promptBlock}`
+      : prompt;
     const studioSource = studioSourceForTool(tool);
     if (tool === 'carousel') {
       const generated = await this.creativeStudio.generateCarousel(
         {
-          prompt,
+          prompt: productionPrompt,
           notes: item.visualDirection,
           slideCount: clampSlideCount(dto.slides || item.structure?.length || undefined),
           planModel: dto.planModel,
           model: dto.imageModel,
           imageSize: dto.imageSize,
+          ...(brand.logoFile ? { brandReferences: [brand.logoFile] } : {}),
         },
         user,
       );
@@ -697,11 +718,19 @@ export class ContentPlanService {
         },
         user.id,
       );
+      let referenceAssetIds: string[] = [];
+      if (brand.logoFile) {
+        const created = await this.imageStudio.addReferences(project.id, [
+          brand.logoFile,
+        ]);
+        referenceAssetIds = created.map((asset) => asset.id).filter(Boolean);
+      }
       const generated = await this.imageStudio.generate(project.id, {
-        prompt,
+        prompt: productionPrompt,
         aspectRatio: '4:5',
         model: dto.imageModel,
         imageSize: dto.imageSize,
+        ...(referenceAssetIds.length ? { referenceAssetIds } : {}),
       });
       const media = previewMediaFromAssets(generated.assets || []);
       if (!media.studioAssetIds.length) {
@@ -727,20 +756,26 @@ export class ContentPlanService {
       project.id,
       dto.characterId,
       dto.characterAssetId,
-      prompt,
+      productionPrompt,
     );
+    let videoPrompt = attached.prompt;
+    let firstFrameAssetId = attached.firstFrameAssetId;
+    if (brand.logoFile && !firstFrameAssetId) {
+      const frames = await this.videoStudio.addFrames(project.id, 'first-frame', [
+        brand.logoFile,
+      ]);
+      firstFrameAssetId = frames[0]?.id;
+    }
     const videoHook = this.requireVideoHook(
       dto.videoHookId !== undefined ? dto.videoHookId : item.videoHookId,
     );
     const generated = await this.videoStudio.generate(project.id, {
-      prompt: applyVideoHookToPrompt(attached.prompt, videoHook),
+      prompt: applyVideoHookToPrompt(videoPrompt, videoHook),
       aspectRatio: '9:16',
       model: dto.videoModel,
       duration: dto.duration,
       resolution: dto.resolution,
-      ...(attached.firstFrameAssetId
-        ? { firstFrameAssetId: attached.firstFrameAssetId }
-        : {}),
+      ...(firstFrameAssetId ? { firstFrameAssetId } : {}),
     });
     const media = previewMediaFromAssets(generated.assets || []);
     if (!media.studioAssetIds.length) {
@@ -751,6 +786,59 @@ export class ContentPlanService {
       studioProjectId: project.id,
       ...media,
     };
+  }
+
+  private async resolveProduceBrand(
+    ownerId: string,
+    dto: CreateContentPlanItemDto,
+  ): Promise<{
+    identity: BrandIdentity;
+    promptBlock: string;
+    logoFile: Awaited<ReturnType<BrandIdentityService['resolveLogoFile']>>;
+  }> {
+    const empty = {
+      identity: {} as BrandIdentity,
+      promptBlock: '',
+      logoFile: null as Awaited<
+        ReturnType<BrandIdentityService['resolveLogoFile']>
+      >,
+    };
+    if (!ownerId) return empty;
+    const useBrandIdentity = dto.useBrandIdentity === true;
+    const useBrandLogo = dto.useBrandLogo === true;
+    if (!useBrandIdentity && !useBrandLogo) return empty;
+    let identity: BrandIdentity = {};
+    try {
+      identity = await this.brandIdentity.get(ownerId);
+    } catch {
+      identity = {};
+    }
+    if (useBrandLogo && !identity.logoImageId) {
+      throw new BadRequestException(
+        'Configure o logo na Identidade da marca antes de usar o logo',
+      );
+    }
+    if (useBrandLogo) {
+      const appearance = String(dto.logoAppearance || '').trim();
+      if (!appearance) {
+        throw new BadRequestException(
+          'Descreva como o logo aparece quando Usar logo está ligado',
+        );
+      }
+    }
+    const promptBlock = buildBrandIdentityPromptBlock(identity, {
+      useBrandIdentity:
+        useBrandIdentity && hasUsefulBrandIdentity(identity),
+      useBrandLogo,
+      logoAppearance: dto.logoAppearance,
+    });
+    const logoFile = useBrandLogo
+      ? await this.brandIdentity.resolveLogoFile(ownerId, identity.logoImageId)
+      : null;
+    if (useBrandLogo && !logoFile) {
+      throw new BadRequestException('Não foi possível carregar o logo da marca');
+    }
+    return { identity, promptBlock, logoFile };
   }
 
   private requireVideoHook(

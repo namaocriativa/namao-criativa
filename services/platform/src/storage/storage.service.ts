@@ -14,6 +14,13 @@ const MIME_EXTENSION: Record<string, string> = {
   'video/mp4': '.mp4',
   'video/webm': '.webm',
   'video/quicktime': '.mov',
+  'audio/mpeg': '.mp3',
+  'audio/mp3': '.mp3',
+  'audio/wav': '.wav',
+  'audio/x-wav': '.wav',
+  'audio/mp4': '.m4a',
+  'audio/aac': '.aac',
+  'audio/ogg': '.ogg',
 };
 
 export const UPLOAD_MIME_TYPES = [
@@ -59,6 +66,21 @@ export function extensionForVideo(
   return '.mp4';
 }
 
+export function extensionForMedia(
+  mimeType: string | null,
+  nameOrUrl: string,
+): string {
+  const mime = (mimeType || '').split(';')[0].trim().toLowerCase();
+  if (mime && MIME_EXTENSION[mime]) return MIME_EXTENSION[mime];
+  if (mime.startsWith('video/')) return extensionForVideo(mime, nameOrUrl);
+  if (mime.startsWith('image/')) return extensionForImage(mime, nameOrUrl);
+  const fromName = nameOrUrl.match(
+    /\.(mp4|webm|mov|mp3|wav|m4a|aac|ogg|png|jpe?g|webp|gif)(?:$|\?)/i,
+  );
+  if (fromName) return `.${fromName[1].toLowerCase().replace('jpeg', 'jpg')}`;
+  return '.bin';
+}
+
 export interface SavedImage {
   sourceUrl: string;
   localPath: string;
@@ -101,6 +123,7 @@ export class StorageService {
   private readonly startEndRoot = path.join(this.storageRoot, 'inicio-fim');
   private readonly ugcSkillsRoot = path.join(this.storageRoot, 'ugc-skills');
   private readonly calendarRoot = path.join(this.storageRoot, 'calendar');
+  private readonly videoEditsRoot = path.join(this.storageRoot, 'video-edits');
 
   async ensureLeadImagesDir(leadId: string): Promise<string> {
     const dir = path.join(this.leadsRoot, leadId, 'images');
@@ -158,6 +181,12 @@ export class StorageService {
 
   async ensureCalendarDir(postId: string): Promise<string> {
     const dir = path.join(this.calendarRoot, postId);
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
+  }
+
+  async ensureVideoEditDir(projectId: string): Promise<string> {
+    const dir = path.join(this.videoEditsRoot, projectId);
     await fs.mkdir(dir, { recursive: true });
     return dir;
   }
@@ -688,6 +717,41 @@ export class StorageService {
     } catch (error) {
       this.logger.warn(
         `Failed to remove storage for calendar post ${postId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async saveVideoEditAsset(
+    projectId: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string | null,
+    prefix = 'media',
+  ): Promise<SavedVideo> {
+    const dir = await this.ensureVideoEditDir(projectId);
+    const mime = (mimeType || '').split(';')[0].trim().toLowerCase();
+    const ext = extensionForMedia(mime, originalName);
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'media';
+    const filename = `${safePrefix}-${randomUUID()}${ext}`;
+    await fs.writeFile(path.join(dir, filename), buffer);
+    const localPath = path
+      .join('storage', 'video-edits', projectId, filename)
+      .replace(/\\/g, '/');
+    return {
+      sourceUrl: `upload://${filename}`,
+      localPath,
+      filename,
+      mimeType: mime || null,
+    };
+  }
+
+  async removeVideoEditDir(projectId: string): Promise<void> {
+    const dir = path.join(this.videoEditsRoot, projectId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove storage for video edit ${projectId}: ${(error as Error).message}`,
       );
     }
   }
