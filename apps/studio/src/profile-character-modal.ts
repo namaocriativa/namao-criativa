@@ -132,6 +132,11 @@ export function initProfileCharacterModal(
   }
 
   async function open(next: Lead) {
+    const id = next.id;
+    if (!id) {
+      setStatus("Perfil sem identificador", true);
+      return;
+    }
     lead = next;
     kind = entityKindOf(next);
     busy = false;
@@ -142,7 +147,7 @@ export function initProfileCharacterModal(
     renderList();
     try {
       const [linkedRes, listRes] = await Promise.all([
-        api(profileApi(kind, next.id, "/character")),
+        api(profileApi(kind, id, "/character")),
         api("/creative/characters"),
       ]);
       if (!listRes.ok) throw new Error(await readError(listRes, "Falha ao listar personagens"));
@@ -160,12 +165,13 @@ export function initProfileCharacterModal(
   }
 
   async function save() {
-    if (!lead || busy) return;
+    const id = lead?.id;
+    if (!id || busy) return;
     busy = true;
     saveBtn.disabled = true;
     setStatus("Salvando…");
     try {
-      const res = await api(profileApi(kind, lead.id, "/character"), {
+      const res = await api(profileApi(kind, id, "/character"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ characterId: selectedId || null }),
